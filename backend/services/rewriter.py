@@ -11,7 +11,7 @@ async def rewrite_sentence(sentence: str, dimension: str, severity: str) -> dict
     prompt = prompt_template.replace("{sentence}", sentence).replace("{dimension}", dimension).replace("{severity}", severity)
 
     try:
-        response = await call_llm(prompt)
+        response = await call_llm(prompt, task_type="rewrite")
         result = parse_llm_json(response, fallback=None)
         if result and "rewrites" in result:
             result.setdefault("original", sentence)

@@ -11,7 +11,7 @@ async def assess_risks(text: str) -> dict:
     prompt = prompt_template + text
 
     try:
-        response = await call_llm(prompt)
+        response = await call_llm(prompt, task_type="risk_assessment")
         return parse_llm_json(response, fallback={"dimensions": [], "risk_sentences": []})
     except Exception as e:
         logger.error("风险评估失败: %s", e)

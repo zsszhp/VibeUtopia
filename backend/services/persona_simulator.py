@@ -20,7 +20,7 @@ async def simulate_platform(text: str, platform: str) -> dict:
     prompt = prompt_template + text
 
     try:
-        response = await call_llm(prompt)
+        response = await call_llm(prompt, task_type="persona_simulation")
         result = parse_llm_json(response, fallback={"focus": "", "comment": "", "sentiment": "neutral", "reason": ""})
         result["platform"] = platform
         result["platform_name"] = PLATFORM_NAMES[platform]
