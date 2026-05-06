@@ -9,6 +9,7 @@ from backend.config import settings
 from backend.database import get_db
 from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction
 from backend.services.analyzer import run_analysis, MAX_TEXT_LENGTH
+from backend.services.video_extractor import extract_video_text
 
 router = APIRouter()
 
@@ -20,6 +21,44 @@ class AnalyzeRequest(BaseModel):
 class AnalyzeResponse(BaseModel):
     task_id: str
     status: str
+
+
+class VideoExtractRequest(BaseModel):
+    url: str = Field(..., description="视频链接(B站/抖音等)")
+
+
+class VideoAnalyzeRequest(BaseModel):
+    url: str = Field(..., description="视频链接(B站/抖音等)")
+
+
+@router.post("/extract-video")
+async def extract_video(req: VideoExtractRequest):
+    """从视频链接提取文案文本"""
+    result = await extract_video_text(req.url)
+    if result.get("error"):
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.post("/analyze-video", response_model=AnalyzeResponse)
+async def analyze_video(req: VideoAnalyzeRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """从视频链接提取文案并自动分析"""
+    extract_result = await extract_video_text(req.url)
+    if extract_result.get("error"):
+        raise HTTPException(status_code=400, detail=extract_result["error"])
+
+    text = extract_result.get("text", "")
+    if len(text.strip()) < 10:
+        raise HTTPException(status_code=400, detail="视频提取的文案太短，无法进行分析")
+
+    task_id = str(uuid.uuid4())
+    task = Task(id=task_id, text=text, status="processing", model=settings.DEEPSEEK_MODEL)
+    db.add(task)
+    db.commit()
+
+    background_tasks.add_task(run_analysis, task_id, text)
+
+    return AnalyzeResponse(task_id=task_id, status="processing")
 
 
 @router.post("/analyze", response_model=AnalyzeResponse)

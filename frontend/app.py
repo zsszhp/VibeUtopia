@@ -33,15 +33,58 @@ with st.sidebar:
         st.warning("后端未启动")
 
 # ---- 主区域: 输入 ----
-st.subheader("输入待评估文案")
-text_input = st.text_area("在此粘贴你的文案/脚本...", height=200, placeholder="输入至少10个字符的文案内容...")
+tab_text, tab_video = st.tabs(["📝 文案输入", "🎬 视频链接"])
 
-col1, col2 = st.columns([1, 5])
-with col1:
-    analyze_btn = st.button("🔍 开始评估", type="primary", use_container_width=True)
+with tab_text:
+    text_input = st.text_area("在此粘贴你的文案/脚本...", height=200, placeholder="输入至少10个字符的文案内容...", key="text_input")
+    analyze_text_btn = st.button("🔍 开始评估", type="primary", use_container_width=True)
 
-# ---- 提交分析 ----
-if analyze_btn:
+with tab_video:
+    video_url = st.text_input("视频链接", placeholder="粘贴B站/抖音等视频链接...", key="video_url")
+    col_extract, col_analyze = st.columns(2)
+    with col_extract:
+        extract_btn = st.button("📋 提取文案", use_container_width=True)
+    with col_analyze:
+        analyze_video_btn = st.button("🔍 提取并评估", type="primary", use_container_width=True)
+
+    # 提取文案展示
+    if extract_btn or analyze_video_btn:
+        if not video_url:
+            st.error("请输入视频链接")
+        else:
+            with st.spinner("正在提取视频文案..."):
+                try:
+                    resp = httpx.post(f"{API_BASE}/extract-video", json={"url": video_url}, timeout=30)
+                    if resp.status_code == 200:
+                        extract_data = resp.json()
+                        st.success(f"提取成功 (来源: {extract_data.get('source', '未知')})")
+                        st.markdown(f"**标题**: {extract_data.get('title', '')}")
+                        if extract_data.get("subtitles"):
+                            st.markdown(f"**字幕内容**:")
+                            st.text(extract_data["subtitles"][:2000])
+                        elif extract_data.get("description"):
+                            st.markdown(f"**简介内容**:")
+                            st.text(extract_data["description"][:2000])
+
+                        if analyze_video_btn:
+                            text_input = extract_data.get("text", "")
+                            if len(text_input.strip()) < 10:
+                                st.error("视频提取的文案太短，无法进行分析")
+                            else:
+                                resp = httpx.post(f"{API_BASE}/analyze", json={"text": text_input}, timeout=10)
+                                if resp.status_code == 200:
+                                    task_id = resp.json()["task_id"]
+                                    st.session_state["current_task"] = task_id
+                                    st.session_state.pop("analysis_result", None)
+                                else:
+                                    st.error(f"提交失败: {resp.text}")
+                    else:
+                        st.error(f"提取失败: {resp.text}")
+                except Exception as e:
+                    st.error(f"连接后端失败: {e}")
+
+# 文案分析提交
+if analyze_text_btn:
     if not text_input or len(text_input.strip()) < 10:
         st.error("请输入至少10个字符的文案")
     else:
