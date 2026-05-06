@@ -1,52 +1,39 @@
-# ===== 隐私与密钥 =====
-.env
-*.key
-*.pem
-
-# ===== 文档（私密/规划/接入文档） =====
-docs/接入文档.md
-docs/archive/
-
-# ===== Python 缓存 =====
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-*.pyo
-.mypy_cache/
-.ruff_cache/
+*.egg-info/
+dist/
+build/
+*.egg
 
-# ===== 虚拟环境 =====
+# 虚拟环境
 venv/
 .venv/
 env/
 
-# ===== 数据库与数据 =====
-data/*.db
-data/*.sqlite
-data/*.sqlite3
+# 环境变量 (包含 API Key)
+.env
 
-# ===== 日志 =====
-*.log
-logs/
+# 数据库
+data/
+*.db
+*.sqlite3
 
-# ===== 编辑器与IDE =====
+# IDE
 .idea/
 .vscode/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
+*.swp
+*.swo
+*~
+
+# 编辑器/AI 配置
 .comate/
 
-# ===== 系统文件 =====
+# 系统文件
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# ===== 前端构建产物 =====
-frontend/node_modules/
-frontend/dist/
-frontend/.nuxt/
-
-# ===== 图标资源（项目内部用） =====
-icon/
+# Streamlit
+.streamlit/secrets.toml

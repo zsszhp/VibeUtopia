@@ -64,7 +64,6 @@ VibeUtopia/
 ├── frontend/
 │   └── app.py              # Streamlit 前端
 ├── data/                   # 本地数据库（运行时生成，不上传）
-├── docs/                   # 项目文档
 ├── .env.example            # 环境变量模板
 ├── requirements.txt        # Python 依赖
 └── start.bat               # Windows 一键启动脚本

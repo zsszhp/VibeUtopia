@@ -1,20 +1,20 @@
 import json
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend.config import settings
 from backend.database import get_db
 from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction
-from backend.services.analyzer import run_analysis
+from backend.services.analyzer import run_analysis, MAX_TEXT_LENGTH
 
 router = APIRouter()
 
 
 class AnalyzeRequest(BaseModel):
-    text: str
+    text: str = Field(..., min_length=10, max_length=MAX_TEXT_LENGTH, description="待评估文案")
 
 
 class AnalyzeResponse(BaseModel):
@@ -23,8 +23,9 @@ class AnalyzeResponse(BaseModel):
 
 
 @router.post("/analyze", response_model=AnalyzeResponse)
-async def analyze(req: AnalyzeRequest, db: Session = Depends(get_db)):
-    if len(req.text.strip()) < 10:
+async def analyze(req: AnalyzeRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    stripped = req.text.strip()
+    if len(stripped) < 10:
         raise HTTPException(status_code=400, detail="文案内容至少需要10个字符")
 
     task_id = str(uuid.uuid4())
@@ -32,8 +33,7 @@ async def analyze(req: AnalyzeRequest, db: Session = Depends(get_db)):
     db.add(task)
     db.commit()
 
-    import asyncio
-    asyncio.create_task(run_analysis(task_id, req.text))
+    background_tasks.add_task(run_analysis, task_id, req.text)
 
     return AnalyzeResponse(task_id=task_id, status="processing")
 
@@ -50,6 +50,11 @@ async def get_result(task_id: str, db: Session = Depends(get_db)):
         summary = db.query(AnalysisSummary).filter(AnalysisSummary.task_id == task_id).first()
         risk_items = db.query(RiskItem).filter(RiskItem.task_id == task_id).all()
         reactions = db.query(PlatformReaction).filter(PlatformReaction.task_id == task_id).all()
+
+        if not summary:
+            result["status"] = "failed"
+            result["error"] = "分析结果数据缺失"
+            return result
 
         result["summary"] = {
             "overall_score": summary.overall_score,
@@ -81,8 +86,11 @@ async def get_result(task_id: str, db: Session = Depends(get_db)):
 
 @router.get("/history")
 async def get_history(skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
+    from sqlalchemy.orm import joinedload
+
     tasks = (
         db.query(Task)
+        .options(joinedload(Task.summary))
         .order_by(Task.created_at.desc())
         .offset(skip)
         .limit(limit)
@@ -94,13 +102,10 @@ async def get_history(skip: int = 0, limit: int = 20, db: Session = Depends(get_
             "task_id": t.id,
             "created_at": t.created_at.isoformat() if t.created_at else None,
             "status": t.status,
-            # 返回原始文案预览（前50字），方便历史列表识别
             "text_preview": (t.text[:50] + "...") if t.text and len(t.text) > 50 else t.text,
         }
-        if t.status == "completed":
-            summary = db.query(AnalysisSummary).filter(AnalysisSummary.task_id == t.id).first()
-            if summary:
-                item["overall_score"] = summary.overall_score
-                item["suggestion"] = summary.suggestion
+        if t.status == "completed" and t.summary:
+            item["overall_score"] = t.summary.overall_score
+            item["suggestion"] = t.summary.suggestion
         results.append(item)
     return results
