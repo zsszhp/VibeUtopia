@@ -38,7 +38,20 @@ tab_text, tab_video, tab_signal, tab_graph, tab_persona, tab_sim = st.tabs(["�
 
 with tab_text:
     text_input = st.text_area("在此粘贴你的文案/脚本...", height=200, placeholder="输入至少10个字符的文案内容...", key="text_input")
-    analyze_text_btn = st.button("🔍 开始评估", type="primary", use_container_width=True)
+
+    # V2.R1: 评估模式选择
+    st.markdown("**评估模式**")
+    col_mode1, col_mode2 = st.columns(2)
+    with col_mode1:
+        quick_btn = st.button("⚡ 快速评估 (MVP+信号增强)", type="primary", use_container_width=True, key="quick_eval")
+    with col_mode2:
+        deep_btn = st.button("🔬 深度评估 (仿真增强)", type="secondary", use_container_width=True, key="deep_eval")
+
+    # V2选项
+    with st.expander("高级选项", expanded=False):
+        enable_signal = st.checkbox("启用热点信号关联", value=True, key="enable_signal")
+        enable_entity_chain = st.checkbox("启用实体风险链", value=True, key="enable_entity_chain")
+        enable_simulation = st.checkbox("启用仿真增强(深度模式自动启用)", value=False, key="enable_simulation")
 
 with tab_video:
     video_url = st.text_input("视频链接", placeholder="粘贴B站/抖音等视频链接...", key="video_url")
@@ -84,33 +97,43 @@ with tab_video:
                 except Exception as e:
                     st.error(f"连接后端失败: {e}")
 
-# 文案分析提交
-if analyze_text_btn:
+# 文案分析提交 (V2.R1: 支持quick/deep模式)
+if quick_btn or deep_btn:
     if not text_input or len(text_input.strip()) < 10:
         st.error("请输入至少10个字符的文案")
     else:
-        with st.spinner("正在提交分析..."):
+        mode = "deep" if deep_btn else "quick"
+        with st.spinner(f"正在提交{('深度' if mode=='deep' else '快速')}评估..."):
             try:
-                resp = httpx.post(f"{API_BASE}/analyze", json={"text": text_input}, timeout=10)
+                resp = httpx.post(f"{API_BASE}/analyze/v2", json={
+                    "text": text_input,
+                    "mode": mode,
+                    "enable_signal": enable_signal,
+                    "enable_entity_chain": enable_entity_chain,
+                    "enable_simulation": enable_simulation or (mode == "deep"),
+                }, timeout=10)
                 if resp.status_code == 200:
                     task_id = resp.json()["task_id"]
                     st.session_state["current_task"] = task_id
+                    st.session_state["v2_mode"] = mode
                     st.session_state.pop("analysis_result", None)
                 else:
                     st.error(f"提交失败: {resp.text}")
             except Exception as e:
                 st.error(f"连接后端失败: {e}")
 
-# ---- 轮询结果 ----
+# ---- 轮询结果 (V2.R1: 支持V2 API轮询) ----
 task_id = st.session_state.get("current_task") or st.session_state.get("selected_task")
+v2_mode = st.session_state.get("v2_mode", "quick")
 
 if task_id and "analysis_result" not in st.session_state:
     progress_bar = st.progress(0, text="分析进行中...")
     result = None
-    for i in range(60):
-        progress_bar.progress(min(i / 60, 1.0), text=f"分析进行中... ({i * 2}s)")
+    max_wait = 120 if v2_mode == "deep" else 60  # deep模式等待更久
+    for i in range(max_wait):
+        progress_bar.progress(min(i / max_wait, 1.0), text=f"{'深度' if v2_mode=='deep' else '快速'}评估进行中... ({i * 2}s)")
         try:
-            resp = httpx.get(f"{API_BASE}/analyze/{task_id}", timeout=10)
+            resp = httpx.get(f"{API_BASE}/analyze/v2/{task_id}", timeout=10)
             if resp.status_code == 200:
                 data = resp.json()
                 if data["status"] == "completed":
@@ -341,6 +364,81 @@ if result:
                             with st.expander("内心推理"):
                                 st.markdown(reasoning)
                     st.markdown("---")
+
+    # V2.R1: 增强风控结果展示
+    v2_enhanced = result.get("v2_enhanced", {})
+    if v2_enhanced:
+        st.divider()
+        st.subheader("🔬 V2增强分析结果")
+
+        # V2 vs MVP分数对比
+        col_mvp, col_v2, col_conf = st.columns(3)
+        with col_mvp:
+            st.metric("MVP评估分", v2_enhanced.get("mvp_score", 0))
+        with col_v2:
+            v2_score = v2_enhanced.get("v2_score", 0)
+            delta = v2_score - v2_enhanced.get("mvp_score", 0)
+            st.metric("V2增强分", v2_score, delta=delta)
+        with col_conf:
+            confidence = v2_enhanced.get("confidence", 0)
+            conf_label = "高" if confidence >= 0.8 else ("中" if confidence >= 0.6 else "低")
+            st.metric("可信度", f"{confidence:.0%} ({conf_label})")
+
+        # 可信度来源
+        conf_sources = v2_enhanced.get("confidence_sources", {})
+        if conf_sources:
+            st.caption("可信度来源: " + " | ".join(f"{k}: {v}" for k, v in conf_sources.items()))
+
+        # 热点关联风险
+        signal_matches = v2_enhanced.get("signal_matches", [])
+        if signal_matches:
+            st.markdown("#### ⚠ 热点关联风险")
+            for sm in signal_matches:
+                risk_icon = "🔴" if sm.get("risk") == "high" else ("🟡" if sm.get("risk") == "medium" else "🟢")
+                st.markdown(
+                    f"{risk_icon} **{sm.get('title', '')}** — "
+                    f"关联度: {sm.get('relevance', 0):.0%}, 风险: {sm.get('risk', 'low')}"
+                )
+
+        # 实体风险链
+        entity_chains = v2_enhanced.get("entity_risk_chains", [])
+        if entity_chains:
+            st.markdown("#### 🔗 实体风险链")
+            for ec in entity_chains:
+                chain_path = " → ".join([ec.get("source", "")] + [p.get("name", "") for p in ec.get("path", [])])
+                risk_badge = "🔴" if ec.get("total_risk", 0) > 0.6 else ("🟡" if ec.get("total_risk", 0) > 0.3 else "🟢")
+                st.markdown(
+                    f"{risk_badge} **{chain_path}** — "
+                    f"风险分: {ec.get('total_risk', 0):.1f}, 维度: {', '.join(ec.get('dims', []))}"
+                )
+
+        # 动态权重调整
+        dyn_weights = v2_enhanced.get("dynamic_weights", {})
+        if dyn_weights:
+            st.markdown("#### ⚖ 动态权重调整")
+            for dim, weight in dyn_weights.items():
+                default_w = {"政治敏感": 1.5, "法律合规": 1.5, "民族宗教": 1.3, "性别议题": 1.0, "道德伦理": 1.0, "群体冒犯": 1.0, "时事踩雷": 1.0}.get(dim, 1.0)
+                if weight > default_w:
+                    st.markdown(f"🔺 **{dim}**: {default_w} → {weight} (提升)")
+
+        # 仿真摘要
+        sim_summary = v2_enhanced.get("simulation_summary", {})
+        if sim_summary and "error" not in sim_summary:
+            st.markdown("#### 🎭 仿真增强结果")
+            col_sim1, col_sim2 = st.columns(2)
+            with col_sim1:
+                propagation = sim_summary.get("propagation", {})
+                st.markdown(f"- 传播阶段: {propagation.get('stage_label', '未知')}")
+                st.markdown(f"- 传播动能: {propagation.get('kinetic', 0):.2f}")
+                st.markdown(f"- 覆盖人数: {propagation.get('reach_count', 0)}")
+            with col_sim2:
+                monitor = sim_summary.get("monitor", {})
+                if monitor:
+                    st.markdown(f"- 极化指数: {monitor.get('polarization_index', 0):.2f}")
+                    sentiment = monitor.get("sentiment_distribution", {})
+                    st.markdown(f"- 情感分布: 正面{sentiment.get('positive',0):.0%} / 负面{sentiment.get('negative',0):.0%}")
+
+            st.caption(f"分析耗时: {v2_enhanced.get('analysis_time', 0):.1f}s")
 
 # ---- 信号采集 Tab ----
 with tab_signal:
