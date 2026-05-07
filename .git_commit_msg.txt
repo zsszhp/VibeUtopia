@@ -1,1 +1,1 @@
-﻿feat: V2.4 social simulation - 5 platform simulators, ABC-tier agents, rule engine, decision engine, message bus, time model, 8 API endpoints, frontend tab, 3 test cases
+﻿chore: pre-restructure backup before test/architecture cleanup
