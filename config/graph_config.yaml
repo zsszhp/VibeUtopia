@@ -1,0 +1,20 @@
+graph:
+  neo4j:
+    uri: "bolt://localhost:7687"
+    user: "neo4j"
+    password: "vibeutopia2024"
+    database: "neo4j"
+
+  ontology:
+    use_llm: true
+    fallback_to_template: true
+    max_documents_for_ontology: 10
+
+  extraction:
+    chunk_size: 2000
+    max_entities_per_chunk: 20
+    max_relations_per_chunk: 30
+
+  visualization:
+    default_depth: 1
+    max_nodes: 100

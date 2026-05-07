@@ -16,6 +16,11 @@ from backend.services.signal.event_detector import EventDetector
 from backend.services.signal.keyword_extractor import KeywordExtractor
 from backend.services.signal.deep_crawler import DeepCrawler
 from backend.services.signal.models import SearchKeyword
+from backend.services.graph.models import EntityType, RelationType
+from backend.services.graph.graph_store import GraphStore
+from backend.services.graph.graph_updater import GraphUpdater
+from backend.services.graph.ontology_generator import generate_ontology, load_ontology
+from backend.services.graph.ontology_templates import get_default_ontology
 
 router = APIRouter()
 
@@ -346,3 +351,136 @@ async def control_scheduler(req: SchedulerRequest):
         return {"status": "stopped", "mode": "manual"}
     else:
         raise HTTPException(status_code=400, detail="action 必须是 start 或 stop")
+
+
+# ============ 知识图谱 API ============
+
+class OntologyGenerateRequest(BaseModel):
+    domain_description: str = Field(..., description="领域描述文本")
+
+
+class GraphExtractRequest(BaseModel):
+    event_id: str = Field("", description="种子事件ID（从DB获取事件详情后抽取）")
+    title: str = Field("", description="事件标题（手动提供时使用）")
+    description: str = Field("", description="事件描述")
+
+
+class GraphQueryRequest(BaseModel):
+    entity_id: str = Field("", description="中心实体ID")
+    depth: int = Field(2, ge=1, le=4, description="子图展开深度")
+    limit: int = Field(100, ge=1, le=500, description="返回节点上限")
+
+
+class GraphPathRequest(BaseModel):
+    from_id: str = Field(..., description="起始实体ID")
+    to_id: str = Field(..., description="目标实体ID")
+    max_depth: int = Field(5, ge=1, le=10, description="最大搜索深度")
+
+
+def _get_graph_store() -> GraphStore:
+    """获取 GraphStore 单例"""
+    from backend.main import graph_store
+    return graph_store
+
+
+@router.get("/graph/ontology")
+async def get_ontology():
+    """获取当前图谱本体定义"""
+    ontology = load_ontology()
+    return {
+        "entity_types": [
+            {"name": et.name, "description": et.description, "properties": et.properties}
+            for et in ontology.entity_types
+        ],
+        "relation_types": [
+            {"name": rt.name, "source": rt.source, "target": rt.target, "description": rt.description}
+            for rt in ontology.relation_types
+        ],
+    }
+
+
+@router.post("/graph/ontology/generate")
+async def generate_ontology_endpoint(req: OntologyGenerateRequest):
+    """根据领域描述动态生成本体"""
+    ontology = await generate_ontology(req.domain_description)
+    return {
+        "entity_types": [
+            {"name": et.name, "description": et.description, "properties": et.properties}
+            for et in ontology.entity_types
+        ],
+        "relation_types": [
+            {"name": rt.name, "source": rt.source, "target": rt.target, "description": rt.description}
+            for rt in ontology.relation_types
+        ],
+    }
+
+
+@router.post("/graph/extract")
+async def extract_entities(req: GraphExtractRequest, db: Session = Depends(get_db)):
+    """从事件中抽取实体和关系，存入图谱"""
+    store = _get_graph_store()
+    updater = GraphUpdater(store)
+
+    if req.event_id:
+        # 从数据库获取事件详情
+        record = db.query(SeedEventRecord).filter(SeedEventRecord.event_id == req.event_id).first()
+        if not record:
+            raise HTTPException(status_code=404, detail="种子事件不存在")
+        event_data = {
+            "event_id": record.event_id,
+            "title": record.title,
+            "description": record.description or "",
+            "comments": json.loads(record.comments_json) if record.comments_json else [],
+        }
+    elif req.title:
+        event_data = {
+            "event_id": str(uuid.uuid4()),
+            "title": req.title,
+            "description": req.description,
+            "comments": [],
+        }
+    else:
+        raise HTTPException(status_code=400, detail="请提供 event_id 或 title")
+
+    result = await updater.process_seed_event(event_data)
+    if not result:
+        return {"status": "no_extraction", "entities": 0, "relations": 0}
+
+    return {
+        "status": "completed",
+        "entities": [
+            {"entity_id": e.entity_id, "entity_type": e.entity_type, "name": e.name, "properties": e.properties}
+            for e in result.entities
+        ],
+        "relations": [
+            {"relation_type": r.relation_type, "source_id": r.source_id, "target_id": r.target_id, "weight": r.weight}
+            for r in result.relations
+        ],
+    }
+
+
+@router.get("/graph/entity/{entity_id}")
+async def get_graph_entity(entity_id: str):
+    """获取图谱实体详情"""
+    store = _get_graph_store()
+    entity = store.get_entity(entity_id)
+    if not entity:
+        raise HTTPException(status_code=404, detail="实体不存在")
+
+    relations = store.get_relations(entity_id)
+    return {"entity": entity, "relations": relations}
+
+
+@router.post("/graph/query")
+async def query_subgraph(req: GraphQueryRequest):
+    """查询以某实体为中心的子图"""
+    store = _get_graph_store()
+    subgraph = store.get_subgraph(req.entity_id, depth=req.depth, limit=req.limit)
+    return subgraph
+
+
+@router.get("/graph/stats")
+async def get_graph_stats():
+    """获取图谱统计信息"""
+    store = _get_graph_store()
+    return store.get_stats()

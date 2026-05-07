@@ -31,5 +31,14 @@ class Settings:
     )
     SIGNAL_DEFAULT_MODE: str = os.getenv("SIGNAL_DEFAULT_MODE", "standard")
 
+    # 知识图谱配置
+    GRAPH_CONFIG_PATH: str = os.getenv(
+        "GRAPH_CONFIG_PATH",
+        str(Path(__file__).parent.parent / "config" / "graph_config.yaml"),
+    )
+    NEO4J_URI: str = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    NEO4J_USER: str = os.getenv("NEO4J_USER", "neo4j")
+    NEO4J_PASSWORD: str = os.getenv("NEO4J_PASSWORD", "vibeutopia2024")
+
 
 settings = Settings()

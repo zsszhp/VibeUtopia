@@ -34,7 +34,7 @@ with st.sidebar:
         st.warning("后端未启动")
 
 # ---- 主区域: 输入 ----
-tab_text, tab_video, tab_signal = st.tabs(["📝 文案输入", "🎬 视频链接", "📡 信号采集"])
+tab_text, tab_video, tab_signal, tab_graph = st.tabs(["📝 文案输入", "🎬 视频链接", "📡 信号采集", "🕸 知识图谱"])
 
 with tab_text:
     text_input = st.text_area("在此粘贴你的文案/脚本...", height=200, placeholder="输入至少10个字符的文案内容...", key="text_input")
@@ -520,3 +520,176 @@ with tab_signal:
                     )
     else:
         st.info("暂无种子事件，请启动调度器并等待事件检测")
+
+# ---- 知识图谱 Tab ----
+with tab_graph:
+    st.subheader("🕸 知识图谱")
+
+    # 图谱统计
+    col_stats, col_action = st.columns([1, 1])
+
+    with col_stats:
+        st.markdown("**图谱状态**")
+        try:
+            resp = httpx.get(f"{API_BASE}/graph/stats", timeout=5)
+            if resp.status_code == 200:
+                stats = resp.json()
+                if stats.get("connected"):
+                    st.success(f"Neo4j 已连接 | 节点: {stats.get('node_count', 0)} | 关系: {stats.get('relation_count', 0)}")
+                    labels = stats.get("labels", [])
+                    if labels:
+                        st.caption(f"实体类型: {', '.join(labels)}")
+                else:
+                    st.warning("Neo4j 未连接，图谱功能不可用（需启动 Docker Neo4j 服务）")
+            else:
+                st.warning("图谱服务不可用")
+        except Exception:
+            st.warning("后端未启动")
+
+    with col_action:
+        st.markdown("**实体抽取**")
+        extract_title = st.text_input("事件标题", placeholder="输入事件标题进行实体抽取...", key="graph_extract_title")
+        extract_desc = st.text_area("事件描述", placeholder="可选：输入事件详细描述...", height=80, key="graph_extract_desc")
+
+        if st.button("🔍 抽取实体", type="primary", key="graph_extract_btn"):
+            if not extract_title:
+                st.error("请输入事件标题")
+            else:
+                with st.spinner("正在抽取实体和关系..."):
+                    try:
+                        resp = httpx.post(
+                            f"{API_BASE}/graph/extract",
+                            json={"title": extract_title, "description": extract_desc},
+                            timeout=60,
+                        )
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            entities = data.get("entities", [])
+                            relations = data.get("relations", [])
+                            st.success(f"抽取完成: {len(entities)} 个实体, {len(relations)} 个关系")
+
+                            if entities:
+                                import pandas as pd
+                                df = pd.DataFrame([
+                                    {"名称": e["name"], "类型": e["entity_type"], "ID": e["entity_id"][:8] + "..."}
+                                    for e in entities
+                                ])
+                                st.dataframe(df, use_container_width=True, hide_index=True)
+
+                            if relations:
+                                for r in relations:
+                                    st.markdown(f"- **{r['relation_type']}**: {r['source_id'][:8]}... → {r['target_id'][:8]}... (权重: {r['weight']:.2f})")
+                        else:
+                            st.error(f"抽取失败: {resp.text}")
+                    except Exception as e:
+                        st.error(f"连接失败: {e}")
+
+    # 本体查看
+    st.divider()
+    col_ont, col_query = st.columns([1, 1])
+
+    with col_ont:
+        st.markdown("**图谱本体**")
+        try:
+            resp = httpx.get(f"{API_BASE}/graph/ontology", timeout=5)
+            if resp.status_code == 200:
+                ontology = resp.json()
+                entity_types = ontology.get("entity_types", [])
+                relation_types = ontology.get("relation_types", [])
+
+                with st.expander(f"📋 实体类型 ({len(entity_types)})", expanded=True):
+                    for et in entity_types:
+                        props = ", ".join(et.get("properties", []))
+                        st.markdown(f"- **{et['name']}**: {et['description']} ({props})")
+
+                with st.expander(f"🔗 关系类型 ({len(relation_types)})", expanded=False):
+                    for rt in relation_types:
+                        st.markdown(f"- **{rt['name']}** ({rt['source']} → {rt['target']}): {rt['description']}")
+            else:
+                st.info("无法加载本体定义")
+        except Exception:
+            st.info("后端未启动")
+
+    with col_query:
+        st.markdown("**子图查询**")
+        query_entity_id = st.text_input("中心实体ID", placeholder="输入实体ID查询子图...", key="graph_query_id")
+        query_depth = st.slider("展开深度", 1, 4, 2, key="graph_query_depth")
+
+        if st.button("🔎 查询子图", key="graph_query_btn"):
+            if not query_entity_id:
+                st.error("请输入实体ID")
+            else:
+                with st.spinner("正在查询子图..."):
+                    try:
+                        resp = httpx.post(
+                            f"{API_BASE}/graph/query",
+                            json={"entity_id": query_entity_id, "depth": query_depth},
+                            timeout=15,
+                        )
+                        if resp.status_code == 200:
+                            subgraph = resp.json()
+                            nodes = subgraph.get("nodes", [])
+                            edges = subgraph.get("edges", [])
+                            st.success(f"查询完成: {len(nodes)} 个节点, {len(edges)} 条边")
+
+                            if nodes:
+                                import pandas as pd
+                                df = pd.DataFrame(nodes)
+                                st.dataframe(df, use_container_width=True, hide_index=True)
+                        else:
+                            st.error(f"查询失败: {resp.text}")
+                    except Exception as e:
+                        st.error(f"连接失败: {e}")
+
+    # 从种子事件批量构建图谱
+    st.divider()
+    st.markdown("**从种子事件构建图谱**")
+    col_events, col_build = st.columns([2, 1])
+
+    with col_events:
+        try:
+            resp = httpx.get(f"{API_BASE}/signals/events", params={"limit": 10, "status": "active"}, timeout=10)
+            if resp.status_code == 200:
+                events = resp.json().get("events", [])
+                if events:
+                    event_options = {e["event_id"]: e["title"] for e in events}
+                    selected_events = st.multiselect(
+                        "选择种子事件",
+                        options=list(event_options.keys()),
+                        format_func=lambda x: event_options[x][:50],
+                        key="graph_event_select",
+                    )
+                else:
+                    st.info("暂无活跃种子事件")
+                    selected_events = []
+            else:
+                selected_events = []
+        except Exception:
+            selected_events = []
+
+    with col_build:
+        if st.button("🔨 批量构建图谱", type="primary", key="graph_build_btn"):
+            if not selected_events:
+                st.error("请选择至少一个种子事件")
+            else:
+                progress = st.progress(0, text="正在构建图谱...")
+                total = len(selected_events)
+                success_count = 0
+
+                for i, event_id in enumerate(selected_events):
+                    try:
+                        resp = httpx.post(
+                            f"{API_BASE}/graph/extract",
+                            json={"event_id": event_id},
+                            timeout=60,
+                        )
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            if data.get("status") == "completed":
+                                success_count += 1
+                    except Exception:
+                        pass
+                    progress.progress((i + 1) / total, text=f"处理中... {i+1}/{total}")
+
+                progress.empty()
+                st.success(f"图谱构建完成: {success_count}/{total} 个事件处理成功")
