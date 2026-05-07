@@ -171,3 +171,37 @@ class SimulationStatus(Base):
     platform_snapshot_json = Column(Text, default="{}")
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow)
+
+
+class PropagationSnapshot(Base):
+    """传播快照 - 每个关键tick记录一次"""
+    __tablename__ = "propagation_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    simulation_id = Column(String, index=True)
+    tick = Column(Integer)
+    stage = Column(String)                     # seed/primary/community/polarization/mainstream/fading
+    propagation_kinetic = Column(Float, default=0.0)
+    polarization_index = Column(Float, default=0.0)
+    reach_count = Column(Integer, default=0)
+    depth = Column(Integer, default=0)
+    sentiment_distribution = Column(Text, default="{}")  # JSON: {positive, negative, neutral}
+    key_influencers = Column(Text, default="[]")         # JSON: [agent_id, ...]
+    snapshot_data = Column(Text, default="{}")           # JSON: 完整快照数据
+    created_at = Column(DateTime, default=utcnow)
+
+
+class PropagationEdge(Base):
+    """传播边 - 记录每条传播路径"""
+    __tablename__ = "propagation_edges"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    simulation_id = Column(String, index=True)
+    source_agent_id = Column(String, index=True)
+    target_agent_id = Column(String, index=True)
+    content_id = Column(String, index=True)
+    action_type = Column(String)
+    platform = Column(String)
+    tick = Column(Integer)
+    influence_score = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=utcnow)

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.config import settings
 from backend.database import get_db
-from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord, AgentRecord, SocialRelation, AgentMemory, SimulationRecord, SimulationStatus
+from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord, AgentRecord, SocialRelation, AgentMemory, SimulationRecord, SimulationStatus, PropagationSnapshot, PropagationEdge
 from backend.services.analyzer import run_analysis, MAX_TEXT_LENGTH
 from backend.services.video_extractor import extract_video_text
 from backend.services.signal.fetcher import HotlistFetcher
@@ -929,4 +929,211 @@ async def get_platform_snapshot(sim_id: str, platform: str):
                 return plat.get_snapshot()
         raise HTTPException(status_code=404, detail="平台快照不存在")
     return snapshot
+
+
+# ── V2.5 传播动力学 API ──────────────────────────────────
+
+@router.get("/simulation/{sim_id}/propagation")
+async def get_propagation(sim_id: str, db: Session = Depends(get_db)):
+    """获取传播树与传播统计数据"""
+    engine = _active_simulations.get(sim_id)
+
+    if engine:
+        # 从活跃引擎获取实时数据
+        spread_model = engine.spread_model
+        return {
+            "sim_id": sim_id,
+            "propagation_tree": spread_model.propagation_tree.to_dict(),
+            "current_stage": spread_model.current_stage.value,
+            "stage_label": __import__(
+                "backend.services.simulation.propagation.spread_model",
+                fromlist=["STAGE_LABELS"]
+            ).STAGE_LABELS.get(spread_model.current_stage, ""),
+            "kinetic_history": spread_model.kinetic_history[-30:],
+            "stage_history": spread_model.stage_history,
+            "summary": spread_model.get_summary(),
+        }
+
+    # 从DB查询历史数据
+    snapshots = db.query(PropagationSnapshot).filter(
+        PropagationSnapshot.simulation_id == sim_id
+    ).order_by(PropagationSnapshot.tick).all()
+
+    if not snapshots:
+        raise HTTPException(status_code=404, detail="传播数据不存在")
+
+    return {
+        "sim_id": sim_id,
+        "snapshots": [
+            {
+                "tick": s.tick,
+                "stage": s.stage,
+                "kinetic": s.propagation_kinetic,
+                "polarization": s.polarization_index,
+                "reach": s.reach_count,
+                "depth": s.depth,
+            }
+            for s in snapshots
+        ],
+        "edges_count": db.query(PropagationEdge).filter(
+            PropagationEdge.simulation_id == sim_id
+        ).count(),
+    }
+
+
+@router.get("/simulation/{sim_id}/polarization")
+async def get_polarization(sim_id: str, db: Session = Depends(get_db)):
+    """获取极化指数时间序列"""
+    engine = _active_simulations.get(sim_id)
+
+    if engine:
+        history = engine.spread_model.polarization_calc.get_history()
+        return {
+            "sim_id": sim_id,
+            "current_polarization": history[-1]["polarization_index"] if history else 0.0,
+            "trend": engine.spread_model.polarization_calc.get_trend(),
+            "history": history[-50:],
+        }
+
+    # 从DB查询
+    snapshots = db.query(PropagationSnapshot).filter(
+        PropagationSnapshot.simulation_id == sim_id
+    ).order_by(PropagationSnapshot.tick).all()
+
+    if not snapshots:
+        raise HTTPException(status_code=404, detail="极化数据不存在")
+
+    return {
+        "sim_id": sim_id,
+        "history": [
+            {"tick": s.tick, "polarization_index": s.polarization_index}
+            for s in snapshots
+        ],
+    }
+
+
+@router.get("/simulation/{sim_id}/kinetic")
+async def get_kinetic(sim_id: str, db: Session = Depends(get_db)):
+    """获取传播动能时间序列"""
+    engine = _active_simulations.get(sim_id)
+
+    if engine:
+        return {
+            "sim_id": sim_id,
+            "current_kinetic": engine.spread_model.prev_kinetic,
+            "history": engine.spread_model.kinetic_history[-50:],
+        }
+
+    # 从DB查询
+    snapshots = db.query(PropagationSnapshot).filter(
+        PropagationSnapshot.simulation_id == sim_id
+    ).order_by(PropagationSnapshot.tick).all()
+
+    if not snapshots:
+        raise HTTPException(status_code=404, detail="动能数据不存在")
+
+    return {
+        "sim_id": sim_id,
+        "history": [
+            {"tick": s.tick, "kinetic": s.propagation_kinetic}
+            for s in snapshots
+        ],
+    }
+
+
+@router.get("/simulation/{sim_id}/replay")
+async def get_replay_timeline(sim_id: str):
+    """获取回放时间轴"""
+    from backend.services.simulation.replay.timeline import ReplayTimeline
+    timeline = ReplayTimeline(sim_id)
+    data = await timeline.get_timeline()
+    return {"sim_id": sim_id, "timeline": data, "count": len(data)}
+
+
+@router.get("/simulation/{sim_id}/snapshot/{tick}")
+async def get_snapshot(sim_id: str, tick: int):
+    """获取指定tick的快照"""
+    from backend.services.simulation.replay.timeline import ReplayTimeline
+    timeline = ReplayTimeline(sim_id)
+    frame = await timeline.get_frame(tick)
+    if not frame:
+        raise HTTPException(status_code=404, detail=f"tick {tick} 的快照不存在")
+    return frame
+
+
+@router.get("/simulation/{sim_id}/diff")
+async def get_snapshot_diff(sim_id: str, tick1: int, tick2: int):
+    """对比两个时刻的快照差异"""
+    from backend.services.simulation.replay.timeline import ReplayTimeline
+    timeline = ReplayTimeline(sim_id)
+    diff = await timeline.get_diff(tick1, tick2)
+    return diff
+
+
+@router.get("/simulation/{sim_id}/monitor")
+async def get_monitor_report(sim_id: str):
+    """获取Watcher监控报告"""
+    engine = _active_simulations.get(sim_id)
+
+    if engine and engine._latest_monitor_report:
+        return {
+            "sim_id": sim_id,
+            "current_report": engine._latest_monitor_report.to_dict(),
+            "history": engine.watcher.get_report_history(10),
+        }
+
+    raise HTTPException(status_code=404, detail="监控报告不存在（仿真可能未运行或未到观察周期）")
+
+
+@router.get("/simulation/{sim_id}/interventions")
+async def get_interventions(sim_id: str):
+    """获取Guardian干预日志"""
+    engine = _active_simulations.get(sim_id)
+
+    if engine:
+        return {
+            "sim_id": sim_id,
+            "interventions": engine.guardian.get_intervention_log(50),
+        }
+
+    raise HTTPException(status_code=404, detail="仿真任务不存在")
+
+
+@router.get("/simulation/{sim_id}/influence-factors")
+async def get_influence_factors(sim_id: str, agent_id: str = None, platform: str = None):
+    """获取影响因素量化结果"""
+    engine = _active_simulations.get(sim_id)
+
+    if not engine:
+        raise HTTPException(status_code=404, detail="仿真任务不存在")
+
+    from backend.services.simulation.propagation.influence_quantifier import InfluenceQuantifier
+    quantifier = InfluenceQuantifier()
+
+    result = {"sim_id": sim_id}
+
+    # Agent因素
+    if agent_id:
+        agent = engine.agents.get(agent_id, {})
+        result["agent_factors"] = quantifier.quantify_agent_factors(agent)
+    else:
+        # 返回所有Agent的平均因素
+        if engine.agents:
+            sample_ids = list(engine.agents.keys())[:5]
+            agent_results = {}
+            for aid in sample_ids:
+                agent_results[aid] = quantifier.quantify_agent_factors(engine.agents[aid])
+            result["agent_factors_sample"] = agent_results
+
+    # 平台因素
+    if platform and platform in engine.platforms:
+        result["platform_factors"] = quantifier.quantify_platform_factors(platform)
+    else:
+        # 返回所有平台因素
+        result["platform_factors"] = {
+            pname: quantifier.quantify_platform_factors(pname)
+            for pname in engine.platforms.keys()
+        }
+
+    return result
 

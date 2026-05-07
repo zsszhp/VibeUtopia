@@ -1014,7 +1014,7 @@ with tab_sim:
             if resp.status_code == 200:
                 status = resp.json()
 
-                col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+                col_s1, col_s2, col_s3, col_s4, col_s5 = st.columns(5)
                 with col_s1:
                     st.metric("状态", status.get("status", "未知"))
                 with col_s2:
@@ -1023,10 +1023,208 @@ with tab_sim:
                     st.metric("仿真时间", status.get("sim_time", "-"))
                 with col_s4:
                     st.metric("Agent", f"B:{status.get('b_agents',0)} C:{status.get('c_agents',0)}")
+                with col_s5:
+                    prop = status.get("propagation", {})
+                    stage_label = prop.get("stage_label", "种子注入")
+                    st.metric("传播阶段", stage_label)
+
+                # V2.5 传播动力学面板
+                prop = status.get("propagation", {})
+                monitor = status.get("monitor", {})
+
+                if prop and any(v for v in prop.values() if isinstance(v, (int, float)) and v > 0):
+                    st.divider()
+                    st.markdown("#### 📊 传播动力学")
+
+                    # 传播阶段指示器
+                    stage = prop.get("stage", "seed")
+                    stage_labels = ["seed", "primary", "community", "polarization", "mainstream", "fading"]
+                    stage_names = ["种子注入", "初级传播", "社群扩散", "立场分化", "主流化", "消退"]
+                    stage_idx = stage_labels.index(stage) if stage in stage_labels else 0
+                    progress_val = stage_idx / max(len(stage_labels) - 1, 1)
+
+                    st.markdown(f"**传播阶段**: {' → '.join(stage_names[:stage_idx+1])}")
+                    st.progress(progress_val)
+
+                    # 关键指标
+                    col_k1, col_k2, col_k3, col_k4 = st.columns(4)
+                    with col_k1:
+                        st.metric("传播动能", f"{prop.get('kinetic', 0):.2f}")
+                    with col_k2:
+                        st.metric("覆盖人数", prop.get("reach_count", 0))
+                    with col_k3:
+                        st.metric("传播深度", prop.get("depth", 0))
+                    with col_k4:
+                        st.metric("传播节点", prop.get("total_nodes", 0))
+
+                    # 监控数据
+                    if monitor:
+                        col_m1, col_m2, col_m3 = st.columns(3)
+                        with col_m1:
+                            pol_idx = monitor.get("polarization_index", 0)
+                            pol_color = "🔴" if pol_idx > 0.6 else "🟠" if pol_idx > 0.4 else "🟢"
+                            st.metric(f"{pol_color} 极化指数", f"{pol_idx:.3f}")
+                        with col_m2:
+                            anom_count = monitor.get("anomaly_count", 0)
+                            anom_icon = "⚠️" if anom_count > 0 else "✅"
+                            st.metric(f"{anom_icon} 异常告警", anom_count)
+                        with col_m3:
+                            sent = monitor.get("sentiment_distribution", {})
+                            neg = sent.get("negative", 0)
+                            st.metric("负面情感", f"{neg:.1%}")
+
+                    # 传播动能 & 极化指数曲线
+                    st.divider()
+                    col_chart1, col_chart2 = st.columns(2)
+
+                    with col_chart1:
+                        st.markdown("**传播动能曲线**")
+                        try:
+                            k_resp = httpx.get(f"{API_BASE}/simulation/{current_sim_id}/kinetic", timeout=10)
+                            if k_resp.status_code == 200:
+                                k_data = k_resp.json()
+                                k_history = k_data.get("history", [])
+                                if k_history:
+                                    import pandas as pd
+                                    kdf = pd.DataFrame(k_history)
+                                    st.line_chart(kdf.set_index("tick")["kinetic"])
+                                else:
+                                    st.info("暂无动能数据")
+                        except Exception:
+                            st.info("动能数据加载中...")
+
+                    with col_chart2:
+                        st.markdown("**极化指数曲线**")
+                        try:
+                            p_resp = httpx.get(f"{API_BASE}/simulation/{current_sim_id}/polarization", timeout=10)
+                            if p_resp.status_code == 200:
+                                p_data = p_resp.json()
+                                p_history = p_data.get("history", [])
+                                if p_history:
+                                    import pandas as pd
+                                    pdf = pd.DataFrame(p_history)
+                                    st.line_chart(pdf.set_index("tick")["polarization_index"])
+                                else:
+                                    st.info("暂无极化数据")
+                        except Exception:
+                            st.info("极化数据加载中...")
+
+                    # 传播路径可视化 & 监控看板
+                    st.divider()
+                    col_vis, col_mon = st.columns(2)
+
+                    with col_vis:
+                        st.markdown("**传播路径 (Top影响者)**")
+                        try:
+                            pr_resp = httpx.get(f"{API_BASE}/simulation/{current_sim_id}/propagation", timeout=10)
+                            if pr_resp.status_code == 200:
+                                pr_data = pr_resp.json()
+                                tree_stats = pr_data.get("propagation_tree", {}).get("stats", {})
+                                influencers = tree_stats.get("top_influencers", [])
+                                if influencers:
+                                    import pandas as pd
+                                    inf_df = pd.DataFrame(influencers, columns=["Agent", "被传播次数"])
+                                    st.dataframe(inf_df, use_container_width=True, hide_index=True)
+                                else:
+                                    st.info("传播路径尚未形成")
+                        except Exception:
+                            st.info("传播数据加载中...")
+
+                    with col_mon:
+                        st.markdown("**监控看板**")
+                        try:
+                            m_resp = httpx.get(f"{API_BASE}/simulation/{current_sim_id}/monitor", timeout=10)
+                            if m_resp.status_code == 200:
+                                m_data = m_resp.json()
+                                report = m_data.get("current_report", {})
+                                anomalies = report.get("anomalies", [])
+                                if anomalies:
+                                    for a in anomalies[:5]:
+                                        sev = a.get("severity", "low")
+                                        icon = "🔴" if sev == "critical" else "🟠" if sev == "high" else "🟡" if sev == "medium" else "🟢"
+                                        st.markdown(f"{icon} **{a.get('type', '')}**: {a.get('description', '')}")
+                                else:
+                                    st.success("无异常告警")
+                        except Exception:
+                            st.info("监控数据加载中...")
+
+                    # Guardian干预日志
+                    try:
+                        i_resp = httpx.get(f"{API_BASE}/simulation/{current_sim_id}/interventions", timeout=10)
+                        if i_resp.status_code == 200:
+                            i_data = i_resp.json()
+                            interventions = i_data.get("interventions", [])
+                            if interventions:
+                                st.markdown("**Guardian干预日志**")
+                                import pandas as pd
+                                int_df = pd.DataFrame(interventions)
+                                st.dataframe(int_df, use_container_width=True, hide_index=True)
+                    except Exception:
+                        pass
+
+                    # 影响因素热力图
+                    st.divider()
+                    st.markdown("**平台影响因素**")
+                    try:
+                        f_resp = httpx.get(f"{API_BASE}/simulation/{current_sim_id}/influence-factors", timeout=10)
+                        if f_resp.status_code == 200:
+                            f_data = f_resp.json()
+                            plat_factors = f_data.get("platform_factors", {})
+                            if plat_factors:
+                                import pandas as pd
+                                rows = []
+                                for pname, factors in plat_factors.items():
+                                    row = {"平台": pname}
+                                    row.update(factors)
+                                    rows.append(row)
+                                fdf = pd.DataFrame(rows)
+                                st.dataframe(fdf, use_container_width=True, hide_index=True)
+                    except Exception:
+                        pass
+
+                    # 仿真回放
+                    st.divider()
+                    st.markdown("**仿真回放**")
+                    try:
+                        r_resp = httpx.get(f"{API_BASE}/simulation/{current_sim_id}/replay", timeout=10)
+                        if r_resp.status_code == 200:
+                            r_data = r_resp.json()
+                            replay_timeline = r_data.get("timeline", [])
+                            if replay_timeline and len(replay_timeline) > 1:
+                                replay_ticks = [f["tick"] for f in replay_timeline]
+                                selected_tick = st.select_slider(
+                                    "选择回放时刻",
+                                    options=replay_ticks,
+                                    key="replay_slider"
+                                )
+                                if selected_tick is not None:
+                                    try:
+                                        sn_resp = httpx.get(
+                                            f"{API_BASE}/simulation/{current_sim_id}/snapshot/{selected_tick}",
+                                            timeout=10,
+                                        )
+                                        if sn_resp.status_code == 200:
+                                            snap = sn_resp.json()
+                                            col_r1, col_r2, col_r3, col_r4 = st.columns(4)
+                                            with col_r1:
+                                                st.metric("传播阶段", snap.get("stage_label", snap.get("stage", "-")))
+                                            with col_r2:
+                                                st.metric("动能", f"{snap.get('kinetic', 0):.2f}")
+                                            with col_r3:
+                                                st.metric("极化", f"{snap.get('polarization', 0):.3f}")
+                                            with col_r4:
+                                                st.metric("覆盖", snap.get("reach", 0))
+                                    except Exception:
+                                        pass
+                            else:
+                                st.info("回放数据不足（需至少2个快照）")
+                    except Exception:
+                        pass
 
                 # 平台状态
                 platforms = status.get("platforms", {})
                 if platforms:
+                    st.divider()
                     st.markdown("**平台状态**")
                     import pandas as pd
                     plat_data = []
