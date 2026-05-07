@@ -1,0 +1,76 @@
+你是一个专业的人格生成专家。请基于以下人格原型模板，生成一个具体的、差异化的人格。
+
+【人格原型模板】
+{archetype_json}
+
+【生成要求】
+1. 基于模板参数生成具体的人格，但不要照搬，需要加入合理的个性变异
+2. 年龄、具体职业、地域等细节应具体化（如"27岁女性UI设计师，杭州"而非"20-30岁上班族"）
+3. 价值观维度的具体取值应在模板基础上±2的范围内浮动
+4. L7动态演化层应包含具体的近期事件（如"上周末被房东涨房租"而非"经济压力"）
+5. 各层之间应保持逻辑一致性（如高教育程度+高级认知水平+高媒体素养应匹配）
+
+请严格按照以下JSON格式输出（不要输出其他内容）：
+{
+  "persona_id": "自动生成的唯一ID（如bili_core_acg_001）",
+  "archetype_base": "原型ID",
+  "platform": "平台标识",
+  "L1_basic": {
+    "age": 27,
+    "gender": "female",
+    "occupation": "UI设计师",
+    "company_type": "互联网公司",
+    "region": "杭州",
+    "income": "12K/月",
+    "education": "本科-视觉传达",
+    "marital_status": "未婚",
+    "housing": "租房"
+  },
+  "L2_values": {
+    "political_tendency": 4.2,
+    "consumerism": 5.5,
+    "family_tradition": 3.8,
+    "social_justice": 6.5,
+    "tech_optimism": 6.0,
+    "value_statement": "一句话总结这个人的核心价值观"
+  },
+  "L3_knowledge": {
+    "professional_domains": ["设计", "互联网"],
+    "information_sources": ["B站", "Dribbble", "设计公众号"],
+    "cognitive_level": "高级",
+    "media_literacy": "中等",
+    "expertise_depth": "在某个领域有深度认知的具体描述",
+    "knowledge_blind_spots": "认知盲区描述"
+  },
+  "L4_behavior": {
+    "expression_style": "温和但有力",
+    "interaction_preference": "遇到感兴趣的话题才评论",
+    "content_preference": ["设计教程", "生活vlog", "科技新知"],
+    "active_hours": "22:00-01:00",
+    "posting_frequency": "偶尔发帖",
+    "comment_style": "简短有力，偶尔引用专业术语"
+  },
+  "L5_correction": {
+    "cultural_taboos": ["抄袭设计", "甲方无理要求"],
+    "sensitive_triggers": ["知识产权侵犯", "996加班文化"],
+    "avoided_topics": ["政治极端话题"],
+    "self_censorship": "中等—会斟酌措辞但不回避观点",
+    "trigger_response_pattern": "遇到敏感触发点时的典型反应模式描述"
+  },
+  "L6_social": {
+    "social_circles": ["设计师圈", "互联网打工人圈"],
+    "influence_level": "圈子内有小影响力",
+    "followed_kol_domains": ["设计", "科技"],
+    "social_activity": "中等—主要在专业圈活跃",
+    "online_identity": "网络上的身份定位描述",
+    "follower_count_range": "100-500"
+  },
+  "L7_evolution": {
+    "recent_experiences": ["上周末加班改方案到凌晨", "刚入手了一个新数位板"],
+    "emotional_baseline": "略焦虑",
+    "attitude_changes": ["对加班文化更加反感", "开始关注工作生活平衡"],
+    "memory_anchors": ["第一次作品被大V转发的成就感", "连续加班一周后的身心崩溃"],
+    "current_mood": "当下的情绪状态描述",
+    "recent_focus": "近期最关注的话题"
+  }
+}

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from backend.database import SessionLocal
 from backend.models import Task, RiskItem, PlatformReaction, AnalysisSummary
 from backend.services.text_splitter import split_text
-from backend.services.persona_simulator import simulate_platforms
+from backend.services.agent_simulator import simulate_all_platforms_with_agents
 from backend.services.risk_assessor import assess_risks
 from backend.services.rewriter import rewrite_sentence
 from backend.services.transcript_detector import detect_transcript_quality, is_noise_sentence
@@ -141,9 +141,9 @@ async def run_analysis(task_id: str, text: str):
             task_id, tq_level, transcript_quality.get("quality_score", 100),
         )
 
-        # 3. 并行执行平台人格模拟 + 风险评估（传入转写质量信息）
+        # 3. 并行执行Agent人格模拟 + 风险评估（传入转写质量信息）
         platform_results, risk_results = await asyncio.gather(
-            simulate_platforms(text),
+            simulate_all_platforms_with_agents(text),
             assess_risks(text, transcript_quality=transcript_quality),
         )
 
@@ -189,13 +189,20 @@ async def run_analysis(task_id: str, text: str):
 
         for pr in platform_results:
             positive, neutral, negative = _compute_sentiment_ratios(pr)
-            # 序列化 sub_reactions 到 reason 字段末尾
+            # 序列化 sub_reactions 和 agent_details 到 reason 字段
             reason = pr.get("reason", "")
             sub_reactions = pr.get("sub_reactions", [])
             if sub_reactions:
                 reason += "\n[群体分化] " + "; ".join(
                     f"{sr.get('group', '')}({sr.get('ratio', 0):.0%}): {sr.get('reaction', '')}"
                     for sr in sub_reactions
+                )
+            # agent_details 存入 reason
+            agent_details = pr.get("agent_details", [])
+            if agent_details:
+                reason += "\n[Agent反应] " + "; ".join(
+                    f"{ad.get('persona_name', '')}({ad.get('reaction_type', '')}): {ad.get('comment', '')[:60]}"
+                    for ad in agent_details
                 )
             db.add(PlatformReaction(
                 task_id=task_id,
@@ -205,6 +212,12 @@ async def run_analysis(task_id: str, text: str):
                 negative=negative,
                 reason=reason,
             ))
+
+        # 收集所有平台的agent_details
+        all_agent_details = []
+        for pr in platform_results:
+            for ad in pr.get("agent_details", []):
+                all_agent_details.append(ad)
 
         dimensions_dict = {d.get("name", ""): d.get("score", 0) for d in dimensions}
         db.add(AnalysisSummary(
@@ -216,6 +229,7 @@ async def run_analysis(task_id: str, text: str):
             transcript_quality=json.dumps(transcript_quality, ensure_ascii=False),
             dimension_weights=json.dumps(dimension_weights, ensure_ascii=False),
             cross_effects=json.dumps(all_cross_effects, ensure_ascii=False),
+            agents_json=json.dumps(all_agent_details, ensure_ascii=False) if all_agent_details else None,
         ))
 
         task = db.query(Task).filter(Task.id == task_id).first()

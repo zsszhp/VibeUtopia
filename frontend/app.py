@@ -158,6 +158,8 @@ if result:
     dimension_weights = summary.get("dimension_weights")
     cross_effects = summary.get("cross_effects", [])
 
+    agents = summary.get("agents", [])
+
     # 转写质量警告横幅（新增）
     if transcript_quality and transcript_quality.get("quality_level") not in ("clean", None):
         tq_level = transcript_quality.get("quality_level", "")
@@ -253,6 +255,11 @@ if result:
                             groups = line.replace("[群体分化] ", "").split("; ")
                             for g in groups:
                                 st.markdown(f"- {g.strip()}")
+                    elif line.startswith("[Agent反应]"):
+                        with st.expander("查看Agent个体反应"):
+                            agent_reactions = line.replace("[Agent反应] ", "").split("; ")
+                            for ar in agent_reactions:
+                                st.markdown(f"- {ar.strip()}")
 
     # 句子级风险高亮
     if risk_items:
@@ -292,3 +299,45 @@ if result:
                 for i, opt in enumerate(options, 1):
                     st.success(f"改写{i}: {opt}")
             st.markdown("---")
+
+    # Agent视角展示（新增）
+    if agents:
+        st.divider()
+        st.subheader("Agent视角洞察")
+        st.caption(f"共 {len(agents)} 个差异化Agent参与了本次模拟")
+
+        # 按平台分组展示
+        platform_names = {"bilibili": "B站", "xiaohongshu": "小红书", "zhihu": "知乎", "douyin": "抖音"}
+        platform_groups = {}
+        for agent in agents:
+            p = agent.get("platform", "unknown")
+            if p not in platform_groups:
+                platform_groups[p] = []
+            platform_groups[p].append(agent)
+
+        for platform_key, platform_agents in platform_groups.items():
+            p_name = platform_names.get(platform_key, platform_key)
+            with st.expander(f"📱 {p_name} — {len(platform_agents)}个Agent", expanded=False):
+                for agent in platform_agents:
+                    reaction_type = agent.get("reaction_type", "neutral")
+                    reaction_icon = "👍" if reaction_type == "positive" else ("😐" if reaction_type == "neutral" else "👎")
+                    intensity = agent.get("emotional_intensity", 0)
+                    persona_name = agent.get("persona_name", "匿名用户")
+                    archetype = agent.get("archetype", "")
+                    comment = agent.get("comment", "")
+                    focus = agent.get("focus", "")
+                    reasoning = agent.get("reasoning", "")
+
+                    col_icon, col_content = st.columns([1, 10])
+                    with col_icon:
+                        st.markdown(f"**{reaction_icon}**")
+                    with col_content:
+                        st.markdown(f"**{persona_name}** ({archetype}) — 情感强度: {intensity:.1f}")
+                        if comment:
+                            st.markdown(f"> {comment}")
+                        if focus:
+                            st.caption(f"关注点: {focus}")
+                        if reasoning:
+                            with st.expander("内心推理"):
+                                st.markdown(reasoning)
+                    st.markdown("---")

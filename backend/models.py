@@ -62,3 +62,4 @@ class AnalysisSummary(Base):
     transcript_quality = Column(Text, nullable=True)
     dimension_weights = Column(Text, nullable=True)
     cross_effects = Column(Text, nullable=True)
+    agents_json = Column(Text, nullable=True)

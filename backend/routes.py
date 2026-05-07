@@ -102,6 +102,7 @@ async def get_result(task_id: str, db: Session = Depends(get_db)):
             "transcript_quality": json.loads(summary.transcript_quality) if summary.transcript_quality else None,
             "dimension_weights": json.loads(summary.dimension_weights) if summary.dimension_weights else None,
             "cross_effects": json.loads(summary.cross_effects) if summary.cross_effects else [],
+            "agents": json.loads(summary.agents_json) if summary.agents_json else [],
         }
         result["risk_items"] = [
             {
