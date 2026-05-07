@@ -205,3 +205,23 @@ class PropagationEdge(Base):
     tick = Column(Integer)
     influence_score = Column(Float, default=0.0)
     created_at = Column(DateTime, default=utcnow)
+
+
+class V2AnalysisResult(Base):
+    """V2增强分析结果（V2.R1新增）"""
+    __tablename__ = "v2_analysis_results"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_id = Column(String, ForeignKey("tasks.id"), unique=True)
+    mode = Column(String, default="quick")             # quick / deep
+    mvp_score = Column(Integer, default=0)
+    v2_score = Column(Integer, default=0)
+    signal_matches = Column(Text, default="[]")         # JSON: 热点关联结果
+    entity_risk_chains = Column(Text, default="[]")     # JSON: 实体风险链
+    dynamic_weights = Column(Text, default="{}")        # JSON: 动态权重
+    simulation_id = Column(String, default="")          # 关联仿真ID
+    simulation_summary = Column(Text, default="{}")     # JSON: 仿真摘要
+    confidence = Column(Float, default=0.0)             # 可信度
+    confidence_sources = Column(Text, default="{}")     # JSON: 可信度来源
+    analysis_time = Column(Float, default=0.0)          # 分析耗时(秒)
+    created_at = Column(DateTime, default=utcnow)

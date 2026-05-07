@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.config import settings
 from backend.database import get_db
-from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord, AgentRecord, SocialRelation, AgentMemory, SimulationRecord, SimulationStatus, PropagationSnapshot, PropagationEdge
+from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord, AgentRecord, SocialRelation, AgentMemory, SimulationRecord, SimulationStatus, PropagationSnapshot, PropagationEdge, V2AnalysisResult
 from backend.services.analyzer import run_analysis, MAX_TEXT_LENGTH
 from backend.services.video_extractor import extract_video_text
 from backend.services.signal.fetcher import HotlistFetcher
@@ -139,6 +139,154 @@ async def get_result(task_id: str, db: Session = Depends(get_db)):
         result["rewrites"] = json.loads(summary.rewrites_json) if summary.rewrites_json else []
 
     return result
+
+
+# ── V2.R1 增强风控 API ──────────────────────────────────────
+
+
+class AnalyzeV2Request(BaseModel):
+    text: str = Field(..., min_length=10, max_length=MAX_TEXT_LENGTH, description="待评估文案")
+    mode: str = Field("quick", description="评估模式: quick(快速)/deep(深度仿真)")
+    enable_signal: bool = Field(True, description="启用热点信号关联")
+    enable_entity_chain: bool = Field(True, description="启用实体风险链")
+    enable_simulation: bool = Field(False, description="启用仿真增强(仅deep模式)")
+
+
+@router.post("/analyze/v2", response_model=AnalyzeResponse)
+async def analyze_v2(req: AnalyzeV2Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """V2仿真增强风控分析"""
+    stripped = req.text.strip()
+    if len(stripped) < 10:
+        raise HTTPException(status_code=400, detail="文案内容至少需要10个字符")
+
+    if req.mode not in ("quick", "deep"):
+        raise HTTPException(status_code=400, detail="mode必须为quick或deep")
+
+    task_id = str(uuid.uuid4())
+    task = Task(id=task_id, text=req.text, status="processing", model="v2-" + req.mode)
+    db.add(task)
+    db.commit()
+
+    from backend.services.enhanced_analyzer import run_enhanced_analysis
+    background_tasks.add_task(
+        run_enhanced_analysis,
+        task_id, req.text, req.mode,
+        req.enable_signal, req.enable_entity_chain, req.enable_simulation,
+    )
+
+    return AnalyzeResponse(task_id=task_id, status="processing")
+
+
+@router.get("/analyze/v2/{task_id}")
+async def get_v2_result(task_id: str, db: Session = Depends(get_db)):
+    """获取V2增强分析结果"""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    result = {"task_id": task.id, "status": task.status}
+
+    # MVP基础结果
+    if task.status == "completed":
+        summary = db.query(AnalysisSummary).filter(AnalysisSummary.task_id == task_id).first()
+        risk_items = db.query(RiskItem).filter(RiskItem.task_id == task_id).all()
+        reactions = db.query(PlatformReaction).filter(PlatformReaction.task_id == task_id).all()
+
+        if summary:
+            result["mvp_result"] = {
+                "overall_score": summary.overall_score,
+                "suggestion": summary.suggestion,
+                "dimensions": json.loads(summary.dimensions_json) if summary.dimensions_json else {},
+                "risk_items": [
+                    {"sentence": ri.sentence, "dimension": ri.dimension, "severity": ri.severity}
+                    for ri in risk_items
+                ],
+                "platform_reactions": {
+                    r.platform: {"positive": r.positive, "neutral": r.neutral, "negative": r.negative}
+                    for r in reactions
+                },
+                "rewrites": json.loads(summary.rewrites_json) if summary.rewrites_json else [],
+            }
+
+    # V2增强结果
+    v2_record = db.query(V2AnalysisResult).filter(V2AnalysisResult.task_id == task_id).first()
+    if v2_record:
+        result["v2_enhanced"] = {
+            "mode": v2_record.mode,
+            "mvp_score": v2_record.mvp_score,
+            "v2_score": v2_record.v2_score,
+            "signal_matches": json.loads(v2_record.signal_matches) if v2_record.signal_matches else [],
+            "entity_risk_chains": json.loads(v2_record.entity_risk_chains) if v2_record.entity_risk_chains else [],
+            "dynamic_weights": json.loads(v2_record.dynamic_weights) if v2_record.dynamic_weights else {},
+            "simulation_id": v2_record.simulation_id,
+            "simulation_summary": json.loads(v2_record.simulation_summary) if v2_record.simulation_summary else {},
+            "confidence": v2_record.confidence,
+            "confidence_sources": json.loads(v2_record.confidence_sources) if v2_record.confidence_sources else {},
+            "analysis_time": v2_record.analysis_time,
+        }
+
+    return result
+
+
+@router.get("/risk/context")
+async def get_risk_context(db: Session = Depends(get_db)):
+    """获取当前热点风险上下文"""
+    from datetime import datetime, timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=72)
+
+    recent_signals = (
+        db.query(SignalRecord)
+        .filter(SignalRecord.last_seen >= cutoff)
+        .order_by(SignalRecord.appearance_count.desc())
+        .limit(20)
+        .all()
+    )
+
+    active_events = (
+        db.query(SeedEventRecord)
+        .filter(SeedEventRecord.status == "active")
+        .order_by(SeedEventRecord.signal_strength.desc())
+        .limit(10)
+        .all()
+    )
+
+    return {
+        "recent_signals": [
+            {"title": s.title, "platform": s.source_platform, "count": s.appearance_count, "rank": s.rank}
+            for s in recent_signals
+        ],
+        "active_events": [
+            {"title": e.title, "category": e.category, "strength": e.signal_strength}
+            for e in active_events
+        ],
+        "total_signals": len(recent_signals),
+        "total_events": len(active_events),
+    }
+
+
+@router.get("/entities/{name}/risk-chain")
+async def get_entity_risk_chain(name: str):
+    """查询指定实体的风险链"""
+    from backend.services.entity_risk_chain import EntityRiskChain
+    chain_analyzer = EntityRiskChain()
+    result = await chain_analyzer.trace(name)
+    return {
+        "entity": name,
+        "entities": result.entities,
+        "chains": [
+            {
+                "source": c.source_entity,
+                "path": [{"name": p.entity_name, "type": p.entity_type, "risk": p.risk_level} for p in c.path],
+                "total_risk": c.total_risk_score,
+                "dimensions": c.risk_dimensions,
+                "description": c.description,
+            }
+            for c in result.chains
+        ],
+        "max_risk_score": result.max_risk_score,
+        "dimension_boosts": result.risk_dimension_boosts,
+        "summary": result.analysis_summary,
+    }
 
 
 @router.get("/history")
