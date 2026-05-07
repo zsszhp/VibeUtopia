@@ -34,6 +34,8 @@ class RiskItem(Base):
     dimension = Column(String)
     severity = Column(String)
     evidence = Column(Text)
+    affected_groups = Column(Text, nullable=True)
+    dimension_weight = Column(Float, nullable=True)
 
 
 class PlatformReaction(Base):
@@ -57,3 +59,6 @@ class AnalysisSummary(Base):
     suggestion = Column(String)
     dimensions_json = Column(Text)
     rewrites_json = Column(Text)
+    transcript_quality = Column(Text, nullable=True)
+    dimension_weights = Column(Text, nullable=True)
+    cross_effects = Column(Text, nullable=True)

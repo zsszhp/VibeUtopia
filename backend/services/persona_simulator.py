@@ -21,9 +21,15 @@ async def simulate_platform(text: str, platform: str) -> dict:
 
     try:
         response = await call_llm(prompt, task_type="persona_simulation")
-        result = parse_llm_json(response, fallback={"focus": "", "comment": "", "sentiment": "neutral", "reason": ""})
+        result = parse_llm_json(response, fallback={
+            "focus": "", "comment": "", "sentiment": "neutral", "reason": "",
+            "sub_reactions": [],
+        })
         result["platform"] = platform
         result["platform_name"] = PLATFORM_NAMES[platform]
+        # 确保 sub_reactions 存在
+        if "sub_reactions" not in result or not result["sub_reactions"]:
+            result["sub_reactions"] = []
         return result
     except Exception as e:
         logger.error("平台 %s 模拟失败: %s", platform, e)
@@ -34,6 +40,7 @@ async def simulate_platform(text: str, platform: str) -> dict:
             "comment": "",
             "sentiment": "neutral",
             "reason": f"模拟失败: {e}",
+            "sub_reactions": [],
         }
 
 

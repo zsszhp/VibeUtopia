@@ -99,6 +99,9 @@ async def get_result(task_id: str, db: Session = Depends(get_db)):
             "overall_score": summary.overall_score,
             "suggestion": summary.suggestion,
             "risk_dimensions": json.loads(summary.dimensions_json) if summary.dimensions_json else {},
+            "transcript_quality": json.loads(summary.transcript_quality) if summary.transcript_quality else None,
+            "dimension_weights": json.loads(summary.dimension_weights) if summary.dimension_weights else None,
+            "cross_effects": json.loads(summary.cross_effects) if summary.cross_effects else [],
         }
         result["risk_items"] = [
             {
@@ -106,6 +109,8 @@ async def get_result(task_id: str, db: Session = Depends(get_db)):
                 "dimension": r.dimension,
                 "severity": r.severity,
                 "evidence": r.evidence,
+                "affected_groups": r.affected_groups.split(",") if r.affected_groups else [],
+                "dimension_weight": r.dimension_weight,
             }
             for r in risk_items
         ]

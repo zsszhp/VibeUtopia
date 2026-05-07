@@ -50,6 +50,7 @@ task_tier_mapping:
   risk_assessment: advanced
   persona_simulation: standard
   rewrite: lite
+  transcript_detection: lite
   default: standard
 
 fallback_strategy:

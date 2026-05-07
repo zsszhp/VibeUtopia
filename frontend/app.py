@@ -1,3 +1,4 @@
+import json
 import time
 
 import httpx
@@ -153,6 +154,23 @@ if result:
     risk_items = result.get("risk_items", [])
     platform_reactions = result.get("platform_reactions", {})
     rewrites = result.get("rewrites", [])
+    transcript_quality = summary.get("transcript_quality")
+    dimension_weights = summary.get("dimension_weights")
+    cross_effects = summary.get("cross_effects", [])
+
+    # 转写质量警告横幅（新增）
+    if transcript_quality and transcript_quality.get("quality_level") not in ("clean", None):
+        tq_level = transcript_quality.get("quality_level", "")
+        tq_score = transcript_quality.get("quality_score", 100)
+        tq_hints = transcript_quality.get("transcript_hints", [])
+        noise_count = len(transcript_quality.get("noise_sentences", []))
+
+        if tq_level == "garbled":
+            st.error(f"⚠️ **转写质量极差** (分数: {tq_score}/100) — {'; '.join(tq_hints)} | 检测到{noise_count}处疑似转写错误，部分风险评估可能不准确")
+        elif tq_level == "heavy_noise":
+            st.warning(f"⚠️ **转写质量较差** (分数: {tq_score}/100) — {'; '.join(tq_hints)} | 检测到{noise_count}处疑似转写错误，部分风险判定可能受影响")
+        elif tq_level == "light_noise":
+            st.info(f"ℹ️ **转写质量一般** (分数: {tq_score}/100) — {'; '.join(tq_hints)}")
 
     # 总分与建议
     st.divider()
@@ -169,6 +187,15 @@ if result:
         suggest_icon = "✅" if suggestion == "可发" else ("⚠" if suggestion == "建议修改" else "🚫")
         st.markdown(f"### {suggest_icon} 发布建议: {suggestion}")
 
+    # 交叉风险提示（新增）
+    if cross_effects:
+        for ce in cross_effects:
+            dims = ce.get("dimensions", [])
+            desc = ce.get("description", "")
+            combined_sev = ce.get("combined_severity", "medium")
+            icon = "🔴" if combined_sev == "high" else "🟡"
+            st.markdown(f"{icon} **交叉风险**: {' + '.join(dims)} — {desc}")
+
     # 七维风险 + 平台情绪
     col_radar, col_platform = st.columns(2)
 
@@ -183,9 +210,15 @@ if result:
 
             for dim, score in risk_dimensions.items():
                 color = "green" if score <= 20 else ("orange" if score <= 50 else "red")
+                # 展示维度权重标签（新增）
+                weight_label = ""
+                if dimension_weights and dim in dimension_weights:
+                    w = dimension_weights[dim]
+                    if w > 1.0:
+                        weight_label = f' <span style="color:red;font-size:0.8em">[权重×{w}]</span>'
                 st.markdown(
                     f'**{dim}** '
-                    f'<span style="color:{color}">{score}</span> '
+                    f'<span style="color:{color}">{score}</span>{weight_label} '
                     f'<span style="background:{color};display:inline-block;width:{score}%;height:12px;border-radius:3px;"></span>',
                     unsafe_allow_html=True,
                 )
@@ -210,7 +243,16 @@ if result:
                 unsafe_allow_html=True,
             )
             if reason:
-                st.caption(f"原因: {reason}")
+                # 解析群体分化信息（新增）
+                reason_lines = reason.split("\n")
+                main_reason = reason_lines[0]
+                st.caption(f"原因: {main_reason}")
+                for line in reason_lines[1:]:
+                    if line.startswith("[群体分化]"):
+                        with st.expander("查看群体分化详情"):
+                            groups = line.replace("[群体分化] ", "").split("; ")
+                            for g in groups:
+                                st.markdown(f"- {g.strip()}")
 
     # 句子级风险高亮
     if risk_items:
@@ -218,11 +260,18 @@ if result:
         st.subheader("风险句子定位")
         for item in risk_items:
             severity_icon = "🔴" if item["severity"] == "high" else ("🟡" if item["severity"] == "medium" else "🟢")
-            with st.expander(f'{severity_icon} {item["sentence"][:50]}...', expanded=(item["severity"] == "high")):
+            affected = item.get("affected_groups", [])
+            affected_label = f" | 影响群体: {', '.join(affected)}" if affected else ""
+            with st.expander(f'{severity_icon} {item["sentence"][:50]}...{affected_label}', expanded=(item["severity"] == "high")):
                 st.markdown(f"**原句**: {item['sentence']}")
                 st.markdown(f"**风险维度**: {item['dimension']}")
                 st.markdown(f"**严重程度**: {item['severity']}")
                 st.markdown(f"**判定依据**: {item['evidence']}")
+                if affected:
+                    st.markdown(f"**影响群体**: {', '.join(affected)}")
+                dim_w = item.get("dimension_weight")
+                if dim_w and dim_w > 1.0:
+                    st.markdown(f"**维度权重**: ×{dim_w} (高风险维度加权)")
 
     # 改写建议
     if rewrites:
@@ -230,8 +279,16 @@ if result:
         st.subheader("安全改写建议")
         for rw in rewrites:
             original = rw.get("original", "")
+            is_noise = rw.get("is_transcript_noise", False)
+            transcript_note = rw.get("transcript_note", "")
             options = rw.get("rewrites", [])
+
             st.markdown(f"**原句**: {original}")
-            for i, opt in enumerate(options, 1):
-                st.success(f"改写{i}: {opt}")
+
+            if is_noise:
+                # 转写噪声标注（新增）
+                st.info(f"📋 **转写质量问题**: {transcript_note}")
+            elif options:
+                for i, opt in enumerate(options, 1):
+                    st.success(f"改写{i}: {opt}")
             st.markdown("---")
