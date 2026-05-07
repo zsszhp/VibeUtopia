@@ -1,0 +1,209 @@
+{
+  "case_id": "case1-celebrity-scandal",
+  "case_name": "明星人设崩塌",
+  "topic": "某顶流明星被曝出私生活混乱，与公众人设严重不符，引发全网热议。该明星此前以正能量形象获得大量代言，事件曝光后多个品牌宣布解约。",
+  "sim_id": "test_case1-celebrity-scandal_1778141457",
+  "agent_count": 6,
+  "total_ticks": 20,
+  "sim_time_sec": 2.2,
+  "total_actions": 8,
+  "by_type": {
+    "view": 5,
+    "like": 2,
+    "comment": 1
+  },
+  "by_platform": {
+    "bilibili": 5,
+    "xiaohongshu": 3
+  },
+  "tick_summaries": [
+    {
+      "tick": 0,
+      "sim_time": "Day1 09:00",
+      "time_slot": "上午(8-12)",
+      "action_count": 0
+    },
+    {
+      "tick": 1,
+      "sim_time": "Day1 10:00",
+      "time_slot": "上午(8-12)",
+      "action_count": 0
+    },
+    {
+      "tick": 2,
+      "sim_time": "Day1 11:00",
+      "time_slot": "上午(8-12)",
+      "action_count": 0
+    },
+    {
+      "tick": 3,
+      "sim_time": "Day1 12:00",
+      "time_slot": "午间(12-14)",
+      "action_count": 0
+    },
+    {
+      "tick": 4,
+      "sim_time": "Day1 13:00",
+      "time_slot": "午间(12-14)",
+      "action_count": 0
+    },
+    {
+      "tick": 5,
+      "sim_time": "Day1 14:00",
+      "time_slot": "下午(14-18)",
+      "action_count": 0
+    },
+    {
+      "tick": 6,
+      "sim_time": "Day1 15:00",
+      "time_slot": "下午(14-18)",
+      "action_count": 0
+    },
+    {
+      "tick": 7,
+      "sim_time": "Day1 16:00",
+      "time_slot": "下午(14-18)",
+      "action_count": 0
+    },
+    {
+      "tick": 8,
+      "sim_time": "Day1 17:00",
+      "time_slot": "下午(14-18)",
+      "action_count": 0
+    },
+    {
+      "tick": 9,
+      "sim_time": "Day1 18:00",
+      "time_slot": "傍晚(18-20)",
+      "action_count": 0
+    },
+    {
+      "tick": 10,
+      "sim_time": "Day1 19:00",
+      "time_slot": "傍晚(18-20)",
+      "action_count": 3
+    },
+    {
+      "tick": 11,
+      "sim_time": "Day1 20:00",
+      "time_slot": "晚间(20-23)",
+      "action_count": 2
+    },
+    {
+      "tick": 12,
+      "sim_time": "Day1 21:00",
+      "time_slot": "晚间(20-23)",
+      "action_count": 0
+    },
+    {
+      "tick": 13,
+      "sim_time": "Day1 22:00",
+      "time_slot": "晚间(20-23)",
+      "action_count": 3
+    },
+    {
+      "tick": 14,
+      "sim_time": "Day1 23:00",
+      "time_slot": "深夜(23-24)",
+      "action_count": 0
+    },
+    {
+      "tick": 15,
+      "sim_time": "Day2 00:00",
+      "time_slot": "深夜(0-6)",
+      "action_count": 0
+    },
+    {
+      "tick": 16,
+      "sim_time": "Day2 01:00",
+      "time_slot": "深夜(0-6)",
+      "action_count": 0
+    },
+    {
+      "tick": 17,
+      "sim_time": "Day2 02:00",
+      "time_slot": "深夜(0-6)",
+      "action_count": 0
+    },
+    {
+      "tick": 18,
+      "sim_time": "Day2 03:00",
+      "time_slot": "深夜(0-6)",
+      "action_count": 0
+    },
+    {
+      "tick": 19,
+      "sim_time": "Day2 04:00",
+      "time_slot": "深夜(0-6)",
+      "action_count": 0
+    }
+  ],
+  "sample_actions": [
+    {
+      "tick": 0,
+      "sim_time": "Day1 09:00",
+      "actions": []
+    },
+    {
+      "tick": 1,
+      "sim_time": "Day1 10:00",
+      "actions": []
+    },
+    {
+      "tick": 2,
+      "sim_time": "Day1 11:00",
+      "actions": []
+    },
+    {
+      "tick": 3,
+      "sim_time": "Day1 12:00",
+      "actions": []
+    },
+    {
+      "tick": 4,
+      "sim_time": "Day1 13:00",
+      "actions": []
+    }
+  ],
+  "platform_snapshots": {
+    "weibo": {
+      "platform": "weibo",
+      "total_posts": 1,
+      "hot_posts": 1,
+      "total_actions": 1,
+      "trending_count": 0,
+      "hashtag_count": 0
+    },
+    "bilibili": {
+      "platform": "bilibili",
+      "total_posts": 1,
+      "hot_posts": 1,
+      "total_actions": 6,
+      "total_danmaku": 1,
+      "total_coins": 0,
+      "total_favorites": 0
+    },
+    "xiaohongshu": {
+      "platform": "xiaohongshu",
+      "total_posts": 1,
+      "hot_posts": 1,
+      "total_actions": 4,
+      "total_collections": 1
+    },
+    "zhihu": {
+      "platform": "zhihu",
+      "total_posts": 1,
+      "hot_posts": 1,
+      "total_actions": 1,
+      "total_upvotes": 0,
+      "total_questions": 0
+    },
+    "douyin": {
+      "platform": "douyin",
+      "total_posts": 1,
+      "hot_posts": 1,
+      "total_actions": 1,
+      "total_challenges": 0
+    }
+  }
+}

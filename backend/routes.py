@@ -1,5 +1,6 @@
 import json
 import uuid
+from typing import Any, Dict
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -7,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.config import settings
 from backend.database import get_db
-from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord, AgentRecord, SocialRelation, AgentMemory
+from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord, AgentRecord, SocialRelation, AgentMemory, SimulationRecord, SimulationStatus
 from backend.services.analyzer import run_analysis, MAX_TEXT_LENGTH
 from backend.services.video_extractor import extract_video_text
 from backend.services.signal.fetcher import HotlistFetcher
@@ -743,4 +744,189 @@ async def generate_social_network(req: NetworkGenerateRequest, db: Session = Dep
         "agent_count": len(agents),
         "type_distribution": type_counts,
     }
+
+
+# ============ 社交仿真 API ============
+
+class SimulationCreateRequest(BaseModel):
+    topic: str = Field(..., description="仿真话题/种子内容")
+    max_ticks: int = Field(144, ge=10, le=1000, description="最大tick数")
+    start_hour: int = Field(8, ge=0, le=23, description="仿真起始小时")
+    time_acceleration: int = Field(60, ge=10, le=360, description="每tick推进的仿真分钟数")
+    tick_interval: float = Field(0.5, ge=0.1, le=5.0, description="tick间隔（秒）")
+    b_agent_per_tick: int = Field(5, ge=1, le=20, description="每tick参与LLM决策的B级Agent数")
+
+
+class SimulationControlRequest(BaseModel):
+    action: str = Field(..., description="操作: start/pause/resume/stop")
+
+
+# 全局仿真引擎实例
+_active_simulations: Dict[str, Any] = {}
+
+
+@router.post("/simulation/create")
+async def create_simulation(req: SimulationCreateRequest, background_tasks: BackgroundTasks):
+    """创建仿真任务"""
+    from backend.services.simulation.engine import SimulationEngine
+
+    sim_id = str(uuid.uuid4())[:12]
+    config = {
+        "max_ticks": req.max_ticks,
+        "start_hour": req.start_hour,
+        "time_acceleration": req.time_acceleration,
+        "tick_interval": req.tick_interval,
+        "b_agent_per_tick": req.b_agent_per_tick,
+    }
+
+    engine = SimulationEngine(sim_id=sim_id, topic=req.topic, config=config)
+
+    # 持久化仿真状态
+    db_record = SimulationStatus(
+        sim_id=sim_id,
+        status="created",
+        topic=req.topic,
+        total_agents=0,
+        config_json=json.dumps(config, ensure_ascii=False),
+    )
+    from backend.database import SessionLocal
+    db = SessionLocal()
+    try:
+        db.add(db_record)
+        db.commit()
+    finally:
+        db.close()
+
+    # 初始化引擎
+    await engine.initialize()
+
+    # 更新Agent数
+    db = SessionLocal()
+    try:
+        record = db.query(SimulationStatus).filter(SimulationStatus.sim_id == sim_id).first()
+        if record:
+            record.total_agents = len(engine.agents)
+            db.commit()
+    finally:
+        db.close()
+
+    _active_simulations[sim_id] = engine
+
+    return {"sim_id": sim_id, "status": "created", "agent_count": len(engine.agents)}
+
+
+@router.post("/simulation/{sim_id}/start")
+async def start_simulation(sim_id: str, background_tasks: BackgroundTasks):
+    """启动仿真"""
+    engine = _active_simulations.get(sim_id)
+    if not engine:
+        raise HTTPException(status_code=404, detail="仿真任务不存在")
+
+    if engine.status == "running":
+        raise HTTPException(status_code=400, detail="仿真已在运行中")
+
+    # 更新状态
+    from backend.database import SessionLocal
+    db = SessionLocal()
+    try:
+        record = db.query(SimulationStatus).filter(SimulationStatus.sim_id == sim_id).first()
+        if record:
+            record.status = "running"
+            db.commit()
+    finally:
+        db.close()
+
+    background_tasks.add_task(engine.run)
+
+    return {"sim_id": sim_id, "status": "running"}
+
+
+@router.post("/simulation/{sim_id}/pause")
+async def pause_simulation(sim_id: str):
+    """暂停仿真"""
+    engine = _active_simulations.get(sim_id)
+    if not engine:
+        raise HTTPException(status_code=404, detail="仿真任务不存在")
+
+    engine.pause()
+    return {"sim_id": sim_id, "status": "paused"}
+
+
+@router.post("/simulation/{sim_id}/resume")
+async def resume_simulation(sim_id: str):
+    """恢复仿真"""
+    engine = _active_simulations.get(sim_id)
+    if not engine:
+        raise HTTPException(status_code=404, detail="仿真任务不存在")
+
+    engine.resume()
+    return {"sim_id": sim_id, "status": "running"}
+
+
+@router.post("/simulation/{sim_id}/stop")
+async def stop_simulation(sim_id: str):
+    """停止仿真"""
+    engine = _active_simulations.get(sim_id)
+    if not engine:
+        raise HTTPException(status_code=404, detail="仿真任务不存在")
+
+    engine.stop()
+
+    from backend.database import SessionLocal
+    db = SessionLocal()
+    try:
+        record = db.query(SimulationStatus).filter(SimulationStatus.sim_id == sim_id).first()
+        if record:
+            record.status = "stopped"
+            db.commit()
+    finally:
+        db.close()
+
+    return {"sim_id": sim_id, "status": "stopped"}
+
+
+@router.get("/simulation/{sim_id}/status")
+async def get_simulation_status(sim_id: str):
+    """获取仿真状态"""
+    engine = _active_simulations.get(sim_id)
+    if engine:
+        return engine.get_status()
+
+    # 从数据库查询已完成的仿真
+    from backend.services.simulation.recorder import SimulationRecorder
+    recorder = SimulationRecorder()
+    info = recorder.get_simulation_info(sim_id)
+    if not info:
+        raise HTTPException(status_code=404, detail="仿真任务不存在")
+    return info
+
+
+@router.get("/simulation/{sim_id}/timeline")
+async def get_simulation_timeline(
+    sim_id: str,
+    start_tick: int = 0,
+    end_tick: int = None,
+    limit: int = 100,
+):
+    """获取仿真时间线"""
+    from backend.services.simulation.recorder import SimulationRecorder
+    recorder = SimulationRecorder()
+    timeline = recorder.get_timeline(sim_id, start_tick, end_tick, limit)
+    return {"sim_id": sim_id, "events": timeline, "count": len(timeline)}
+
+
+@router.get("/simulation/{sim_id}/platform/{platform}")
+async def get_platform_snapshot(sim_id: str, platform: str):
+    """获取平台快照"""
+    from backend.services.simulation.recorder import SimulationRecorder
+    recorder = SimulationRecorder()
+    snapshot = recorder.get_platform_snapshot(sim_id, platform)
+    if not snapshot:
+        engine = _active_simulations.get(sim_id)
+        if engine:
+            plat = engine.platforms.get(platform)
+            if plat:
+                return plat.get_snapshot()
+        raise HTTPException(status_code=404, detail="平台快照不存在")
+    return snapshot
 

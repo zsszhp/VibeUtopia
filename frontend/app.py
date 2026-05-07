@@ -34,7 +34,7 @@ with st.sidebar:
         st.warning("后端未启动")
 
 # ---- 主区域: 输入 ----
-tab_text, tab_video, tab_signal, tab_graph, tab_persona = st.tabs(["📝 文案输入", "🎬 视频链接", "📡 信号采集", "🕸 知识图谱", "🧬 人格工厂"])
+tab_text, tab_video, tab_signal, tab_graph, tab_persona, tab_sim = st.tabs(["📝 文案输入", "🎬 视频链接", "📡 信号采集", "🕸 知识图谱", "🧬 人格工厂", "🎭 社交仿真"])
 
 with tab_text:
     text_input = st.text_area("在此粘贴你的文案/脚本...", height=200, placeholder="输入至少10个字符的文案内容...", key="text_input")
@@ -916,3 +916,148 @@ with tab_persona:
 
     with col_net_info:
         st.info("社会关系网络基于Watts-Strogatz小世界模型生成，包含5种关系类型：关注、好友、对立、师徒、同组织。需要先有3个以上的活跃Agent。")
+
+# ---- 社交仿真 Tab ----
+with tab_sim:
+    st.subheader("🎭 社交仿真")
+
+    # 创建仿真
+    col_create, col_control = st.columns([2, 1])
+
+    with col_create:
+        st.markdown("**创建仿真**")
+        sim_topic = st.text_input("仿真话题", placeholder="输入要仿真的话题内容...", key="sim_topic")
+        col_cfg1, col_cfg2, col_cfg3 = st.columns(3)
+        with col_cfg1:
+            sim_ticks = st.slider("仿真时长(tick)", 10, 500, 144, key="sim_ticks")
+        with col_cfg2:
+            sim_accel = st.slider("时间加速(分钟/tick)", 10, 360, 60, key="sim_accel")
+        with col_cfg3:
+            sim_b_agent = st.slider("B级Agent数/tick", 1, 20, 5, key="sim_b_agent")
+
+        if st.button("🚀 创建仿真", type="primary", key="create_sim_btn"):
+            if not sim_topic:
+                st.error("请输入仿真话题")
+            else:
+                with st.spinner("正在初始化仿真..."):
+                    try:
+                        resp = httpx.post(
+                            f"{API_BASE}/simulation/create",
+                            json={
+                                "topic": sim_topic,
+                                "max_ticks": sim_ticks,
+                                "time_acceleration": sim_accel,
+                                "b_agent_per_tick": sim_b_agent,
+                            },
+                            timeout=30,
+                        )
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            st.session_state["sim_id"] = data["sim_id"]
+                            st.success(f"仿真创建成功: {data['sim_id']} ({data['agent_count']} 个Agent)")
+                        else:
+                            st.error(f"创建失败: {resp.text}")
+                    except Exception as e:
+                        st.error(f"连接失败: {e}")
+
+    with col_control:
+        st.markdown("**仿真控制**")
+        current_sim_id = st.session_state.get("sim_id", "")
+        st.caption(f"当前仿真: {current_sim_id or '未创建'}")
+
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            if st.button("▶ 启动", key="sim_start_btn", use_container_width=True):
+                if not current_sim_id:
+                    st.error("请先创建仿真")
+                else:
+                    try:
+                        resp = httpx.post(f"{API_BASE}/simulation/{current_sim_id}/start", timeout=10)
+                        if resp.status_code == 200:
+                            st.success("仿真已启动")
+                    except Exception as e:
+                        st.error(f"连接失败: {e}")
+
+            if st.button("⏸ 暂停", key="sim_pause_btn", use_container_width=True):
+                if current_sim_id:
+                    try:
+                        httpx.post(f"{API_BASE}/simulation/{current_sim_id}/pause", timeout=5)
+                        st.info("仿真已暂停")
+                    except Exception:
+                        pass
+
+        with col_btn2:
+            if st.button("▶ 恢复", key="sim_resume_btn", use_container_width=True):
+                if current_sim_id:
+                    try:
+                        httpx.post(f"{API_BASE}/simulation/{current_sim_id}/resume", timeout=5)
+                        st.info("仿真已恢复")
+                    except Exception:
+                        pass
+
+            if st.button("⏹ 停止", key="sim_stop_btn", use_container_width=True):
+                if current_sim_id:
+                    try:
+                        httpx.post(f"{API_BASE}/simulation/{current_sim_id}/stop", timeout=5)
+                        st.info("仿真已停止")
+                    except Exception:
+                        pass
+
+    # 实时状态
+    st.divider()
+    if current_sim_id:
+        if st.button("🔄 刷新状态", key="refresh_sim_status"):
+            st.session_state.pop("sim_status", None)
+
+        try:
+            resp = httpx.get(f"{API_BASE}/simulation/{current_sim_id}/status", timeout=10)
+            if resp.status_code == 200:
+                status = resp.json()
+
+                col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+                with col_s1:
+                    st.metric("状态", status.get("status", "未知"))
+                with col_s2:
+                    st.metric("Tick", f"{status.get('current_tick', 0)}/{status.get('max_ticks', 0)}")
+                with col_s3:
+                    st.metric("仿真时间", status.get("sim_time", "-"))
+                with col_s4:
+                    st.metric("Agent", f"B:{status.get('b_agents',0)} C:{status.get('c_agents',0)}")
+
+                # 平台状态
+                platforms = status.get("platforms", {})
+                if platforms:
+                    st.markdown("**平台状态**")
+                    import pandas as pd
+                    plat_data = []
+                    for p, snap in platforms.items():
+                        plat_data.append({
+                            "平台": snap.get("platform", p),
+                            "帖子数": snap.get("total_posts", 0),
+                            "热帖": snap.get("hot_posts", 0),
+                            "行为数": snap.get("total_actions", 0),
+                        })
+                    st.dataframe(pd.DataFrame(plat_data), use_container_width=True, hide_index=True)
+        except Exception:
+            st.warning("无法获取仿真状态")
+
+        # 时间线
+        st.divider()
+        st.markdown("**仿真时间线**")
+        try:
+            resp = httpx.get(f"{API_BASE}/simulation/{current_sim_id}/timeline", params={"limit": 50}, timeout=10)
+            if resp.status_code == 200:
+                timeline = resp.json()
+                events = timeline.get("events", [])
+                if events:
+                    import pandas as pd
+                    df = pd.DataFrame(events)
+                    display_cols = ["tick", "sim_time", "platform", "action_type", "agent_tier", "content"]
+                    available = [c for c in display_cols if c in df.columns]
+                    st.dataframe(df[available], use_container_width=True, hide_index=True)
+                else:
+                    st.info("暂无仿真事件，请启动仿真后等待")
+        except Exception:
+            pass
+    else:
+        st.info("请先创建仿真任务")

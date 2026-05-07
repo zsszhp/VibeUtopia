@@ -140,3 +140,34 @@ class AgentMemory(Base):
     weight = Column(Float, default=1.0)
     source_task_id = Column(String, nullable=True)
     created_at = Column(DateTime, default=utcnow)
+
+
+class SimulationRecord(Base):
+    __tablename__ = "simulation_records"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    sim_id = Column(String, index=True)
+    tick = Column(Integer, default=0)
+    sim_time = Column(String)
+    agent_id = Column(String, index=True)
+    agent_tier = Column(String)
+    platform = Column(String)
+    action_type = Column(String)
+    content = Column(Text, nullable=True)
+    target_id = Column(String, nullable=True)
+    metadata_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+
+
+class SimulationStatus(Base):
+    __tablename__ = "simulation_statuses"
+
+    sim_id = Column(String, primary_key=True)
+    status = Column(String, default="created")
+    topic = Column(Text)
+    total_ticks = Column(Integer, default=0)
+    total_agents = Column(Integer, default=0)
+    config_json = Column(Text, default="{}")
+    platform_snapshot_json = Column(Text, default="{}")
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow)

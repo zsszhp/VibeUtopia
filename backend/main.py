@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
     graph_store.close()
 
 
-app = FastAPI(title="VibeUtopia", version="0.4.0", lifespan=lifespan)
+app = FastAPI(title="VibeUtopia", version="0.5.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
