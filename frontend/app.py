@@ -34,7 +34,7 @@ with st.sidebar:
         st.warning("后端未启动")
 
 # ---- 主区域: 输入 ----
-tab_text, tab_video, tab_signal, tab_graph, tab_persona, tab_sim = st.tabs(["📝 文案输入", "🎬 视频链接", "📡 信号采集", "🕸 知识图谱", "🧬 人格工厂", "🎭 社交仿真"])
+tab_text, tab_video, tab_signal, tab_graph, tab_persona, tab_sim, tab_validate = st.tabs(["📝 文案输入", "🎬 视频链接", "📡 信号采集", "🕸 知识图谱", "🧬 人格工厂", "🎭 社交仿真", "✅ 验证回测"])
 
 with tab_text:
     text_input = st.text_area("在此粘贴你的文案/脚本...", height=200, placeholder="输入至少10个字符的文案内容...", key="text_input")
@@ -1357,3 +1357,82 @@ with tab_sim:
             pass
     else:
         st.info("请先创建仿真任务")
+
+# ---- 验证回测 Tab (V2.R2) ----
+with tab_validate:
+    st.subheader("✅ 验证与回测")
+
+    col_bt, col_cons = st.columns(2)
+
+    with col_bt:
+        st.markdown("#### 回测框架")
+        if st.button("▶ 运行回测(10案例)", key="run_backtest"):
+            with st.spinner("回测运行中..."):
+                try:
+                    resp = httpx.post(f"{API_BASE}/backtest/run", json={"case_ids": []}, timeout=10)
+                    if resp.status_code == 200:
+                        st.success("回测已启动，请稍后查看结果")
+                    else:
+                        st.error(f"启动失败: {resp.text}")
+                except Exception as e:
+                    st.error(f"连接后端失败: {e}")
+
+        # 显示回测结果
+        try:
+            resp = httpx.get(f"{API_BASE}/backtest/results", timeout=5)
+            if resp.status_code == 200:
+                results = resp.json()
+                if results:
+                    for r in results:
+                        scores = r.get("accuracy_scores", {})
+                        st.markdown(
+                            f"**{r.get('title', '')}** — "
+                            f"MVP: {scores.get('mvp_avg', 0):.0%}, "
+                            f"V2: {scores.get('v2_avg', 0):.0%}, "
+                            f"改善: +{scores.get('improvement', 0):.0%}, "
+                            f"判定: {scores.get('go_no_go', '')}"
+                        )
+                else:
+                    st.info("暂无回测结果")
+        except Exception:
+            st.warning("无法获取回测结果")
+
+    with col_cons:
+        st.markdown("#### 一致性检查")
+        cons_text = st.text_area("输入文案进行一致性检查", height=100, key="cons_text")
+        cons_runs = st.slider("运行次数", 2, 5, 3, key="cons_runs")
+        if st.button("▶ 运行一致性检查", key="run_consistency"):
+            if not cons_text or len(cons_text.strip()) < 10:
+                st.error("请输入至少10个字符")
+            else:
+                with st.spinner("一致性检查运行中..."):
+                    try:
+                        resp = httpx.post(f"{API_BASE}/consistency/check", json={
+                            "text": cons_text, "run_count": cons_runs
+                        }, timeout=300)
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            st.metric("综合一致性", f"{data.get('overall_consistency', 0):.0%}")
+                            st.caption(f"方向: {data.get('direction_consistency', 0):.0%} | 平台: {data.get('platform_consistency', 0):.0%} | 维度: {data.get('dimension_consistency', 0):.0%}")
+                            st.caption(f"分数范围: {data.get('score_range', [0,0])} | 标准差: {data.get('score_std', 0):.1f}")
+                            if data.get("divergent_dimensions"):
+                                st.warning(f"分歧维度: {', '.join(data['divergent_dimensions'])}")
+                        else:
+                            st.error(f"检查失败: {resp.text}")
+                    except Exception as e:
+                        st.error(f"连接后端失败: {e}")
+
+    # 数据库状态
+    st.divider()
+    st.markdown("#### 系统状态")
+    try:
+        resp = httpx.get(f"{API_BASE}/system/db-status", timeout=5)
+        if resp.status_code == 200:
+            status = resp.json()
+            db_type = status.get("db_type", "unknown")
+            db_icon = "🟢" if status.get("status") == "connected" else "🔴"
+            st.markdown(f"{db_icon} **数据库**: {db_type} | 表数量: {status.get('table_count', 0)}")
+        else:
+            st.warning("无法获取数据库状态")
+    except Exception:
+        st.warning("后端未连接")
