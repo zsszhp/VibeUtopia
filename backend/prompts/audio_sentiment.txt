@@ -1,0 +1,21 @@
+分析以下语音转写文本中的说话者情感倾向。
+
+请以JSON格式返回：
+```json
+{
+  "sentiment": "positive|neutral|negative|mixed",
+  "emotion": "happy|angry|sad|fearful|surprised|disgusted|neutral",
+  "intensity": 0.0-1.0,
+  "confidence": 0.0-1.0,
+  "description": "情感描述"
+}
+```
+
+请重点关注：
+1. 情感极性：正面/中性/负面/混合
+2. 具体情绪：快乐/愤怒/悲伤/恐惧/惊讶/厌恶/中性
+3. 情感强度：0-1的连续值
+4. 分析置信度
+
+转写文本：
+{text}

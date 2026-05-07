@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.config import settings
 from backend.database import get_db
-from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord, AgentRecord, SocialRelation, AgentMemory, SimulationRecord, SimulationStatus, PropagationSnapshot, PropagationEdge, V2AnalysisResult, BacktestRecord, ConsistencyRecord, TrendPredictionRecord, ReportRecord
+from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord, AgentRecord, SocialRelation, AgentMemory, SimulationRecord, SimulationStatus, PropagationSnapshot, PropagationEdge, V2AnalysisResult, BacktestRecord, ConsistencyRecord, TrendPredictionRecord, ReportRecord, VideoAnalysisRecord, FrameRecord
 from backend.services.analyzer import run_analysis, MAX_TEXT_LENGTH
 from backend.services.video_extractor import extract_video_text
 from backend.services.signal.fetcher import HotlistFetcher
@@ -50,6 +50,428 @@ async def extract_video(req: VideoExtractRequest):
     if result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
+
+
+# ═══════════════════════════════════════════════════════════════
+# V2.R4 多模态风控 API
+# ═══════════════════════════════════════════════════════════════
+
+class VideoAnalyzeV2Request(BaseModel):
+    url: str = Field("", description="视频链接(B站/抖音等)")
+    video_path: str = Field("", description="本地视频文件路径(优先于url)")
+    mode: str = Field("quick", description="分析模式: quick(关键帧+OCR)/deep(全部模态)")
+    max_frames: int = Field(50, description="最大关键帧数")
+
+
+class FrameAnalyzeRequest(BaseModel):
+    video_path: str = Field(..., description="视频文件路径")
+    max_frames: int = Field(50, description="最大关键帧数")
+    enable_ocr: bool = Field(True, description="是否启用OCR")
+    enable_risk: bool = Field(True, description="是否启用画面风险评估")
+
+
+class AudioTranscribeRequest(BaseModel):
+    video_path: str = Field(..., description="视频文件路径")
+    enable_sentiment: bool = Field(True, description="是否启用情感分析")
+
+
+@router.post("/analyze-video/v2")
+async def analyze_video_v2(req: VideoAnalyzeV2Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """多模态视频风控分析（V2.R4）- 关键帧提取+OCR+画面风险+音频+交叉检测"""
+    task_id = str(uuid.uuid4())
+
+    record = VideoAnalysisRecord(
+        task_id=task_id,
+        video_url=req.url,
+        video_path=req.video_path,
+        status="processing",
+    )
+    db.add(record)
+    db.commit()
+
+    background_tasks.add_task(_run_video_analysis_v2, task_id, req.url, req.video_path, req.mode, req.max_frames)
+
+    return {"task_id": task_id, "status": "processing", "mode": req.mode}
+
+
+@router.post("/analyze-frames")
+async def analyze_frames(req: FrameAnalyzeRequest, db: Session = Depends(get_db)):
+    """关键帧提取+OCR+画面风险分析"""
+    import time
+    start_time = time.time()
+
+    # 1. 提取关键帧
+    from backend.services.keyframe_extractor import KeyframeExtractor
+    extractor = KeyframeExtractor({"max_frames": req.max_frames})
+    frame_result = await extractor.extract(req.video_path)
+
+    if frame_result.error:
+        raise HTTPException(status_code=400, detail=frame_result.error)
+
+    result = {
+        "total_frames": frame_result.total_frames,
+        "duration": frame_result.duration,
+        "method_used": frame_result.method_used,
+        "scene_count": frame_result.scene_count,
+        "frames": [
+            {
+                "index": f.index,
+                "timestamp": f.timestamp,
+                "file_path": f.file_path,
+                "method": f.method,
+                "scene_index": f.scene_index,
+            }
+            for f in frame_result.frames
+        ],
+    }
+
+    # 2. OCR识别
+    if req.enable_ocr:
+        from backend.services.frame_ocr import FrameOCR
+        ocr = FrameOCR()
+        ocr_result = await ocr.extract_video_text(frame_result.frames)
+        result["ocr"] = {
+            "engine_used": ocr_result.engine_used,
+            "all_text": ocr_result.all_text,
+            "frame_count": len(ocr_result.frame_results),
+            "frame_results": [
+                {
+                    "frame_index": fr.frame_index,
+                    "timestamp": fr.timestamp,
+                    "full_text": fr.full_text,
+                    "items": [
+                        {"text": item.text, "confidence": item.confidence, "position": item.position}
+                        for item in fr.items
+                    ],
+                }
+                for fr in ocr_result.frame_results
+            ],
+        }
+
+    # 3. 画面风险评估
+    if req.enable_risk:
+        from backend.services.frame_risk import FrameRiskAssessor
+        assessor = FrameRiskAssessor()
+        risk_result = await assessor.assess_video_frames(frame_result.frames)
+        result["frame_risks"] = {
+            "overall_risk_level": risk_result.overall_risk_level,
+            "high_risk_frames": risk_result.high_risk_frames,
+            "risk_summary": risk_result.risk_summary,
+            "frame_results": [
+                {
+                    "frame_index": fr.frame_index,
+                    "timestamp": fr.timestamp,
+                    "risk_level": fr.risk_level,
+                    "summary": fr.summary,
+                    "risks": [
+                        {
+                            "risk_type": r.risk_type,
+                            "description": r.description,
+                            "severity": r.severity,
+                            "confidence": r.confidence,
+                            "suggestion": r.suggestion,
+                        }
+                        for r in fr.risks
+                    ],
+                }
+                for fr in risk_result.frame_results
+            ],
+        }
+
+    result["analysis_time"] = round(time.time() - start_time, 2)
+    return result
+
+
+@router.get("/frames/{task_id}")
+async def get_frame_results(task_id: str, db: Session = Depends(get_db)):
+    """获取视频帧分析结果"""
+    record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="视频分析任务不存在")
+
+    result = {
+        "task_id": task_id,
+        "status": record.status,
+        "keyframe_method": record.keyframe_method,
+        "keyframe_count": record.keyframe_count,
+        "ocr_engine": record.ocr_engine,
+        "ocr_text": record.ocr_text,
+        "frame_risk_level": record.frame_risk_level,
+        "audio_engine": record.audio_engine,
+        "audio_text": record.audio_text,
+        "overall_risk_level": record.overall_risk_level,
+        "overall_risk_score": record.overall_risk_score,
+        "analysis_time": record.analysis_time,
+    }
+
+    if record.error:
+        result["error"] = record.error
+
+    # 获取帧记录
+    frames = db.query(FrameRecord).filter(FrameRecord.task_id == task_id).order_by(FrameRecord.frame_index).all()
+    result["frames"] = [
+        {
+            "frame_index": f.frame_index,
+            "timestamp": f.timestamp,
+            "file_path": f.file_path,
+            "ocr_text": f.ocr_text,
+            "risk_level": f.risk_level,
+        }
+        for f in frames
+    ]
+
+    return result
+
+
+@router.post("/audio/transcribe")
+async def transcribe_audio(req: AudioTranscribeRequest):
+    """音频转写+情感分析"""
+    from backend.services.audio_analyzer import AudioAnalyzer
+    analyzer = AudioAnalyzer({"enable_sentiment": req.enable_sentiment})
+    result = await analyzer.analyze(req.video_path)
+
+    if result.error:
+        raise HTTPException(status_code=400, detail=result.error)
+
+    response = {
+        "engine_used": result.engine_used,
+        "duration": result.duration,
+        "language": result.language,
+        "full_text": result.full_text,
+        "segments": [
+            {"start": s.start, "end": s.end, "text": s.text}
+            for s in result.segments
+        ],
+        "risk_text": result.risk_text,
+    }
+
+    if result.sentiment:
+        response["sentiment"] = {
+            "sentiment": result.sentiment.sentiment,
+            "emotion": result.sentiment.emotion,
+            "intensity": result.sentiment.intensity,
+            "confidence": result.sentiment.confidence,
+            "description": result.sentiment.description,
+        }
+
+    return response
+
+
+@router.get("/cross-modal/{task_id}")
+async def get_cross_modal_risk(task_id: str, db: Session = Depends(get_db)):
+    """获取交叉模态风险检测结果"""
+    record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="视频分析任务不存在")
+
+    if record.status != "completed":
+        return {"task_id": task_id, "status": record.status}
+
+    return {
+        "task_id": task_id,
+        "status": "completed",
+        "text_risks": {},  # 文字风控需要单独查
+        "ocr_text": record.ocr_text,
+        "audio_text": record.audio_text,
+        "audio_sentiment": json.loads(record.audio_sentiment) if record.audio_sentiment else {},
+        "frame_risk_level": record.frame_risk_level,
+        "cross_modal_risks": json.loads(record.cross_modal_risks) if record.cross_modal_risks else [],
+        "overall_risk_level": record.overall_risk_level,
+        "overall_risk_score": record.overall_risk_score,
+        "risk_breakdown": json.loads(record.risk_breakdown) if record.risk_breakdown else {},
+    }
+
+
+async def _run_video_analysis_v2(task_id: str, video_url: str, video_path: str, mode: str, max_frames: int):
+    """后台运行多模态视频分析"""
+    import time
+    start_time = time.time()
+
+    from backend.database import SessionLocal
+    db = SessionLocal()
+
+    try:
+        record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+        if not record:
+            return
+
+        # 解析视频路径
+        actual_path = video_path
+        if not actual_path and video_url:
+            # 下载视频
+            from backend.services.keyframe_extractor import KeyframeExtractor
+            extractor = KeyframeExtractor({"max_frames": max_frames})
+            downloaded = await extractor._download_video(video_url)
+            if downloaded:
+                actual_path = downloaded
+                record.video_path = downloaded
+                db.commit()
+            else:
+                record.status = "failed"
+                record.error = "无法下载视频"
+                db.commit()
+                return
+
+        if not actual_path or not os.path.exists(actual_path):
+            record.status = "failed"
+            record.error = "视频文件不存在"
+            db.commit()
+            return
+
+        # 1. 关键帧提取
+        from backend.services.keyframe_extractor import KeyframeExtractor
+        extractor = KeyframeExtractor({"max_frames": max_frames})
+        frame_result = await extractor.extract(actual_path)
+
+        if frame_result.error:
+            record.status = "failed"
+            record.error = frame_result.error
+            db.commit()
+            return
+
+        record.keyframe_method = frame_result.method_used
+        record.keyframe_count = len(frame_result.frames)
+        record.keyframe_dir = os.path.dirname(frame_result.frames[0].file_path) if frame_result.frames else ""
+
+        # 保存帧记录
+        for f in frame_result.frames:
+            frame_record = FrameRecord(
+                task_id=task_id,
+                frame_index=f.index,
+                timestamp=f.timestamp,
+                file_path=f.file_path,
+                method=f.method,
+                scene_index=f.scene_index,
+            )
+            db.add(frame_record)
+
+        db.commit()
+
+        # 2. OCR识别
+        ocr_text = ""
+        if mode in ("quick", "deep"):
+            from backend.services.frame_ocr import FrameOCR
+            ocr = FrameOCR()
+            ocr_result = await ocr.extract_video_text(frame_result.frames)
+            record.ocr_engine = ocr_result.engine_used
+            record.ocr_text = ocr_result.all_text
+            ocr_text = ocr_result.all_text
+
+            # 更新帧OCR结果
+            for fr in ocr_result.frame_results:
+                frame_rec = db.query(FrameRecord).filter(
+                    FrameRecord.task_id == task_id,
+                    FrameRecord.timestamp == fr.timestamp,
+                ).first()
+                if frame_rec:
+                    frame_rec.ocr_text = fr.full_text
+                    frame_rec.ocr_items = json.dumps(
+                        [{"text": item.text, "confidence": item.confidence, "position": item.position}
+                         for item in fr.items]
+                    )
+            db.commit()
+
+        # 3. 画面风险评估
+        frame_risk_level = "safe"
+        frame_risk_details = []
+        if mode in ("quick", "deep"):
+            from backend.services.frame_risk import FrameRiskAssessor
+            assessor = FrameRiskAssessor()
+            risk_result = await assessor.assess_video_frames(frame_result.frames)
+            record.frame_risk_level = risk_result.overall_risk_level
+            frame_risk_level = risk_result.overall_risk_level
+            frame_risk_details = [
+                {
+                    "frame_index": fr.frame_index,
+                    "risk_level": fr.risk_level,
+                    "risks": [{"risk_type": r.risk_type, "severity": r.severity, "description": r.description}
+                              for r in fr.risks],
+                }
+                for fr in risk_result.frame_results
+            ]
+            record.frame_risk_details = json.dumps(frame_risk_details)
+
+            # 更新帧风险结果
+            for fr in risk_result.frame_results:
+                frame_rec = db.query(FrameRecord).filter(
+                    FrameRecord.task_id == task_id,
+                    FrameRecord.timestamp == fr.timestamp,
+                ).first()
+                if frame_rec:
+                    frame_rec.risk_level = fr.risk_level
+                    frame_rec.risk_details = json.dumps(
+                        [{"risk_type": r.risk_type, "severity": r.severity, "description": r.description}
+                         for r in fr.risks]
+                    )
+            db.commit()
+
+        # 4. 音频分析（deep模式）
+        audio_text = ""
+        audio_sentiment = {}
+        if mode == "deep":
+            from backend.services.audio_analyzer import AudioAnalyzer
+            analyzer = AudioAnalyzer({"enable_sentiment": True})
+            audio_result = await analyzer.analyze(actual_path)
+
+            if not audio_result.error:
+                record.audio_engine = audio_result.engine_used
+                record.audio_text = audio_result.full_text
+                record.audio_language = audio_result.language
+                audio_text = audio_result.full_text
+
+                if audio_result.sentiment:
+                    audio_sentiment = {
+                        "sentiment": audio_result.sentiment.sentiment,
+                        "emotion": audio_result.sentiment.emotion,
+                        "intensity": audio_result.sentiment.intensity,
+                        "confidence": audio_result.sentiment.confidence,
+                    }
+                    record.audio_sentiment = json.dumps(audio_sentiment)
+            db.commit()
+
+        # 5. 交叉风险检测（deep模式）
+        cross_risks = []
+        if mode == "deep":
+            from backend.services.cross_modal_risk import CrossModalRiskDetector
+            detector = CrossModalRiskDetector()
+            cross_result = await detector.detect(
+                text_analysis={"text": "", "risk_level": "safe"},  # 文字风控结果需要从Task获取
+                image_risks=frame_risk_details,
+                audio_analysis=audio_sentiment if audio_sentiment else None,
+                ocr_text=ocr_text,
+                audio_text=audio_text,
+                task_id=task_id,
+            )
+
+            cross_risks = [
+                {
+                    "risk_type": r.risk_type,
+                    "modalities": r.modalities,
+                    "description": r.description,
+                    "severity": r.severity,
+                    "confidence": r.confidence,
+                }
+                for r in cross_result.cross_risks
+            ]
+            record.cross_modal_risks = json.dumps(cross_risks)
+            record.overall_risk_level = cross_result.overall_risk_level
+            record.overall_risk_score = cross_result.overall_risk_score
+            record.risk_breakdown = json.dumps(cross_result.risk_breakdown)
+            db.commit()
+
+        # 完成
+        record.analysis_time = round(time.time() - start_time, 2)
+        record.status = "completed"
+        db.commit()
+
+    except Exception as e:
+        record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+        if record:
+            record.status = "failed"
+            record.error = str(e)
+            db.commit()
+    finally:
+        db.close()
 
 
 @router.post("/analyze-video", response_model=AnalyzeResponse)
@@ -107,6 +529,428 @@ async def get_result(task_id: str, db: Session = Depends(get_db)):
             result["error"] = "分析结果数据缺失"
             return result
 
+
+# ═══════════════════════════════════════════════════════════════
+# V2.R4 多模态风控 API
+# ═══════════════════════════════════════════════════════════════
+
+class VideoAnalyzeV2Request(BaseModel):
+    url: str = Field("", description="视频链接(B站/抖音等)")
+    video_path: str = Field("", description="本地视频文件路径(优先于url)")
+    mode: str = Field("quick", description="分析模式: quick(关键帧+OCR)/deep(全部模态)")
+    max_frames: int = Field(50, description="最大关键帧数")
+
+
+class FrameAnalyzeRequest(BaseModel):
+    video_path: str = Field(..., description="视频文件路径")
+    max_frames: int = Field(50, description="最大关键帧数")
+    enable_ocr: bool = Field(True, description="是否启用OCR")
+    enable_risk: bool = Field(True, description="是否启用画面风险评估")
+
+
+class AudioTranscribeRequest(BaseModel):
+    video_path: str = Field(..., description="视频文件路径")
+    enable_sentiment: bool = Field(True, description="是否启用情感分析")
+
+
+@router.post("/analyze-video/v2")
+async def analyze_video_v2(req: VideoAnalyzeV2Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """多模态视频风控分析（V2.R4）- 关键帧提取+OCR+画面风险+音频+交叉检测"""
+    task_id = str(uuid.uuid4())
+
+    record = VideoAnalysisRecord(
+        task_id=task_id,
+        video_url=req.url,
+        video_path=req.video_path,
+        status="processing",
+    )
+    db.add(record)
+    db.commit()
+
+    background_tasks.add_task(_run_video_analysis_v2, task_id, req.url, req.video_path, req.mode, req.max_frames)
+
+    return {"task_id": task_id, "status": "processing", "mode": req.mode}
+
+
+@router.post("/analyze-frames")
+async def analyze_frames(req: FrameAnalyzeRequest, db: Session = Depends(get_db)):
+    """关键帧提取+OCR+画面风险分析"""
+    import time
+    start_time = time.time()
+
+    # 1. 提取关键帧
+    from backend.services.keyframe_extractor import KeyframeExtractor
+    extractor = KeyframeExtractor({"max_frames": req.max_frames})
+    frame_result = await extractor.extract(req.video_path)
+
+    if frame_result.error:
+        raise HTTPException(status_code=400, detail=frame_result.error)
+
+    result = {
+        "total_frames": frame_result.total_frames,
+        "duration": frame_result.duration,
+        "method_used": frame_result.method_used,
+        "scene_count": frame_result.scene_count,
+        "frames": [
+            {
+                "index": f.index,
+                "timestamp": f.timestamp,
+                "file_path": f.file_path,
+                "method": f.method,
+                "scene_index": f.scene_index,
+            }
+            for f in frame_result.frames
+        ],
+    }
+
+    # 2. OCR识别
+    if req.enable_ocr:
+        from backend.services.frame_ocr import FrameOCR
+        ocr = FrameOCR()
+        ocr_result = await ocr.extract_video_text(frame_result.frames)
+        result["ocr"] = {
+            "engine_used": ocr_result.engine_used,
+            "all_text": ocr_result.all_text,
+            "frame_count": len(ocr_result.frame_results),
+            "frame_results": [
+                {
+                    "frame_index": fr.frame_index,
+                    "timestamp": fr.timestamp,
+                    "full_text": fr.full_text,
+                    "items": [
+                        {"text": item.text, "confidence": item.confidence, "position": item.position}
+                        for item in fr.items
+                    ],
+                }
+                for fr in ocr_result.frame_results
+            ],
+        }
+
+    # 3. 画面风险评估
+    if req.enable_risk:
+        from backend.services.frame_risk import FrameRiskAssessor
+        assessor = FrameRiskAssessor()
+        risk_result = await assessor.assess_video_frames(frame_result.frames)
+        result["frame_risks"] = {
+            "overall_risk_level": risk_result.overall_risk_level,
+            "high_risk_frames": risk_result.high_risk_frames,
+            "risk_summary": risk_result.risk_summary,
+            "frame_results": [
+                {
+                    "frame_index": fr.frame_index,
+                    "timestamp": fr.timestamp,
+                    "risk_level": fr.risk_level,
+                    "summary": fr.summary,
+                    "risks": [
+                        {
+                            "risk_type": r.risk_type,
+                            "description": r.description,
+                            "severity": r.severity,
+                            "confidence": r.confidence,
+                            "suggestion": r.suggestion,
+                        }
+                        for r in fr.risks
+                    ],
+                }
+                for fr in risk_result.frame_results
+            ],
+        }
+
+    result["analysis_time"] = round(time.time() - start_time, 2)
+    return result
+
+
+@router.get("/frames/{task_id}")
+async def get_frame_results(task_id: str, db: Session = Depends(get_db)):
+    """获取视频帧分析结果"""
+    record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="视频分析任务不存在")
+
+    result = {
+        "task_id": task_id,
+        "status": record.status,
+        "keyframe_method": record.keyframe_method,
+        "keyframe_count": record.keyframe_count,
+        "ocr_engine": record.ocr_engine,
+        "ocr_text": record.ocr_text,
+        "frame_risk_level": record.frame_risk_level,
+        "audio_engine": record.audio_engine,
+        "audio_text": record.audio_text,
+        "overall_risk_level": record.overall_risk_level,
+        "overall_risk_score": record.overall_risk_score,
+        "analysis_time": record.analysis_time,
+    }
+
+    if record.error:
+        result["error"] = record.error
+
+    # 获取帧记录
+    frames = db.query(FrameRecord).filter(FrameRecord.task_id == task_id).order_by(FrameRecord.frame_index).all()
+    result["frames"] = [
+        {
+            "frame_index": f.frame_index,
+            "timestamp": f.timestamp,
+            "file_path": f.file_path,
+            "ocr_text": f.ocr_text,
+            "risk_level": f.risk_level,
+        }
+        for f in frames
+    ]
+
+    return result
+
+
+@router.post("/audio/transcribe")
+async def transcribe_audio(req: AudioTranscribeRequest):
+    """音频转写+情感分析"""
+    from backend.services.audio_analyzer import AudioAnalyzer
+    analyzer = AudioAnalyzer({"enable_sentiment": req.enable_sentiment})
+    result = await analyzer.analyze(req.video_path)
+
+    if result.error:
+        raise HTTPException(status_code=400, detail=result.error)
+
+    response = {
+        "engine_used": result.engine_used,
+        "duration": result.duration,
+        "language": result.language,
+        "full_text": result.full_text,
+        "segments": [
+            {"start": s.start, "end": s.end, "text": s.text}
+            for s in result.segments
+        ],
+        "risk_text": result.risk_text,
+    }
+
+    if result.sentiment:
+        response["sentiment"] = {
+            "sentiment": result.sentiment.sentiment,
+            "emotion": result.sentiment.emotion,
+            "intensity": result.sentiment.intensity,
+            "confidence": result.sentiment.confidence,
+            "description": result.sentiment.description,
+        }
+
+    return response
+
+
+@router.get("/cross-modal/{task_id}")
+async def get_cross_modal_risk(task_id: str, db: Session = Depends(get_db)):
+    """获取交叉模态风险检测结果"""
+    record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="视频分析任务不存在")
+
+    if record.status != "completed":
+        return {"task_id": task_id, "status": record.status}
+
+    return {
+        "task_id": task_id,
+        "status": "completed",
+        "text_risks": {},  # 文字风控需要单独查
+        "ocr_text": record.ocr_text,
+        "audio_text": record.audio_text,
+        "audio_sentiment": json.loads(record.audio_sentiment) if record.audio_sentiment else {},
+        "frame_risk_level": record.frame_risk_level,
+        "cross_modal_risks": json.loads(record.cross_modal_risks) if record.cross_modal_risks else [],
+        "overall_risk_level": record.overall_risk_level,
+        "overall_risk_score": record.overall_risk_score,
+        "risk_breakdown": json.loads(record.risk_breakdown) if record.risk_breakdown else {},
+    }
+
+
+async def _run_video_analysis_v2(task_id: str, video_url: str, video_path: str, mode: str, max_frames: int):
+    """后台运行多模态视频分析"""
+    import time
+    start_time = time.time()
+
+    from backend.database import SessionLocal
+    db = SessionLocal()
+
+    try:
+        record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+        if not record:
+            return
+
+        # 解析视频路径
+        actual_path = video_path
+        if not actual_path and video_url:
+            # 下载视频
+            from backend.services.keyframe_extractor import KeyframeExtractor
+            extractor = KeyframeExtractor({"max_frames": max_frames})
+            downloaded = await extractor._download_video(video_url)
+            if downloaded:
+                actual_path = downloaded
+                record.video_path = downloaded
+                db.commit()
+            else:
+                record.status = "failed"
+                record.error = "无法下载视频"
+                db.commit()
+                return
+
+        if not actual_path or not os.path.exists(actual_path):
+            record.status = "failed"
+            record.error = "视频文件不存在"
+            db.commit()
+            return
+
+        # 1. 关键帧提取
+        from backend.services.keyframe_extractor import KeyframeExtractor
+        extractor = KeyframeExtractor({"max_frames": max_frames})
+        frame_result = await extractor.extract(actual_path)
+
+        if frame_result.error:
+            record.status = "failed"
+            record.error = frame_result.error
+            db.commit()
+            return
+
+        record.keyframe_method = frame_result.method_used
+        record.keyframe_count = len(frame_result.frames)
+        record.keyframe_dir = os.path.dirname(frame_result.frames[0].file_path) if frame_result.frames else ""
+
+        # 保存帧记录
+        for f in frame_result.frames:
+            frame_record = FrameRecord(
+                task_id=task_id,
+                frame_index=f.index,
+                timestamp=f.timestamp,
+                file_path=f.file_path,
+                method=f.method,
+                scene_index=f.scene_index,
+            )
+            db.add(frame_record)
+
+        db.commit()
+
+        # 2. OCR识别
+        ocr_text = ""
+        if mode in ("quick", "deep"):
+            from backend.services.frame_ocr import FrameOCR
+            ocr = FrameOCR()
+            ocr_result = await ocr.extract_video_text(frame_result.frames)
+            record.ocr_engine = ocr_result.engine_used
+            record.ocr_text = ocr_result.all_text
+            ocr_text = ocr_result.all_text
+
+            # 更新帧OCR结果
+            for fr in ocr_result.frame_results:
+                frame_rec = db.query(FrameRecord).filter(
+                    FrameRecord.task_id == task_id,
+                    FrameRecord.timestamp == fr.timestamp,
+                ).first()
+                if frame_rec:
+                    frame_rec.ocr_text = fr.full_text
+                    frame_rec.ocr_items = json.dumps(
+                        [{"text": item.text, "confidence": item.confidence, "position": item.position}
+                         for item in fr.items]
+                    )
+            db.commit()
+
+        # 3. 画面风险评估
+        frame_risk_level = "safe"
+        frame_risk_details = []
+        if mode in ("quick", "deep"):
+            from backend.services.frame_risk import FrameRiskAssessor
+            assessor = FrameRiskAssessor()
+            risk_result = await assessor.assess_video_frames(frame_result.frames)
+            record.frame_risk_level = risk_result.overall_risk_level
+            frame_risk_level = risk_result.overall_risk_level
+            frame_risk_details = [
+                {
+                    "frame_index": fr.frame_index,
+                    "risk_level": fr.risk_level,
+                    "risks": [{"risk_type": r.risk_type, "severity": r.severity, "description": r.description}
+                              for r in fr.risks],
+                }
+                for fr in risk_result.frame_results
+            ]
+            record.frame_risk_details = json.dumps(frame_risk_details)
+
+            # 更新帧风险结果
+            for fr in risk_result.frame_results:
+                frame_rec = db.query(FrameRecord).filter(
+                    FrameRecord.task_id == task_id,
+                    FrameRecord.timestamp == fr.timestamp,
+                ).first()
+                if frame_rec:
+                    frame_rec.risk_level = fr.risk_level
+                    frame_rec.risk_details = json.dumps(
+                        [{"risk_type": r.risk_type, "severity": r.severity, "description": r.description}
+                         for r in fr.risks]
+                    )
+            db.commit()
+
+        # 4. 音频分析（deep模式）
+        audio_text = ""
+        audio_sentiment = {}
+        if mode == "deep":
+            from backend.services.audio_analyzer import AudioAnalyzer
+            analyzer = AudioAnalyzer({"enable_sentiment": True})
+            audio_result = await analyzer.analyze(actual_path)
+
+            if not audio_result.error:
+                record.audio_engine = audio_result.engine_used
+                record.audio_text = audio_result.full_text
+                record.audio_language = audio_result.language
+                audio_text = audio_result.full_text
+
+                if audio_result.sentiment:
+                    audio_sentiment = {
+                        "sentiment": audio_result.sentiment.sentiment,
+                        "emotion": audio_result.sentiment.emotion,
+                        "intensity": audio_result.sentiment.intensity,
+                        "confidence": audio_result.sentiment.confidence,
+                    }
+                    record.audio_sentiment = json.dumps(audio_sentiment)
+            db.commit()
+
+        # 5. 交叉风险检测（deep模式）
+        cross_risks = []
+        if mode == "deep":
+            from backend.services.cross_modal_risk import CrossModalRiskDetector
+            detector = CrossModalRiskDetector()
+            cross_result = await detector.detect(
+                text_analysis={"text": "", "risk_level": "safe"},  # 文字风控结果需要从Task获取
+                image_risks=frame_risk_details,
+                audio_analysis=audio_sentiment if audio_sentiment else None,
+                ocr_text=ocr_text,
+                audio_text=audio_text,
+                task_id=task_id,
+            )
+
+            cross_risks = [
+                {
+                    "risk_type": r.risk_type,
+                    "modalities": r.modalities,
+                    "description": r.description,
+                    "severity": r.severity,
+                    "confidence": r.confidence,
+                }
+                for r in cross_result.cross_risks
+            ]
+            record.cross_modal_risks = json.dumps(cross_risks)
+            record.overall_risk_level = cross_result.overall_risk_level
+            record.overall_risk_score = cross_result.overall_risk_score
+            record.risk_breakdown = json.dumps(cross_result.risk_breakdown)
+            db.commit()
+
+        # 完成
+        record.analysis_time = round(time.time() - start_time, 2)
+        record.status = "completed"
+        db.commit()
+
+    except Exception as e:
+        record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+        if record:
+            record.status = "failed"
+            record.error = str(e)
+            db.commit()
+    finally:
+        db.close()
+
         result["summary"] = {
             "overall_score": summary.overall_score,
             "suggestion": summary.suggestion,
@@ -139,6 +983,428 @@ async def get_result(task_id: str, db: Session = Depends(get_db)):
         result["rewrites"] = json.loads(summary.rewrites_json) if summary.rewrites_json else []
 
     return result
+
+
+# ═══════════════════════════════════════════════════════════════
+# V2.R4 多模态风控 API
+# ═══════════════════════════════════════════════════════════════
+
+class VideoAnalyzeV2Request(BaseModel):
+    url: str = Field("", description="视频链接(B站/抖音等)")
+    video_path: str = Field("", description="本地视频文件路径(优先于url)")
+    mode: str = Field("quick", description="分析模式: quick(关键帧+OCR)/deep(全部模态)")
+    max_frames: int = Field(50, description="最大关键帧数")
+
+
+class FrameAnalyzeRequest(BaseModel):
+    video_path: str = Field(..., description="视频文件路径")
+    max_frames: int = Field(50, description="最大关键帧数")
+    enable_ocr: bool = Field(True, description="是否启用OCR")
+    enable_risk: bool = Field(True, description="是否启用画面风险评估")
+
+
+class AudioTranscribeRequest(BaseModel):
+    video_path: str = Field(..., description="视频文件路径")
+    enable_sentiment: bool = Field(True, description="是否启用情感分析")
+
+
+@router.post("/analyze-video/v2")
+async def analyze_video_v2(req: VideoAnalyzeV2Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """多模态视频风控分析（V2.R4）- 关键帧提取+OCR+画面风险+音频+交叉检测"""
+    task_id = str(uuid.uuid4())
+
+    record = VideoAnalysisRecord(
+        task_id=task_id,
+        video_url=req.url,
+        video_path=req.video_path,
+        status="processing",
+    )
+    db.add(record)
+    db.commit()
+
+    background_tasks.add_task(_run_video_analysis_v2, task_id, req.url, req.video_path, req.mode, req.max_frames)
+
+    return {"task_id": task_id, "status": "processing", "mode": req.mode}
+
+
+@router.post("/analyze-frames")
+async def analyze_frames(req: FrameAnalyzeRequest, db: Session = Depends(get_db)):
+    """关键帧提取+OCR+画面风险分析"""
+    import time
+    start_time = time.time()
+
+    # 1. 提取关键帧
+    from backend.services.keyframe_extractor import KeyframeExtractor
+    extractor = KeyframeExtractor({"max_frames": req.max_frames})
+    frame_result = await extractor.extract(req.video_path)
+
+    if frame_result.error:
+        raise HTTPException(status_code=400, detail=frame_result.error)
+
+    result = {
+        "total_frames": frame_result.total_frames,
+        "duration": frame_result.duration,
+        "method_used": frame_result.method_used,
+        "scene_count": frame_result.scene_count,
+        "frames": [
+            {
+                "index": f.index,
+                "timestamp": f.timestamp,
+                "file_path": f.file_path,
+                "method": f.method,
+                "scene_index": f.scene_index,
+            }
+            for f in frame_result.frames
+        ],
+    }
+
+    # 2. OCR识别
+    if req.enable_ocr:
+        from backend.services.frame_ocr import FrameOCR
+        ocr = FrameOCR()
+        ocr_result = await ocr.extract_video_text(frame_result.frames)
+        result["ocr"] = {
+            "engine_used": ocr_result.engine_used,
+            "all_text": ocr_result.all_text,
+            "frame_count": len(ocr_result.frame_results),
+            "frame_results": [
+                {
+                    "frame_index": fr.frame_index,
+                    "timestamp": fr.timestamp,
+                    "full_text": fr.full_text,
+                    "items": [
+                        {"text": item.text, "confidence": item.confidence, "position": item.position}
+                        for item in fr.items
+                    ],
+                }
+                for fr in ocr_result.frame_results
+            ],
+        }
+
+    # 3. 画面风险评估
+    if req.enable_risk:
+        from backend.services.frame_risk import FrameRiskAssessor
+        assessor = FrameRiskAssessor()
+        risk_result = await assessor.assess_video_frames(frame_result.frames)
+        result["frame_risks"] = {
+            "overall_risk_level": risk_result.overall_risk_level,
+            "high_risk_frames": risk_result.high_risk_frames,
+            "risk_summary": risk_result.risk_summary,
+            "frame_results": [
+                {
+                    "frame_index": fr.frame_index,
+                    "timestamp": fr.timestamp,
+                    "risk_level": fr.risk_level,
+                    "summary": fr.summary,
+                    "risks": [
+                        {
+                            "risk_type": r.risk_type,
+                            "description": r.description,
+                            "severity": r.severity,
+                            "confidence": r.confidence,
+                            "suggestion": r.suggestion,
+                        }
+                        for r in fr.risks
+                    ],
+                }
+                for fr in risk_result.frame_results
+            ],
+        }
+
+    result["analysis_time"] = round(time.time() - start_time, 2)
+    return result
+
+
+@router.get("/frames/{task_id}")
+async def get_frame_results(task_id: str, db: Session = Depends(get_db)):
+    """获取视频帧分析结果"""
+    record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="视频分析任务不存在")
+
+    result = {
+        "task_id": task_id,
+        "status": record.status,
+        "keyframe_method": record.keyframe_method,
+        "keyframe_count": record.keyframe_count,
+        "ocr_engine": record.ocr_engine,
+        "ocr_text": record.ocr_text,
+        "frame_risk_level": record.frame_risk_level,
+        "audio_engine": record.audio_engine,
+        "audio_text": record.audio_text,
+        "overall_risk_level": record.overall_risk_level,
+        "overall_risk_score": record.overall_risk_score,
+        "analysis_time": record.analysis_time,
+    }
+
+    if record.error:
+        result["error"] = record.error
+
+    # 获取帧记录
+    frames = db.query(FrameRecord).filter(FrameRecord.task_id == task_id).order_by(FrameRecord.frame_index).all()
+    result["frames"] = [
+        {
+            "frame_index": f.frame_index,
+            "timestamp": f.timestamp,
+            "file_path": f.file_path,
+            "ocr_text": f.ocr_text,
+            "risk_level": f.risk_level,
+        }
+        for f in frames
+    ]
+
+    return result
+
+
+@router.post("/audio/transcribe")
+async def transcribe_audio(req: AudioTranscribeRequest):
+    """音频转写+情感分析"""
+    from backend.services.audio_analyzer import AudioAnalyzer
+    analyzer = AudioAnalyzer({"enable_sentiment": req.enable_sentiment})
+    result = await analyzer.analyze(req.video_path)
+
+    if result.error:
+        raise HTTPException(status_code=400, detail=result.error)
+
+    response = {
+        "engine_used": result.engine_used,
+        "duration": result.duration,
+        "language": result.language,
+        "full_text": result.full_text,
+        "segments": [
+            {"start": s.start, "end": s.end, "text": s.text}
+            for s in result.segments
+        ],
+        "risk_text": result.risk_text,
+    }
+
+    if result.sentiment:
+        response["sentiment"] = {
+            "sentiment": result.sentiment.sentiment,
+            "emotion": result.sentiment.emotion,
+            "intensity": result.sentiment.intensity,
+            "confidence": result.sentiment.confidence,
+            "description": result.sentiment.description,
+        }
+
+    return response
+
+
+@router.get("/cross-modal/{task_id}")
+async def get_cross_modal_risk(task_id: str, db: Session = Depends(get_db)):
+    """获取交叉模态风险检测结果"""
+    record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="视频分析任务不存在")
+
+    if record.status != "completed":
+        return {"task_id": task_id, "status": record.status}
+
+    return {
+        "task_id": task_id,
+        "status": "completed",
+        "text_risks": {},  # 文字风控需要单独查
+        "ocr_text": record.ocr_text,
+        "audio_text": record.audio_text,
+        "audio_sentiment": json.loads(record.audio_sentiment) if record.audio_sentiment else {},
+        "frame_risk_level": record.frame_risk_level,
+        "cross_modal_risks": json.loads(record.cross_modal_risks) if record.cross_modal_risks else [],
+        "overall_risk_level": record.overall_risk_level,
+        "overall_risk_score": record.overall_risk_score,
+        "risk_breakdown": json.loads(record.risk_breakdown) if record.risk_breakdown else {},
+    }
+
+
+async def _run_video_analysis_v2(task_id: str, video_url: str, video_path: str, mode: str, max_frames: int):
+    """后台运行多模态视频分析"""
+    import time
+    start_time = time.time()
+
+    from backend.database import SessionLocal
+    db = SessionLocal()
+
+    try:
+        record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+        if not record:
+            return
+
+        # 解析视频路径
+        actual_path = video_path
+        if not actual_path and video_url:
+            # 下载视频
+            from backend.services.keyframe_extractor import KeyframeExtractor
+            extractor = KeyframeExtractor({"max_frames": max_frames})
+            downloaded = await extractor._download_video(video_url)
+            if downloaded:
+                actual_path = downloaded
+                record.video_path = downloaded
+                db.commit()
+            else:
+                record.status = "failed"
+                record.error = "无法下载视频"
+                db.commit()
+                return
+
+        if not actual_path or not os.path.exists(actual_path):
+            record.status = "failed"
+            record.error = "视频文件不存在"
+            db.commit()
+            return
+
+        # 1. 关键帧提取
+        from backend.services.keyframe_extractor import KeyframeExtractor
+        extractor = KeyframeExtractor({"max_frames": max_frames})
+        frame_result = await extractor.extract(actual_path)
+
+        if frame_result.error:
+            record.status = "failed"
+            record.error = frame_result.error
+            db.commit()
+            return
+
+        record.keyframe_method = frame_result.method_used
+        record.keyframe_count = len(frame_result.frames)
+        record.keyframe_dir = os.path.dirname(frame_result.frames[0].file_path) if frame_result.frames else ""
+
+        # 保存帧记录
+        for f in frame_result.frames:
+            frame_record = FrameRecord(
+                task_id=task_id,
+                frame_index=f.index,
+                timestamp=f.timestamp,
+                file_path=f.file_path,
+                method=f.method,
+                scene_index=f.scene_index,
+            )
+            db.add(frame_record)
+
+        db.commit()
+
+        # 2. OCR识别
+        ocr_text = ""
+        if mode in ("quick", "deep"):
+            from backend.services.frame_ocr import FrameOCR
+            ocr = FrameOCR()
+            ocr_result = await ocr.extract_video_text(frame_result.frames)
+            record.ocr_engine = ocr_result.engine_used
+            record.ocr_text = ocr_result.all_text
+            ocr_text = ocr_result.all_text
+
+            # 更新帧OCR结果
+            for fr in ocr_result.frame_results:
+                frame_rec = db.query(FrameRecord).filter(
+                    FrameRecord.task_id == task_id,
+                    FrameRecord.timestamp == fr.timestamp,
+                ).first()
+                if frame_rec:
+                    frame_rec.ocr_text = fr.full_text
+                    frame_rec.ocr_items = json.dumps(
+                        [{"text": item.text, "confidence": item.confidence, "position": item.position}
+                         for item in fr.items]
+                    )
+            db.commit()
+
+        # 3. 画面风险评估
+        frame_risk_level = "safe"
+        frame_risk_details = []
+        if mode in ("quick", "deep"):
+            from backend.services.frame_risk import FrameRiskAssessor
+            assessor = FrameRiskAssessor()
+            risk_result = await assessor.assess_video_frames(frame_result.frames)
+            record.frame_risk_level = risk_result.overall_risk_level
+            frame_risk_level = risk_result.overall_risk_level
+            frame_risk_details = [
+                {
+                    "frame_index": fr.frame_index,
+                    "risk_level": fr.risk_level,
+                    "risks": [{"risk_type": r.risk_type, "severity": r.severity, "description": r.description}
+                              for r in fr.risks],
+                }
+                for fr in risk_result.frame_results
+            ]
+            record.frame_risk_details = json.dumps(frame_risk_details)
+
+            # 更新帧风险结果
+            for fr in risk_result.frame_results:
+                frame_rec = db.query(FrameRecord).filter(
+                    FrameRecord.task_id == task_id,
+                    FrameRecord.timestamp == fr.timestamp,
+                ).first()
+                if frame_rec:
+                    frame_rec.risk_level = fr.risk_level
+                    frame_rec.risk_details = json.dumps(
+                        [{"risk_type": r.risk_type, "severity": r.severity, "description": r.description}
+                         for r in fr.risks]
+                    )
+            db.commit()
+
+        # 4. 音频分析（deep模式）
+        audio_text = ""
+        audio_sentiment = {}
+        if mode == "deep":
+            from backend.services.audio_analyzer import AudioAnalyzer
+            analyzer = AudioAnalyzer({"enable_sentiment": True})
+            audio_result = await analyzer.analyze(actual_path)
+
+            if not audio_result.error:
+                record.audio_engine = audio_result.engine_used
+                record.audio_text = audio_result.full_text
+                record.audio_language = audio_result.language
+                audio_text = audio_result.full_text
+
+                if audio_result.sentiment:
+                    audio_sentiment = {
+                        "sentiment": audio_result.sentiment.sentiment,
+                        "emotion": audio_result.sentiment.emotion,
+                        "intensity": audio_result.sentiment.intensity,
+                        "confidence": audio_result.sentiment.confidence,
+                    }
+                    record.audio_sentiment = json.dumps(audio_sentiment)
+            db.commit()
+
+        # 5. 交叉风险检测（deep模式）
+        cross_risks = []
+        if mode == "deep":
+            from backend.services.cross_modal_risk import CrossModalRiskDetector
+            detector = CrossModalRiskDetector()
+            cross_result = await detector.detect(
+                text_analysis={"text": "", "risk_level": "safe"},  # 文字风控结果需要从Task获取
+                image_risks=frame_risk_details,
+                audio_analysis=audio_sentiment if audio_sentiment else None,
+                ocr_text=ocr_text,
+                audio_text=audio_text,
+                task_id=task_id,
+            )
+
+            cross_risks = [
+                {
+                    "risk_type": r.risk_type,
+                    "modalities": r.modalities,
+                    "description": r.description,
+                    "severity": r.severity,
+                    "confidence": r.confidence,
+                }
+                for r in cross_result.cross_risks
+            ]
+            record.cross_modal_risks = json.dumps(cross_risks)
+            record.overall_risk_level = cross_result.overall_risk_level
+            record.overall_risk_score = cross_result.overall_risk_score
+            record.risk_breakdown = json.dumps(cross_result.risk_breakdown)
+            db.commit()
+
+        # 完成
+        record.analysis_time = round(time.time() - start_time, 2)
+        record.status = "completed"
+        db.commit()
+
+    except Exception as e:
+        record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+        if record:
+            record.status = "failed"
+            record.error = str(e)
+            db.commit()
+    finally:
+        db.close()
 
 
 # ── V2.R1 增强风控 API ──────────────────────────────────────
@@ -226,6 +1492,428 @@ async def get_v2_result(task_id: str, db: Session = Depends(get_db)):
         }
 
     return result
+
+
+# ═══════════════════════════════════════════════════════════════
+# V2.R4 多模态风控 API
+# ═══════════════════════════════════════════════════════════════
+
+class VideoAnalyzeV2Request(BaseModel):
+    url: str = Field("", description="视频链接(B站/抖音等)")
+    video_path: str = Field("", description="本地视频文件路径(优先于url)")
+    mode: str = Field("quick", description="分析模式: quick(关键帧+OCR)/deep(全部模态)")
+    max_frames: int = Field(50, description="最大关键帧数")
+
+
+class FrameAnalyzeRequest(BaseModel):
+    video_path: str = Field(..., description="视频文件路径")
+    max_frames: int = Field(50, description="最大关键帧数")
+    enable_ocr: bool = Field(True, description="是否启用OCR")
+    enable_risk: bool = Field(True, description="是否启用画面风险评估")
+
+
+class AudioTranscribeRequest(BaseModel):
+    video_path: str = Field(..., description="视频文件路径")
+    enable_sentiment: bool = Field(True, description="是否启用情感分析")
+
+
+@router.post("/analyze-video/v2")
+async def analyze_video_v2(req: VideoAnalyzeV2Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """多模态视频风控分析（V2.R4）- 关键帧提取+OCR+画面风险+音频+交叉检测"""
+    task_id = str(uuid.uuid4())
+
+    record = VideoAnalysisRecord(
+        task_id=task_id,
+        video_url=req.url,
+        video_path=req.video_path,
+        status="processing",
+    )
+    db.add(record)
+    db.commit()
+
+    background_tasks.add_task(_run_video_analysis_v2, task_id, req.url, req.video_path, req.mode, req.max_frames)
+
+    return {"task_id": task_id, "status": "processing", "mode": req.mode}
+
+
+@router.post("/analyze-frames")
+async def analyze_frames(req: FrameAnalyzeRequest, db: Session = Depends(get_db)):
+    """关键帧提取+OCR+画面风险分析"""
+    import time
+    start_time = time.time()
+
+    # 1. 提取关键帧
+    from backend.services.keyframe_extractor import KeyframeExtractor
+    extractor = KeyframeExtractor({"max_frames": req.max_frames})
+    frame_result = await extractor.extract(req.video_path)
+
+    if frame_result.error:
+        raise HTTPException(status_code=400, detail=frame_result.error)
+
+    result = {
+        "total_frames": frame_result.total_frames,
+        "duration": frame_result.duration,
+        "method_used": frame_result.method_used,
+        "scene_count": frame_result.scene_count,
+        "frames": [
+            {
+                "index": f.index,
+                "timestamp": f.timestamp,
+                "file_path": f.file_path,
+                "method": f.method,
+                "scene_index": f.scene_index,
+            }
+            for f in frame_result.frames
+        ],
+    }
+
+    # 2. OCR识别
+    if req.enable_ocr:
+        from backend.services.frame_ocr import FrameOCR
+        ocr = FrameOCR()
+        ocr_result = await ocr.extract_video_text(frame_result.frames)
+        result["ocr"] = {
+            "engine_used": ocr_result.engine_used,
+            "all_text": ocr_result.all_text,
+            "frame_count": len(ocr_result.frame_results),
+            "frame_results": [
+                {
+                    "frame_index": fr.frame_index,
+                    "timestamp": fr.timestamp,
+                    "full_text": fr.full_text,
+                    "items": [
+                        {"text": item.text, "confidence": item.confidence, "position": item.position}
+                        for item in fr.items
+                    ],
+                }
+                for fr in ocr_result.frame_results
+            ],
+        }
+
+    # 3. 画面风险评估
+    if req.enable_risk:
+        from backend.services.frame_risk import FrameRiskAssessor
+        assessor = FrameRiskAssessor()
+        risk_result = await assessor.assess_video_frames(frame_result.frames)
+        result["frame_risks"] = {
+            "overall_risk_level": risk_result.overall_risk_level,
+            "high_risk_frames": risk_result.high_risk_frames,
+            "risk_summary": risk_result.risk_summary,
+            "frame_results": [
+                {
+                    "frame_index": fr.frame_index,
+                    "timestamp": fr.timestamp,
+                    "risk_level": fr.risk_level,
+                    "summary": fr.summary,
+                    "risks": [
+                        {
+                            "risk_type": r.risk_type,
+                            "description": r.description,
+                            "severity": r.severity,
+                            "confidence": r.confidence,
+                            "suggestion": r.suggestion,
+                        }
+                        for r in fr.risks
+                    ],
+                }
+                for fr in risk_result.frame_results
+            ],
+        }
+
+    result["analysis_time"] = round(time.time() - start_time, 2)
+    return result
+
+
+@router.get("/frames/{task_id}")
+async def get_frame_results(task_id: str, db: Session = Depends(get_db)):
+    """获取视频帧分析结果"""
+    record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="视频分析任务不存在")
+
+    result = {
+        "task_id": task_id,
+        "status": record.status,
+        "keyframe_method": record.keyframe_method,
+        "keyframe_count": record.keyframe_count,
+        "ocr_engine": record.ocr_engine,
+        "ocr_text": record.ocr_text,
+        "frame_risk_level": record.frame_risk_level,
+        "audio_engine": record.audio_engine,
+        "audio_text": record.audio_text,
+        "overall_risk_level": record.overall_risk_level,
+        "overall_risk_score": record.overall_risk_score,
+        "analysis_time": record.analysis_time,
+    }
+
+    if record.error:
+        result["error"] = record.error
+
+    # 获取帧记录
+    frames = db.query(FrameRecord).filter(FrameRecord.task_id == task_id).order_by(FrameRecord.frame_index).all()
+    result["frames"] = [
+        {
+            "frame_index": f.frame_index,
+            "timestamp": f.timestamp,
+            "file_path": f.file_path,
+            "ocr_text": f.ocr_text,
+            "risk_level": f.risk_level,
+        }
+        for f in frames
+    ]
+
+    return result
+
+
+@router.post("/audio/transcribe")
+async def transcribe_audio(req: AudioTranscribeRequest):
+    """音频转写+情感分析"""
+    from backend.services.audio_analyzer import AudioAnalyzer
+    analyzer = AudioAnalyzer({"enable_sentiment": req.enable_sentiment})
+    result = await analyzer.analyze(req.video_path)
+
+    if result.error:
+        raise HTTPException(status_code=400, detail=result.error)
+
+    response = {
+        "engine_used": result.engine_used,
+        "duration": result.duration,
+        "language": result.language,
+        "full_text": result.full_text,
+        "segments": [
+            {"start": s.start, "end": s.end, "text": s.text}
+            for s in result.segments
+        ],
+        "risk_text": result.risk_text,
+    }
+
+    if result.sentiment:
+        response["sentiment"] = {
+            "sentiment": result.sentiment.sentiment,
+            "emotion": result.sentiment.emotion,
+            "intensity": result.sentiment.intensity,
+            "confidence": result.sentiment.confidence,
+            "description": result.sentiment.description,
+        }
+
+    return response
+
+
+@router.get("/cross-modal/{task_id}")
+async def get_cross_modal_risk(task_id: str, db: Session = Depends(get_db)):
+    """获取交叉模态风险检测结果"""
+    record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="视频分析任务不存在")
+
+    if record.status != "completed":
+        return {"task_id": task_id, "status": record.status}
+
+    return {
+        "task_id": task_id,
+        "status": "completed",
+        "text_risks": {},  # 文字风控需要单独查
+        "ocr_text": record.ocr_text,
+        "audio_text": record.audio_text,
+        "audio_sentiment": json.loads(record.audio_sentiment) if record.audio_sentiment else {},
+        "frame_risk_level": record.frame_risk_level,
+        "cross_modal_risks": json.loads(record.cross_modal_risks) if record.cross_modal_risks else [],
+        "overall_risk_level": record.overall_risk_level,
+        "overall_risk_score": record.overall_risk_score,
+        "risk_breakdown": json.loads(record.risk_breakdown) if record.risk_breakdown else {},
+    }
+
+
+async def _run_video_analysis_v2(task_id: str, video_url: str, video_path: str, mode: str, max_frames: int):
+    """后台运行多模态视频分析"""
+    import time
+    start_time = time.time()
+
+    from backend.database import SessionLocal
+    db = SessionLocal()
+
+    try:
+        record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+        if not record:
+            return
+
+        # 解析视频路径
+        actual_path = video_path
+        if not actual_path and video_url:
+            # 下载视频
+            from backend.services.keyframe_extractor import KeyframeExtractor
+            extractor = KeyframeExtractor({"max_frames": max_frames})
+            downloaded = await extractor._download_video(video_url)
+            if downloaded:
+                actual_path = downloaded
+                record.video_path = downloaded
+                db.commit()
+            else:
+                record.status = "failed"
+                record.error = "无法下载视频"
+                db.commit()
+                return
+
+        if not actual_path or not os.path.exists(actual_path):
+            record.status = "failed"
+            record.error = "视频文件不存在"
+            db.commit()
+            return
+
+        # 1. 关键帧提取
+        from backend.services.keyframe_extractor import KeyframeExtractor
+        extractor = KeyframeExtractor({"max_frames": max_frames})
+        frame_result = await extractor.extract(actual_path)
+
+        if frame_result.error:
+            record.status = "failed"
+            record.error = frame_result.error
+            db.commit()
+            return
+
+        record.keyframe_method = frame_result.method_used
+        record.keyframe_count = len(frame_result.frames)
+        record.keyframe_dir = os.path.dirname(frame_result.frames[0].file_path) if frame_result.frames else ""
+
+        # 保存帧记录
+        for f in frame_result.frames:
+            frame_record = FrameRecord(
+                task_id=task_id,
+                frame_index=f.index,
+                timestamp=f.timestamp,
+                file_path=f.file_path,
+                method=f.method,
+                scene_index=f.scene_index,
+            )
+            db.add(frame_record)
+
+        db.commit()
+
+        # 2. OCR识别
+        ocr_text = ""
+        if mode in ("quick", "deep"):
+            from backend.services.frame_ocr import FrameOCR
+            ocr = FrameOCR()
+            ocr_result = await ocr.extract_video_text(frame_result.frames)
+            record.ocr_engine = ocr_result.engine_used
+            record.ocr_text = ocr_result.all_text
+            ocr_text = ocr_result.all_text
+
+            # 更新帧OCR结果
+            for fr in ocr_result.frame_results:
+                frame_rec = db.query(FrameRecord).filter(
+                    FrameRecord.task_id == task_id,
+                    FrameRecord.timestamp == fr.timestamp,
+                ).first()
+                if frame_rec:
+                    frame_rec.ocr_text = fr.full_text
+                    frame_rec.ocr_items = json.dumps(
+                        [{"text": item.text, "confidence": item.confidence, "position": item.position}
+                         for item in fr.items]
+                    )
+            db.commit()
+
+        # 3. 画面风险评估
+        frame_risk_level = "safe"
+        frame_risk_details = []
+        if mode in ("quick", "deep"):
+            from backend.services.frame_risk import FrameRiskAssessor
+            assessor = FrameRiskAssessor()
+            risk_result = await assessor.assess_video_frames(frame_result.frames)
+            record.frame_risk_level = risk_result.overall_risk_level
+            frame_risk_level = risk_result.overall_risk_level
+            frame_risk_details = [
+                {
+                    "frame_index": fr.frame_index,
+                    "risk_level": fr.risk_level,
+                    "risks": [{"risk_type": r.risk_type, "severity": r.severity, "description": r.description}
+                              for r in fr.risks],
+                }
+                for fr in risk_result.frame_results
+            ]
+            record.frame_risk_details = json.dumps(frame_risk_details)
+
+            # 更新帧风险结果
+            for fr in risk_result.frame_results:
+                frame_rec = db.query(FrameRecord).filter(
+                    FrameRecord.task_id == task_id,
+                    FrameRecord.timestamp == fr.timestamp,
+                ).first()
+                if frame_rec:
+                    frame_rec.risk_level = fr.risk_level
+                    frame_rec.risk_details = json.dumps(
+                        [{"risk_type": r.risk_type, "severity": r.severity, "description": r.description}
+                         for r in fr.risks]
+                    )
+            db.commit()
+
+        # 4. 音频分析（deep模式）
+        audio_text = ""
+        audio_sentiment = {}
+        if mode == "deep":
+            from backend.services.audio_analyzer import AudioAnalyzer
+            analyzer = AudioAnalyzer({"enable_sentiment": True})
+            audio_result = await analyzer.analyze(actual_path)
+
+            if not audio_result.error:
+                record.audio_engine = audio_result.engine_used
+                record.audio_text = audio_result.full_text
+                record.audio_language = audio_result.language
+                audio_text = audio_result.full_text
+
+                if audio_result.sentiment:
+                    audio_sentiment = {
+                        "sentiment": audio_result.sentiment.sentiment,
+                        "emotion": audio_result.sentiment.emotion,
+                        "intensity": audio_result.sentiment.intensity,
+                        "confidence": audio_result.sentiment.confidence,
+                    }
+                    record.audio_sentiment = json.dumps(audio_sentiment)
+            db.commit()
+
+        # 5. 交叉风险检测（deep模式）
+        cross_risks = []
+        if mode == "deep":
+            from backend.services.cross_modal_risk import CrossModalRiskDetector
+            detector = CrossModalRiskDetector()
+            cross_result = await detector.detect(
+                text_analysis={"text": "", "risk_level": "safe"},  # 文字风控结果需要从Task获取
+                image_risks=frame_risk_details,
+                audio_analysis=audio_sentiment if audio_sentiment else None,
+                ocr_text=ocr_text,
+                audio_text=audio_text,
+                task_id=task_id,
+            )
+
+            cross_risks = [
+                {
+                    "risk_type": r.risk_type,
+                    "modalities": r.modalities,
+                    "description": r.description,
+                    "severity": r.severity,
+                    "confidence": r.confidence,
+                }
+                for r in cross_result.cross_risks
+            ]
+            record.cross_modal_risks = json.dumps(cross_risks)
+            record.overall_risk_level = cross_result.overall_risk_level
+            record.overall_risk_score = cross_result.overall_risk_score
+            record.risk_breakdown = json.dumps(cross_result.risk_breakdown)
+            db.commit()
+
+        # 完成
+        record.analysis_time = round(time.time() - start_time, 2)
+        record.status = "completed"
+        db.commit()
+
+    except Exception as e:
+        record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+        if record:
+            record.status = "failed"
+            record.error = str(e)
+            db.commit()
+    finally:
+        db.close()
 
 
 @router.get("/risk/context")
@@ -639,7 +2327,429 @@ async def get_history(skip: int = 0, limit: int = 20, db: Session = Depends(get_
             item["overall_score"] = t.summary.overall_score
             item["suggestion"] = t.summary.suggestion
         results.append(item)
-    return results
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════
+# V2.R4 多模态风控 API
+# ═══════════════════════════════════════════════════════════════
+
+class VideoAnalyzeV2Request(BaseModel):
+    url: str = Field("", description="视频链接(B站/抖音等)")
+    video_path: str = Field("", description="本地视频文件路径(优先于url)")
+    mode: str = Field("quick", description="分析模式: quick(关键帧+OCR)/deep(全部模态)")
+    max_frames: int = Field(50, description="最大关键帧数")
+
+
+class FrameAnalyzeRequest(BaseModel):
+    video_path: str = Field(..., description="视频文件路径")
+    max_frames: int = Field(50, description="最大关键帧数")
+    enable_ocr: bool = Field(True, description="是否启用OCR")
+    enable_risk: bool = Field(True, description="是否启用画面风险评估")
+
+
+class AudioTranscribeRequest(BaseModel):
+    video_path: str = Field(..., description="视频文件路径")
+    enable_sentiment: bool = Field(True, description="是否启用情感分析")
+
+
+@router.post("/analyze-video/v2")
+async def analyze_video_v2(req: VideoAnalyzeV2Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """多模态视频风控分析（V2.R4）- 关键帧提取+OCR+画面风险+音频+交叉检测"""
+    task_id = str(uuid.uuid4())
+
+    record = VideoAnalysisRecord(
+        task_id=task_id,
+        video_url=req.url,
+        video_path=req.video_path,
+        status="processing",
+    )
+    db.add(record)
+    db.commit()
+
+    background_tasks.add_task(_run_video_analysis_v2, task_id, req.url, req.video_path, req.mode, req.max_frames)
+
+    return {"task_id": task_id, "status": "processing", "mode": req.mode}
+
+
+@router.post("/analyze-frames")
+async def analyze_frames(req: FrameAnalyzeRequest, db: Session = Depends(get_db)):
+    """关键帧提取+OCR+画面风险分析"""
+    import time
+    start_time = time.time()
+
+    # 1. 提取关键帧
+    from backend.services.keyframe_extractor import KeyframeExtractor
+    extractor = KeyframeExtractor({"max_frames": req.max_frames})
+    frame_result = await extractor.extract(req.video_path)
+
+    if frame_result.error:
+        raise HTTPException(status_code=400, detail=frame_result.error)
+
+    result = {
+        "total_frames": frame_result.total_frames,
+        "duration": frame_result.duration,
+        "method_used": frame_result.method_used,
+        "scene_count": frame_result.scene_count,
+        "frames": [
+            {
+                "index": f.index,
+                "timestamp": f.timestamp,
+                "file_path": f.file_path,
+                "method": f.method,
+                "scene_index": f.scene_index,
+            }
+            for f in frame_result.frames
+        ],
+    }
+
+    # 2. OCR识别
+    if req.enable_ocr:
+        from backend.services.frame_ocr import FrameOCR
+        ocr = FrameOCR()
+        ocr_result = await ocr.extract_video_text(frame_result.frames)
+        result["ocr"] = {
+            "engine_used": ocr_result.engine_used,
+            "all_text": ocr_result.all_text,
+            "frame_count": len(ocr_result.frame_results),
+            "frame_results": [
+                {
+                    "frame_index": fr.frame_index,
+                    "timestamp": fr.timestamp,
+                    "full_text": fr.full_text,
+                    "items": [
+                        {"text": item.text, "confidence": item.confidence, "position": item.position}
+                        for item in fr.items
+                    ],
+                }
+                for fr in ocr_result.frame_results
+            ],
+        }
+
+    # 3. 画面风险评估
+    if req.enable_risk:
+        from backend.services.frame_risk import FrameRiskAssessor
+        assessor = FrameRiskAssessor()
+        risk_result = await assessor.assess_video_frames(frame_result.frames)
+        result["frame_risks"] = {
+            "overall_risk_level": risk_result.overall_risk_level,
+            "high_risk_frames": risk_result.high_risk_frames,
+            "risk_summary": risk_result.risk_summary,
+            "frame_results": [
+                {
+                    "frame_index": fr.frame_index,
+                    "timestamp": fr.timestamp,
+                    "risk_level": fr.risk_level,
+                    "summary": fr.summary,
+                    "risks": [
+                        {
+                            "risk_type": r.risk_type,
+                            "description": r.description,
+                            "severity": r.severity,
+                            "confidence": r.confidence,
+                            "suggestion": r.suggestion,
+                        }
+                        for r in fr.risks
+                    ],
+                }
+                for fr in risk_result.frame_results
+            ],
+        }
+
+    result["analysis_time"] = round(time.time() - start_time, 2)
+    return result
+
+
+@router.get("/frames/{task_id}")
+async def get_frame_results(task_id: str, db: Session = Depends(get_db)):
+    """获取视频帧分析结果"""
+    record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="视频分析任务不存在")
+
+    result = {
+        "task_id": task_id,
+        "status": record.status,
+        "keyframe_method": record.keyframe_method,
+        "keyframe_count": record.keyframe_count,
+        "ocr_engine": record.ocr_engine,
+        "ocr_text": record.ocr_text,
+        "frame_risk_level": record.frame_risk_level,
+        "audio_engine": record.audio_engine,
+        "audio_text": record.audio_text,
+        "overall_risk_level": record.overall_risk_level,
+        "overall_risk_score": record.overall_risk_score,
+        "analysis_time": record.analysis_time,
+    }
+
+    if record.error:
+        result["error"] = record.error
+
+    # 获取帧记录
+    frames = db.query(FrameRecord).filter(FrameRecord.task_id == task_id).order_by(FrameRecord.frame_index).all()
+    result["frames"] = [
+        {
+            "frame_index": f.frame_index,
+            "timestamp": f.timestamp,
+            "file_path": f.file_path,
+            "ocr_text": f.ocr_text,
+            "risk_level": f.risk_level,
+        }
+        for f in frames
+    ]
+
+    return result
+
+
+@router.post("/audio/transcribe")
+async def transcribe_audio(req: AudioTranscribeRequest):
+    """音频转写+情感分析"""
+    from backend.services.audio_analyzer import AudioAnalyzer
+    analyzer = AudioAnalyzer({"enable_sentiment": req.enable_sentiment})
+    result = await analyzer.analyze(req.video_path)
+
+    if result.error:
+        raise HTTPException(status_code=400, detail=result.error)
+
+    response = {
+        "engine_used": result.engine_used,
+        "duration": result.duration,
+        "language": result.language,
+        "full_text": result.full_text,
+        "segments": [
+            {"start": s.start, "end": s.end, "text": s.text}
+            for s in result.segments
+        ],
+        "risk_text": result.risk_text,
+    }
+
+    if result.sentiment:
+        response["sentiment"] = {
+            "sentiment": result.sentiment.sentiment,
+            "emotion": result.sentiment.emotion,
+            "intensity": result.sentiment.intensity,
+            "confidence": result.sentiment.confidence,
+            "description": result.sentiment.description,
+        }
+
+    return response
+
+
+@router.get("/cross-modal/{task_id}")
+async def get_cross_modal_risk(task_id: str, db: Session = Depends(get_db)):
+    """获取交叉模态风险检测结果"""
+    record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="视频分析任务不存在")
+
+    if record.status != "completed":
+        return {"task_id": task_id, "status": record.status}
+
+    return {
+        "task_id": task_id,
+        "status": "completed",
+        "text_risks": {},  # 文字风控需要单独查
+        "ocr_text": record.ocr_text,
+        "audio_text": record.audio_text,
+        "audio_sentiment": json.loads(record.audio_sentiment) if record.audio_sentiment else {},
+        "frame_risk_level": record.frame_risk_level,
+        "cross_modal_risks": json.loads(record.cross_modal_risks) if record.cross_modal_risks else [],
+        "overall_risk_level": record.overall_risk_level,
+        "overall_risk_score": record.overall_risk_score,
+        "risk_breakdown": json.loads(record.risk_breakdown) if record.risk_breakdown else {},
+    }
+
+
+async def _run_video_analysis_v2(task_id: str, video_url: str, video_path: str, mode: str, max_frames: int):
+    """后台运行多模态视频分析"""
+    import time
+    start_time = time.time()
+
+    from backend.database import SessionLocal
+    db = SessionLocal()
+
+    try:
+        record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+        if not record:
+            return
+
+        # 解析视频路径
+        actual_path = video_path
+        if not actual_path and video_url:
+            # 下载视频
+            from backend.services.keyframe_extractor import KeyframeExtractor
+            extractor = KeyframeExtractor({"max_frames": max_frames})
+            downloaded = await extractor._download_video(video_url)
+            if downloaded:
+                actual_path = downloaded
+                record.video_path = downloaded
+                db.commit()
+            else:
+                record.status = "failed"
+                record.error = "无法下载视频"
+                db.commit()
+                return
+
+        if not actual_path or not os.path.exists(actual_path):
+            record.status = "failed"
+            record.error = "视频文件不存在"
+            db.commit()
+            return
+
+        # 1. 关键帧提取
+        from backend.services.keyframe_extractor import KeyframeExtractor
+        extractor = KeyframeExtractor({"max_frames": max_frames})
+        frame_result = await extractor.extract(actual_path)
+
+        if frame_result.error:
+            record.status = "failed"
+            record.error = frame_result.error
+            db.commit()
+            return
+
+        record.keyframe_method = frame_result.method_used
+        record.keyframe_count = len(frame_result.frames)
+        record.keyframe_dir = os.path.dirname(frame_result.frames[0].file_path) if frame_result.frames else ""
+
+        # 保存帧记录
+        for f in frame_result.frames:
+            frame_record = FrameRecord(
+                task_id=task_id,
+                frame_index=f.index,
+                timestamp=f.timestamp,
+                file_path=f.file_path,
+                method=f.method,
+                scene_index=f.scene_index,
+            )
+            db.add(frame_record)
+
+        db.commit()
+
+        # 2. OCR识别
+        ocr_text = ""
+        if mode in ("quick", "deep"):
+            from backend.services.frame_ocr import FrameOCR
+            ocr = FrameOCR()
+            ocr_result = await ocr.extract_video_text(frame_result.frames)
+            record.ocr_engine = ocr_result.engine_used
+            record.ocr_text = ocr_result.all_text
+            ocr_text = ocr_result.all_text
+
+            # 更新帧OCR结果
+            for fr in ocr_result.frame_results:
+                frame_rec = db.query(FrameRecord).filter(
+                    FrameRecord.task_id == task_id,
+                    FrameRecord.timestamp == fr.timestamp,
+                ).first()
+                if frame_rec:
+                    frame_rec.ocr_text = fr.full_text
+                    frame_rec.ocr_items = json.dumps(
+                        [{"text": item.text, "confidence": item.confidence, "position": item.position}
+                         for item in fr.items]
+                    )
+            db.commit()
+
+        # 3. 画面风险评估
+        frame_risk_level = "safe"
+        frame_risk_details = []
+        if mode in ("quick", "deep"):
+            from backend.services.frame_risk import FrameRiskAssessor
+            assessor = FrameRiskAssessor()
+            risk_result = await assessor.assess_video_frames(frame_result.frames)
+            record.frame_risk_level = risk_result.overall_risk_level
+            frame_risk_level = risk_result.overall_risk_level
+            frame_risk_details = [
+                {
+                    "frame_index": fr.frame_index,
+                    "risk_level": fr.risk_level,
+                    "risks": [{"risk_type": r.risk_type, "severity": r.severity, "description": r.description}
+                              for r in fr.risks],
+                }
+                for fr in risk_result.frame_results
+            ]
+            record.frame_risk_details = json.dumps(frame_risk_details)
+
+            # 更新帧风险结果
+            for fr in risk_result.frame_results:
+                frame_rec = db.query(FrameRecord).filter(
+                    FrameRecord.task_id == task_id,
+                    FrameRecord.timestamp == fr.timestamp,
+                ).first()
+                if frame_rec:
+                    frame_rec.risk_level = fr.risk_level
+                    frame_rec.risk_details = json.dumps(
+                        [{"risk_type": r.risk_type, "severity": r.severity, "description": r.description}
+                         for r in fr.risks]
+                    )
+            db.commit()
+
+        # 4. 音频分析（deep模式）
+        audio_text = ""
+        audio_sentiment = {}
+        if mode == "deep":
+            from backend.services.audio_analyzer import AudioAnalyzer
+            analyzer = AudioAnalyzer({"enable_sentiment": True})
+            audio_result = await analyzer.analyze(actual_path)
+
+            if not audio_result.error:
+                record.audio_engine = audio_result.engine_used
+                record.audio_text = audio_result.full_text
+                record.audio_language = audio_result.language
+                audio_text = audio_result.full_text
+
+                if audio_result.sentiment:
+                    audio_sentiment = {
+                        "sentiment": audio_result.sentiment.sentiment,
+                        "emotion": audio_result.sentiment.emotion,
+                        "intensity": audio_result.sentiment.intensity,
+                        "confidence": audio_result.sentiment.confidence,
+                    }
+                    record.audio_sentiment = json.dumps(audio_sentiment)
+            db.commit()
+
+        # 5. 交叉风险检测（deep模式）
+        cross_risks = []
+        if mode == "deep":
+            from backend.services.cross_modal_risk import CrossModalRiskDetector
+            detector = CrossModalRiskDetector()
+            cross_result = await detector.detect(
+                text_analysis={"text": "", "risk_level": "safe"},  # 文字风控结果需要从Task获取
+                image_risks=frame_risk_details,
+                audio_analysis=audio_sentiment if audio_sentiment else None,
+                ocr_text=ocr_text,
+                audio_text=audio_text,
+                task_id=task_id,
+            )
+
+            cross_risks = [
+                {
+                    "risk_type": r.risk_type,
+                    "modalities": r.modalities,
+                    "description": r.description,
+                    "severity": r.severity,
+                    "confidence": r.confidence,
+                }
+                for r in cross_result.cross_risks
+            ]
+            record.cross_modal_risks = json.dumps(cross_risks)
+            record.overall_risk_level = cross_result.overall_risk_level
+            record.overall_risk_score = cross_result.overall_risk_score
+            record.risk_breakdown = json.dumps(cross_result.risk_breakdown)
+            db.commit()
+
+        # 完成
+        record.analysis_time = round(time.time() - start_time, 2)
+        record.status = "completed"
+        db.commit()
+
+    except Exception as e:
+        record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+        if record:
+            record.status = "failed"
+            record.error = str(e)
+            db.commit()
+    finally:
+        db.close()s
 
 
 # ============ 信号采集 API ============
@@ -1610,4 +3720,426 @@ async def get_influence_factors(sim_id: str, agent_id: str = None, platform: str
         }
 
     return result
+
+
+# ═══════════════════════════════════════════════════════════════
+# V2.R4 多模态风控 API
+# ═══════════════════════════════════════════════════════════════
+
+class VideoAnalyzeV2Request(BaseModel):
+    url: str = Field("", description="视频链接(B站/抖音等)")
+    video_path: str = Field("", description="本地视频文件路径(优先于url)")
+    mode: str = Field("quick", description="分析模式: quick(关键帧+OCR)/deep(全部模态)")
+    max_frames: int = Field(50, description="最大关键帧数")
+
+
+class FrameAnalyzeRequest(BaseModel):
+    video_path: str = Field(..., description="视频文件路径")
+    max_frames: int = Field(50, description="最大关键帧数")
+    enable_ocr: bool = Field(True, description="是否启用OCR")
+    enable_risk: bool = Field(True, description="是否启用画面风险评估")
+
+
+class AudioTranscribeRequest(BaseModel):
+    video_path: str = Field(..., description="视频文件路径")
+    enable_sentiment: bool = Field(True, description="是否启用情感分析")
+
+
+@router.post("/analyze-video/v2")
+async def analyze_video_v2(req: VideoAnalyzeV2Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """多模态视频风控分析（V2.R4）- 关键帧提取+OCR+画面风险+音频+交叉检测"""
+    task_id = str(uuid.uuid4())
+
+    record = VideoAnalysisRecord(
+        task_id=task_id,
+        video_url=req.url,
+        video_path=req.video_path,
+        status="processing",
+    )
+    db.add(record)
+    db.commit()
+
+    background_tasks.add_task(_run_video_analysis_v2, task_id, req.url, req.video_path, req.mode, req.max_frames)
+
+    return {"task_id": task_id, "status": "processing", "mode": req.mode}
+
+
+@router.post("/analyze-frames")
+async def analyze_frames(req: FrameAnalyzeRequest, db: Session = Depends(get_db)):
+    """关键帧提取+OCR+画面风险分析"""
+    import time
+    start_time = time.time()
+
+    # 1. 提取关键帧
+    from backend.services.keyframe_extractor import KeyframeExtractor
+    extractor = KeyframeExtractor({"max_frames": req.max_frames})
+    frame_result = await extractor.extract(req.video_path)
+
+    if frame_result.error:
+        raise HTTPException(status_code=400, detail=frame_result.error)
+
+    result = {
+        "total_frames": frame_result.total_frames,
+        "duration": frame_result.duration,
+        "method_used": frame_result.method_used,
+        "scene_count": frame_result.scene_count,
+        "frames": [
+            {
+                "index": f.index,
+                "timestamp": f.timestamp,
+                "file_path": f.file_path,
+                "method": f.method,
+                "scene_index": f.scene_index,
+            }
+            for f in frame_result.frames
+        ],
+    }
+
+    # 2. OCR识别
+    if req.enable_ocr:
+        from backend.services.frame_ocr import FrameOCR
+        ocr = FrameOCR()
+        ocr_result = await ocr.extract_video_text(frame_result.frames)
+        result["ocr"] = {
+            "engine_used": ocr_result.engine_used,
+            "all_text": ocr_result.all_text,
+            "frame_count": len(ocr_result.frame_results),
+            "frame_results": [
+                {
+                    "frame_index": fr.frame_index,
+                    "timestamp": fr.timestamp,
+                    "full_text": fr.full_text,
+                    "items": [
+                        {"text": item.text, "confidence": item.confidence, "position": item.position}
+                        for item in fr.items
+                    ],
+                }
+                for fr in ocr_result.frame_results
+            ],
+        }
+
+    # 3. 画面风险评估
+    if req.enable_risk:
+        from backend.services.frame_risk import FrameRiskAssessor
+        assessor = FrameRiskAssessor()
+        risk_result = await assessor.assess_video_frames(frame_result.frames)
+        result["frame_risks"] = {
+            "overall_risk_level": risk_result.overall_risk_level,
+            "high_risk_frames": risk_result.high_risk_frames,
+            "risk_summary": risk_result.risk_summary,
+            "frame_results": [
+                {
+                    "frame_index": fr.frame_index,
+                    "timestamp": fr.timestamp,
+                    "risk_level": fr.risk_level,
+                    "summary": fr.summary,
+                    "risks": [
+                        {
+                            "risk_type": r.risk_type,
+                            "description": r.description,
+                            "severity": r.severity,
+                            "confidence": r.confidence,
+                            "suggestion": r.suggestion,
+                        }
+                        for r in fr.risks
+                    ],
+                }
+                for fr in risk_result.frame_results
+            ],
+        }
+
+    result["analysis_time"] = round(time.time() - start_time, 2)
+    return result
+
+
+@router.get("/frames/{task_id}")
+async def get_frame_results(task_id: str, db: Session = Depends(get_db)):
+    """获取视频帧分析结果"""
+    record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="视频分析任务不存在")
+
+    result = {
+        "task_id": task_id,
+        "status": record.status,
+        "keyframe_method": record.keyframe_method,
+        "keyframe_count": record.keyframe_count,
+        "ocr_engine": record.ocr_engine,
+        "ocr_text": record.ocr_text,
+        "frame_risk_level": record.frame_risk_level,
+        "audio_engine": record.audio_engine,
+        "audio_text": record.audio_text,
+        "overall_risk_level": record.overall_risk_level,
+        "overall_risk_score": record.overall_risk_score,
+        "analysis_time": record.analysis_time,
+    }
+
+    if record.error:
+        result["error"] = record.error
+
+    # 获取帧记录
+    frames = db.query(FrameRecord).filter(FrameRecord.task_id == task_id).order_by(FrameRecord.frame_index).all()
+    result["frames"] = [
+        {
+            "frame_index": f.frame_index,
+            "timestamp": f.timestamp,
+            "file_path": f.file_path,
+            "ocr_text": f.ocr_text,
+            "risk_level": f.risk_level,
+        }
+        for f in frames
+    ]
+
+    return result
+
+
+@router.post("/audio/transcribe")
+async def transcribe_audio(req: AudioTranscribeRequest):
+    """音频转写+情感分析"""
+    from backend.services.audio_analyzer import AudioAnalyzer
+    analyzer = AudioAnalyzer({"enable_sentiment": req.enable_sentiment})
+    result = await analyzer.analyze(req.video_path)
+
+    if result.error:
+        raise HTTPException(status_code=400, detail=result.error)
+
+    response = {
+        "engine_used": result.engine_used,
+        "duration": result.duration,
+        "language": result.language,
+        "full_text": result.full_text,
+        "segments": [
+            {"start": s.start, "end": s.end, "text": s.text}
+            for s in result.segments
+        ],
+        "risk_text": result.risk_text,
+    }
+
+    if result.sentiment:
+        response["sentiment"] = {
+            "sentiment": result.sentiment.sentiment,
+            "emotion": result.sentiment.emotion,
+            "intensity": result.sentiment.intensity,
+            "confidence": result.sentiment.confidence,
+            "description": result.sentiment.description,
+        }
+
+    return response
+
+
+@router.get("/cross-modal/{task_id}")
+async def get_cross_modal_risk(task_id: str, db: Session = Depends(get_db)):
+    """获取交叉模态风险检测结果"""
+    record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="视频分析任务不存在")
+
+    if record.status != "completed":
+        return {"task_id": task_id, "status": record.status}
+
+    return {
+        "task_id": task_id,
+        "status": "completed",
+        "text_risks": {},  # 文字风控需要单独查
+        "ocr_text": record.ocr_text,
+        "audio_text": record.audio_text,
+        "audio_sentiment": json.loads(record.audio_sentiment) if record.audio_sentiment else {},
+        "frame_risk_level": record.frame_risk_level,
+        "cross_modal_risks": json.loads(record.cross_modal_risks) if record.cross_modal_risks else [],
+        "overall_risk_level": record.overall_risk_level,
+        "overall_risk_score": record.overall_risk_score,
+        "risk_breakdown": json.loads(record.risk_breakdown) if record.risk_breakdown else {},
+    }
+
+
+async def _run_video_analysis_v2(task_id: str, video_url: str, video_path: str, mode: str, max_frames: int):
+    """后台运行多模态视频分析"""
+    import time
+    start_time = time.time()
+
+    from backend.database import SessionLocal
+    db = SessionLocal()
+
+    try:
+        record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+        if not record:
+            return
+
+        # 解析视频路径
+        actual_path = video_path
+        if not actual_path and video_url:
+            # 下载视频
+            from backend.services.keyframe_extractor import KeyframeExtractor
+            extractor = KeyframeExtractor({"max_frames": max_frames})
+            downloaded = await extractor._download_video(video_url)
+            if downloaded:
+                actual_path = downloaded
+                record.video_path = downloaded
+                db.commit()
+            else:
+                record.status = "failed"
+                record.error = "无法下载视频"
+                db.commit()
+                return
+
+        if not actual_path or not os.path.exists(actual_path):
+            record.status = "failed"
+            record.error = "视频文件不存在"
+            db.commit()
+            return
+
+        # 1. 关键帧提取
+        from backend.services.keyframe_extractor import KeyframeExtractor
+        extractor = KeyframeExtractor({"max_frames": max_frames})
+        frame_result = await extractor.extract(actual_path)
+
+        if frame_result.error:
+            record.status = "failed"
+            record.error = frame_result.error
+            db.commit()
+            return
+
+        record.keyframe_method = frame_result.method_used
+        record.keyframe_count = len(frame_result.frames)
+        record.keyframe_dir = os.path.dirname(frame_result.frames[0].file_path) if frame_result.frames else ""
+
+        # 保存帧记录
+        for f in frame_result.frames:
+            frame_record = FrameRecord(
+                task_id=task_id,
+                frame_index=f.index,
+                timestamp=f.timestamp,
+                file_path=f.file_path,
+                method=f.method,
+                scene_index=f.scene_index,
+            )
+            db.add(frame_record)
+
+        db.commit()
+
+        # 2. OCR识别
+        ocr_text = ""
+        if mode in ("quick", "deep"):
+            from backend.services.frame_ocr import FrameOCR
+            ocr = FrameOCR()
+            ocr_result = await ocr.extract_video_text(frame_result.frames)
+            record.ocr_engine = ocr_result.engine_used
+            record.ocr_text = ocr_result.all_text
+            ocr_text = ocr_result.all_text
+
+            # 更新帧OCR结果
+            for fr in ocr_result.frame_results:
+                frame_rec = db.query(FrameRecord).filter(
+                    FrameRecord.task_id == task_id,
+                    FrameRecord.timestamp == fr.timestamp,
+                ).first()
+                if frame_rec:
+                    frame_rec.ocr_text = fr.full_text
+                    frame_rec.ocr_items = json.dumps(
+                        [{"text": item.text, "confidence": item.confidence, "position": item.position}
+                         for item in fr.items]
+                    )
+            db.commit()
+
+        # 3. 画面风险评估
+        frame_risk_level = "safe"
+        frame_risk_details = []
+        if mode in ("quick", "deep"):
+            from backend.services.frame_risk import FrameRiskAssessor
+            assessor = FrameRiskAssessor()
+            risk_result = await assessor.assess_video_frames(frame_result.frames)
+            record.frame_risk_level = risk_result.overall_risk_level
+            frame_risk_level = risk_result.overall_risk_level
+            frame_risk_details = [
+                {
+                    "frame_index": fr.frame_index,
+                    "risk_level": fr.risk_level,
+                    "risks": [{"risk_type": r.risk_type, "severity": r.severity, "description": r.description}
+                              for r in fr.risks],
+                }
+                for fr in risk_result.frame_results
+            ]
+            record.frame_risk_details = json.dumps(frame_risk_details)
+
+            # 更新帧风险结果
+            for fr in risk_result.frame_results:
+                frame_rec = db.query(FrameRecord).filter(
+                    FrameRecord.task_id == task_id,
+                    FrameRecord.timestamp == fr.timestamp,
+                ).first()
+                if frame_rec:
+                    frame_rec.risk_level = fr.risk_level
+                    frame_rec.risk_details = json.dumps(
+                        [{"risk_type": r.risk_type, "severity": r.severity, "description": r.description}
+                         for r in fr.risks]
+                    )
+            db.commit()
+
+        # 4. 音频分析（deep模式）
+        audio_text = ""
+        audio_sentiment = {}
+        if mode == "deep":
+            from backend.services.audio_analyzer import AudioAnalyzer
+            analyzer = AudioAnalyzer({"enable_sentiment": True})
+            audio_result = await analyzer.analyze(actual_path)
+
+            if not audio_result.error:
+                record.audio_engine = audio_result.engine_used
+                record.audio_text = audio_result.full_text
+                record.audio_language = audio_result.language
+                audio_text = audio_result.full_text
+
+                if audio_result.sentiment:
+                    audio_sentiment = {
+                        "sentiment": audio_result.sentiment.sentiment,
+                        "emotion": audio_result.sentiment.emotion,
+                        "intensity": audio_result.sentiment.intensity,
+                        "confidence": audio_result.sentiment.confidence,
+                    }
+                    record.audio_sentiment = json.dumps(audio_sentiment)
+            db.commit()
+
+        # 5. 交叉风险检测（deep模式）
+        cross_risks = []
+        if mode == "deep":
+            from backend.services.cross_modal_risk import CrossModalRiskDetector
+            detector = CrossModalRiskDetector()
+            cross_result = await detector.detect(
+                text_analysis={"text": "", "risk_level": "safe"},  # 文字风控结果需要从Task获取
+                image_risks=frame_risk_details,
+                audio_analysis=audio_sentiment if audio_sentiment else None,
+                ocr_text=ocr_text,
+                audio_text=audio_text,
+                task_id=task_id,
+            )
+
+            cross_risks = [
+                {
+                    "risk_type": r.risk_type,
+                    "modalities": r.modalities,
+                    "description": r.description,
+                    "severity": r.severity,
+                    "confidence": r.confidence,
+                }
+                for r in cross_result.cross_risks
+            ]
+            record.cross_modal_risks = json.dumps(cross_risks)
+            record.overall_risk_level = cross_result.overall_risk_level
+            record.overall_risk_score = cross_result.overall_risk_score
+            record.risk_breakdown = json.dumps(cross_result.risk_breakdown)
+            db.commit()
+
+        # 完成
+        record.analysis_time = round(time.time() - start_time, 2)
+        record.status = "completed"
+        db.commit()
+
+    except Exception as e:
+        record = db.query(VideoAnalysisRecord).filter(VideoAnalysisRecord.task_id == task_id).first()
+        if record:
+            record.status = "failed"
+            record.error = str(e)
+            db.commit()
+    finally:
+        db.close()
 

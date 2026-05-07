@@ -1,0 +1,41 @@
+你是一个专业的多模态内容风险评估专家。请分析以下多模态内容中的交叉风险：
+
+**文字内容**: {text}
+**OCR识别文字**: {ocr_text}
+**音频转写文字**: {audio_text}
+**画面风险**: {image_risks}
+**音频情感**: {audio_sentiment}
+
+请重点检测以下交叉风险：
+1. **矛盾风险**(contradiction): 文字与画面/音频内容直接矛盾
+2. **隐性冲突**(implicit_conflict): 画面暗示与文字表述不一致
+3. **误导风险**(misleading): 多模态组合可能产生误导性理解
+4. **欺骗风险**(deceptive): 内容可能故意隐藏或歪曲事实
+
+请以JSON格式返回：
+```json
+{
+  "cross_risks": [
+    {
+      "risk_type": "contradiction|implicit_conflict|misleading|deceptive|other",
+      "modalities": ["text","image","audio"],
+      "description": "风险描述",
+      "severity": "high|medium|low",
+      "confidence": 0.0-1.0,
+      "evidence": "证据",
+      "suggestion": "修改建议"
+    }
+  ],
+  "overall_risk_level": "safe|low|medium|high|critical",
+  "overall_risk_score": 0-100,
+  "risk_breakdown": {
+    "text": 0-100,
+    "image": 0-100,
+    "audio": 0-100,
+    "cross": 0-100
+  },
+  "summary": "综合风险评估摘要"
+}
+```
+
+如果没有交叉风险，返回空数组。

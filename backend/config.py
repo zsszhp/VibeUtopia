@@ -54,5 +54,12 @@ class Settings:
     AGENT_MEMORY_MAX_PER_AGENT: int = int(os.getenv("AGENT_MEMORY_MAX_PER_AGENT", "100"))
     AGENT_MEMORY_HALF_LIFE_DAYS: int = int(os.getenv("AGENT_MEMORY_HALF_LIFE_DAYS", "7"))
 
+    # 多模态风控配置（V2.R4新增）
+    KEYFRAME_MAX_FRAMES: int = int(os.getenv("KEYFRAME_MAX_FRAMES", "50"))
+    KEYFRAME_INTERVAL_SECONDS: float = float(os.getenv("KEYFRAME_INTERVAL_SECONDS", "5.0"))
+    OCR_MIN_CONFIDENCE: float = float(os.getenv("OCR_MIN_CONFIDENCE", "0.5"))
+    WHISPER_MODEL: str = os.getenv("WHISPER_MODEL", "base")
+    WHISPER_DEVICE: str = os.getenv("WHISPER_DEVICE", "cpu")
+
 
 settings = Settings()

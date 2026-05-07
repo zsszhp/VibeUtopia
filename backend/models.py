@@ -286,3 +286,50 @@ class ReportRecord(Base):
     summary = Column(Text, default="")
     metadata_json = Column(Text, default="{}")
     created_at = Column(DateTime, default=utcnow)
+
+
+class VideoAnalysisRecord(Base):
+    """多模态视频分析记录（V2.R4新增）"""
+    __tablename__ = "video_analysis_records"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_id = Column(String, index=True)
+    video_url = Column(String, default="")
+    video_path = Column(String, default="")
+    keyframe_method = Column(String, default="")            # scenedetect/ffmpeg/opencv
+    keyframe_count = Column(Integer, default=0)
+    keyframe_dir = Column(String, default="")               # 关键帧输出目录
+    ocr_engine = Column(String, default="")                 # paddleocr/easyocr
+    ocr_text = Column(Text, default="")                     # OCR合并文字
+    frame_risk_level = Column(String, default="safe")       # 画面综合风险等级
+    frame_risk_details = Column(Text, default="[]")         # JSON: 各帧风险
+    audio_engine = Column(String, default="")               # faster-whisper/openai-whisper
+    audio_text = Column(Text, default="")                   # 音频转写文字
+    audio_language = Column(String, default="")
+    audio_sentiment = Column(Text, default="{}")            # JSON: 情感分析
+    cross_modal_risks = Column(Text, default="[]")          # JSON: 交叉风险
+    overall_risk_level = Column(String, default="safe")     # 综合风险等级
+    overall_risk_score = Column(Float, default=0.0)         # 综合风险分数
+    risk_breakdown = Column(Text, default="{}")             # JSON: 分模态风险
+    analysis_time = Column(Float, default=0.0)              # 分析耗时(秒)
+    status = Column(String, default="processing")           # processing/completed/failed
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+
+
+class FrameRecord(Base):
+    """关键帧记录（V2.R4新增）"""
+    __tablename__ = "frame_records"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_id = Column(String, index=True)
+    frame_index = Column(Integer, default=0)
+    timestamp = Column(Float, default=0.0)
+    file_path = Column(String)
+    method = Column(String, default="")                     # scenedetect/interval/opencv
+    scene_index = Column(Integer, default=-1)
+    ocr_text = Column(Text, default="")                     # 该帧OCR文字
+    ocr_items = Column(Text, default="[]")                  # JSON: OCR详细结果
+    risk_level = Column(String, default="safe")             # 该帧风险等级
+    risk_details = Column(Text, default="[]")               # JSON: 风险详情
+    created_at = Column(DateTime, default=utcnow)
