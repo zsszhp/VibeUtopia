@@ -1,0 +1,53 @@
+你是一个专业的内容创作者风格分析专家。请分析以下博主的历史内容，生成5维风格画像。
+
+**博主历史内容**:
+{contents}
+
+请以JSON格式返回画像：
+```json
+{
+  "vocabulary": {
+    "top_words": [{"word": "词汇", "count": 10, "ratio": 0.05}],
+    "avg_sentence_length": 15.0,
+    "professional_ratio": 0.3,
+    "emotional_words": ["感动", "愤怒"],
+    "readability_score": 75.0
+  },
+  "expression": {
+    "tone": "casual",
+    "sentence_patterns": ["疑问句", "感叹句"],
+    "rhetoric_devices": ["比喻", "反问"],
+    "emoji_usage": 0.5,
+    "exclamation_ratio": 0.3
+  },
+  "topics": {
+    "primary_topics": [{"topic": "美食", "weight": 0.4}],
+    "secondary_topics": [{"topic": "旅行", "weight": 0.2}],
+    "content_diversity": 0.6,
+    "trending_sensitivity": 0.7
+  },
+  "audience": {
+    "target_age": "18-35",
+    "target_gender": "女性为主",
+    "engagement_style": "积极互动",
+    "avg_engagement": 0.05,
+    "fan_loyalty": 0.7
+  },
+  "risk": {
+    "historical_risk_count": 1,
+    "risk_dimensions": ["道德伦理"],
+    "risk_tolerance": "moderate",
+    "sensitive_topics": ["争议性社会话题"],
+    "near_miss_count": 2
+  },
+  "overall_style": "轻松幽默的美食生活博主，善于用比喻和互动吸引观众",
+  "style_tags": ["美食", "生活", "幽默", "互动型"],
+  "confidence": 0.8
+}
+```
+
+注意：
+1. top_words最多10个，按频率降序
+2. tone只能是: formal/casual/humorous/serious/inspiring
+3. risk_tolerance只能是: conservative/moderate/aggressive
+4. 所有数值型字段需在合理范围内

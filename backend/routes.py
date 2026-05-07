@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.config import settings
 from backend.database import get_db
-from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord, AgentRecord, SocialRelation, AgentMemory, SimulationRecord, SimulationStatus, PropagationSnapshot, PropagationEdge, V2AnalysisResult, BacktestRecord, ConsistencyRecord, TrendPredictionRecord, ReportRecord, VideoAnalysisRecord, FrameRecord
+from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord, AgentRecord, SocialRelation, AgentMemory, SimulationRecord, SimulationStatus, PropagationSnapshot, PropagationEdge, V2AnalysisResult, BacktestRecord, ConsistencyRecord, TrendPredictionRecord, ReportRecord, VideoAnalysisRecord, FrameRecord, BloggerProfileRecord, CompetitorCompareRecord
 from backend.services.analyzer import run_analysis, MAX_TEXT_LENGTH
 from backend.services.video_extractor import extract_video_text
 from backend.services.signal.fetcher import HotlistFetcher
@@ -472,6 +472,249 @@ async def _run_video_analysis_v2(task_id: str, video_url: str, video_path: str, 
             db.commit()
     finally:
         db.close()
+
+
+# ═══════════════════════════════════════════════════════════════
+# V2.R6 博主附加服务 API
+# ═══════════════════════════════════════════════════════════════
+
+class BloggerAnalyzeRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    name: str = Field("", description="博主名称")
+    platform: str = Field("", description="平台")
+    contents: list = Field(default_factory=list, description="历史内容列表")
+
+
+class BloggerRecommendRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    hot_topics: list = Field(default_factory=list, description="可选热点列表")
+
+
+class CompetitorCompareRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    competitor_id: str = Field(..., description="竞品博主ID")
+    competitor_contents: list = Field(default_factory=list, description="竞品历史内容")
+
+
+@router.post("/blogger/analyze")
+async def analyze_blogger(req: BloggerAnalyzeRequest, db: Session = Depends(get_db)):
+    """生成博主风格画像"""
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    profiler = BloggerProfiler()
+    profile = await profiler.generate_profile(
+        blogger_id=req.blogger_id,
+        name=req.name,
+        platform=req.platform,
+        contents=req.contents,
+    )
+
+    # 保存到数据库
+    import dataclasses
+    existing = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    profile_data = {
+        "vocabulary_json": json.dumps(dataclasses.asdict(profile.vocabulary), ensure_ascii=False),
+        "expression_json": json.dumps(dataclasses.asdict(profile.expression), ensure_ascii=False),
+        "topics_json": json.dumps(dataclasses.asdict(profile.topics), ensure_ascii=False),
+        "audience_json": json.dumps(dataclasses.asdict(profile.audience), ensure_ascii=False),
+        "risk_json": json.dumps(dataclasses.asdict(profile.risk), ensure_ascii=False),
+        "overall_style": profile.overall_style,
+        "style_tags": json.dumps(profile.style_tags, ensure_ascii=False),
+        "confidence": profile.confidence,
+        "content_count": profile.content_count,
+        "name": req.name,
+        "platform": req.platform,
+    }
+
+    if existing:
+        for k, v in profile_data.items():
+            setattr(existing, k, v)
+        existing.updated_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    else:
+        record = BloggerProfileRecord(blogger_id=req.blogger_id, **profile_data)
+        db.add(record)
+
+    db.commit()
+
+    return {
+        "blogger_id": profile.blogger_id,
+        "name": profile.name,
+        "overall_style": profile.overall_style,
+        "style_tags": profile.style_tags,
+        "confidence": profile.confidence,
+        "vocabulary": dataclasses.asdict(profile.vocabulary),
+        "expression": dataclasses.asdict(profile.expression),
+        "topics": dataclasses.asdict(profile.topics),
+        "audience": dataclasses.asdict(profile.audience),
+        "risk": dataclasses.asdict(profile.risk),
+    }
+
+
+@router.get("/blogger/{blogger_id}/profile")
+async def get_blogger_profile(blogger_id: str, db: Session = Depends(get_db)):
+    """获取博主画像"""
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="博主画像不存在")
+
+    return {
+        "blogger_id": record.blogger_id,
+        "name": record.name,
+        "platform": record.platform,
+        "content_count": record.content_count,
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+        "confidence": record.confidence,
+        "updated_at": str(record.updated_at) if record.updated_at else "",
+    }
+
+
+@router.post("/blogger/recommend")
+async def recommend_topics(req: BloggerRecommendRequest, db: Session = Depends(get_db)):
+    """选题推荐"""
+    from backend.services.topic_recommender import TopicRecommender
+
+    # 获取博主画像
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    profile_data = {
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+    }
+
+    recommender = TopicRecommender()
+    result = await recommender.recommend(
+        blogger_profile=profile_data,
+        hot_topics=req.hot_topics if req.hot_topics else None,
+        blogger_id=req.blogger_id,
+        blogger_name=record.name,
+    )
+
+    return {
+        "blogger_id": result.blogger_id,
+        "blogger_name": result.blogger_name,
+        "hot_topics_used": result.hot_topics_used,
+        "recommendations": [
+            {
+                "topic": r.topic,
+                "angle": r.angle,
+                "reason": r.reason,
+                "trend_score": r.trend_score,
+                "style_match": r.style_match,
+                "risk_level": r.risk_level,
+                "risk_note": r.risk_note,
+                "estimated_reach": r.estimated_reach,
+                "priority": r.priority,
+            }
+            for r in result.recommendations
+        ],
+        "summary": result.summary,
+    }
+
+
+@router.post("/competitor/compare")
+async def compare_competitors(req: CompetitorCompareRequest, db: Session = Depends(get_db)):
+    """竞品对标分析"""
+    from backend.services.competitor_analyzer import CompetitorAnalyzer
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    # 获取博主画像
+    blogger_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not blogger_record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    blogger_data = {
+        "vocabulary": json.loads(blogger_record.vocabulary_json) if blogger_record.vocabulary_json else {},
+        "expression": json.loads(blogger_record.expression_json) if blogger_record.expression_json else {},
+        "topics": json.loads(blogger_record.topics_json) if blogger_record.topics_json else {},
+        "audience": json.loads(blogger_record.audience_json) if blogger_record.audience_json else {},
+        "risk": json.loads(blogger_record.risk_json) if blogger_record.risk_json else {},
+        "overall_style": blogger_record.overall_style,
+        "style_tags": json.loads(blogger_record.style_tags) if blogger_record.style_tags else [],
+    }
+
+    # 获取或生成竞品画像
+    competitor_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.competitor_id
+    ).first()
+
+    if competitor_record:
+        competitor_data = {
+            "vocabulary": json.loads(competitor_record.vocabulary_json) if competitor_record.vocabulary_json else {},
+            "expression": json.loads(competitor_record.expression_json) if competitor_record.expression_json else {},
+            "topics": json.loads(competitor_record.topics_json) if competitor_record.topics_json else {},
+            "audience": json.loads(competitor_record.audience_json) if competitor_record.audience_json else {},
+            "risk": json.loads(competitor_record.risk_json) if competitor_record.risk_json else {},
+            "overall_style": competitor_record.overall_style,
+            "style_tags": json.loads(competitor_record.style_tags) if competitor_record.style_tags else [],
+        }
+    elif req.competitor_contents:
+        # 实时生成竞品画像
+        profiler = BloggerProfiler()
+        comp_profile = await profiler.generate_profile(
+            blogger_id=req.competitor_id,
+            contents=req.competitor_contents,
+        )
+        import dataclasses
+        competitor_data = dataclasses.asdict(comp_profile)
+    else:
+        raise HTTPException(status_code=400, detail="竞品画像不存在且未提供内容，无法生成画像")
+
+    # 对比分析
+    analyzer = CompetitorAnalyzer()
+    result = await analyzer.compare(
+        blogger_profile=blogger_data,
+        competitor_profile=competitor_data,
+        blogger_id=req.blogger_id,
+        blogger_name=blogger_record.name,
+        competitor_id=req.competitor_id,
+    )
+
+    # 保存记录
+    import dataclasses
+    compare_record = CompetitorCompareRecord(
+        blogger_id=req.blogger_id,
+        competitor_id=req.competitor_id,
+        style_comparisons=json.dumps([dataclasses.asdict(c) for c in result.style_comparisons], ensure_ascii=False),
+        content_gaps=json.dumps([dataclasses.asdict(g) for g in result.content_gaps], ensure_ascii=False),
+        suggestions=json.dumps([dataclasses.asdict(s) for s in result.suggestions], ensure_ascii=False),
+        overall_assessment=result.overall_assessment,
+    )
+    db.add(compare_record)
+    db.commit()
+
+    return {
+        "blogger_id": result.blogger_id,
+        "competitor_id": result.competitor_id,
+        "style_comparisons": [dataclasses.asdict(c) for c in result.style_comparisons],
+        "content_gaps": [dataclasses.asdict(g) for g in result.content_gaps],
+        "suggestions": [dataclasses.asdict(s) for s in result.suggestions],
+        "overall_assessment": result.overall_assessment,
+    }
 
 
 @router.post("/analyze-video", response_model=AnalyzeResponse)
@@ -951,6 +1194,249 @@ async def _run_video_analysis_v2(task_id: str, video_url: str, video_path: str, 
     finally:
         db.close()
 
+
+# ═══════════════════════════════════════════════════════════════
+# V2.R6 博主附加服务 API
+# ═══════════════════════════════════════════════════════════════
+
+class BloggerAnalyzeRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    name: str = Field("", description="博主名称")
+    platform: str = Field("", description="平台")
+    contents: list = Field(default_factory=list, description="历史内容列表")
+
+
+class BloggerRecommendRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    hot_topics: list = Field(default_factory=list, description="可选热点列表")
+
+
+class CompetitorCompareRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    competitor_id: str = Field(..., description="竞品博主ID")
+    competitor_contents: list = Field(default_factory=list, description="竞品历史内容")
+
+
+@router.post("/blogger/analyze")
+async def analyze_blogger(req: BloggerAnalyzeRequest, db: Session = Depends(get_db)):
+    """生成博主风格画像"""
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    profiler = BloggerProfiler()
+    profile = await profiler.generate_profile(
+        blogger_id=req.blogger_id,
+        name=req.name,
+        platform=req.platform,
+        contents=req.contents,
+    )
+
+    # 保存到数据库
+    import dataclasses
+    existing = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    profile_data = {
+        "vocabulary_json": json.dumps(dataclasses.asdict(profile.vocabulary), ensure_ascii=False),
+        "expression_json": json.dumps(dataclasses.asdict(profile.expression), ensure_ascii=False),
+        "topics_json": json.dumps(dataclasses.asdict(profile.topics), ensure_ascii=False),
+        "audience_json": json.dumps(dataclasses.asdict(profile.audience), ensure_ascii=False),
+        "risk_json": json.dumps(dataclasses.asdict(profile.risk), ensure_ascii=False),
+        "overall_style": profile.overall_style,
+        "style_tags": json.dumps(profile.style_tags, ensure_ascii=False),
+        "confidence": profile.confidence,
+        "content_count": profile.content_count,
+        "name": req.name,
+        "platform": req.platform,
+    }
+
+    if existing:
+        for k, v in profile_data.items():
+            setattr(existing, k, v)
+        existing.updated_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    else:
+        record = BloggerProfileRecord(blogger_id=req.blogger_id, **profile_data)
+        db.add(record)
+
+    db.commit()
+
+    return {
+        "blogger_id": profile.blogger_id,
+        "name": profile.name,
+        "overall_style": profile.overall_style,
+        "style_tags": profile.style_tags,
+        "confidence": profile.confidence,
+        "vocabulary": dataclasses.asdict(profile.vocabulary),
+        "expression": dataclasses.asdict(profile.expression),
+        "topics": dataclasses.asdict(profile.topics),
+        "audience": dataclasses.asdict(profile.audience),
+        "risk": dataclasses.asdict(profile.risk),
+    }
+
+
+@router.get("/blogger/{blogger_id}/profile")
+async def get_blogger_profile(blogger_id: str, db: Session = Depends(get_db)):
+    """获取博主画像"""
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="博主画像不存在")
+
+    return {
+        "blogger_id": record.blogger_id,
+        "name": record.name,
+        "platform": record.platform,
+        "content_count": record.content_count,
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+        "confidence": record.confidence,
+        "updated_at": str(record.updated_at) if record.updated_at else "",
+    }
+
+
+@router.post("/blogger/recommend")
+async def recommend_topics(req: BloggerRecommendRequest, db: Session = Depends(get_db)):
+    """选题推荐"""
+    from backend.services.topic_recommender import TopicRecommender
+
+    # 获取博主画像
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    profile_data = {
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+    }
+
+    recommender = TopicRecommender()
+    result = await recommender.recommend(
+        blogger_profile=profile_data,
+        hot_topics=req.hot_topics if req.hot_topics else None,
+        blogger_id=req.blogger_id,
+        blogger_name=record.name,
+    )
+
+    return {
+        "blogger_id": result.blogger_id,
+        "blogger_name": result.blogger_name,
+        "hot_topics_used": result.hot_topics_used,
+        "recommendations": [
+            {
+                "topic": r.topic,
+                "angle": r.angle,
+                "reason": r.reason,
+                "trend_score": r.trend_score,
+                "style_match": r.style_match,
+                "risk_level": r.risk_level,
+                "risk_note": r.risk_note,
+                "estimated_reach": r.estimated_reach,
+                "priority": r.priority,
+            }
+            for r in result.recommendations
+        ],
+        "summary": result.summary,
+    }
+
+
+@router.post("/competitor/compare")
+async def compare_competitors(req: CompetitorCompareRequest, db: Session = Depends(get_db)):
+    """竞品对标分析"""
+    from backend.services.competitor_analyzer import CompetitorAnalyzer
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    # 获取博主画像
+    blogger_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not blogger_record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    blogger_data = {
+        "vocabulary": json.loads(blogger_record.vocabulary_json) if blogger_record.vocabulary_json else {},
+        "expression": json.loads(blogger_record.expression_json) if blogger_record.expression_json else {},
+        "topics": json.loads(blogger_record.topics_json) if blogger_record.topics_json else {},
+        "audience": json.loads(blogger_record.audience_json) if blogger_record.audience_json else {},
+        "risk": json.loads(blogger_record.risk_json) if blogger_record.risk_json else {},
+        "overall_style": blogger_record.overall_style,
+        "style_tags": json.loads(blogger_record.style_tags) if blogger_record.style_tags else [],
+    }
+
+    # 获取或生成竞品画像
+    competitor_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.competitor_id
+    ).first()
+
+    if competitor_record:
+        competitor_data = {
+            "vocabulary": json.loads(competitor_record.vocabulary_json) if competitor_record.vocabulary_json else {},
+            "expression": json.loads(competitor_record.expression_json) if competitor_record.expression_json else {},
+            "topics": json.loads(competitor_record.topics_json) if competitor_record.topics_json else {},
+            "audience": json.loads(competitor_record.audience_json) if competitor_record.audience_json else {},
+            "risk": json.loads(competitor_record.risk_json) if competitor_record.risk_json else {},
+            "overall_style": competitor_record.overall_style,
+            "style_tags": json.loads(competitor_record.style_tags) if competitor_record.style_tags else [],
+        }
+    elif req.competitor_contents:
+        # 实时生成竞品画像
+        profiler = BloggerProfiler()
+        comp_profile = await profiler.generate_profile(
+            blogger_id=req.competitor_id,
+            contents=req.competitor_contents,
+        )
+        import dataclasses
+        competitor_data = dataclasses.asdict(comp_profile)
+    else:
+        raise HTTPException(status_code=400, detail="竞品画像不存在且未提供内容，无法生成画像")
+
+    # 对比分析
+    analyzer = CompetitorAnalyzer()
+    result = await analyzer.compare(
+        blogger_profile=blogger_data,
+        competitor_profile=competitor_data,
+        blogger_id=req.blogger_id,
+        blogger_name=blogger_record.name,
+        competitor_id=req.competitor_id,
+    )
+
+    # 保存记录
+    import dataclasses
+    compare_record = CompetitorCompareRecord(
+        blogger_id=req.blogger_id,
+        competitor_id=req.competitor_id,
+        style_comparisons=json.dumps([dataclasses.asdict(c) for c in result.style_comparisons], ensure_ascii=False),
+        content_gaps=json.dumps([dataclasses.asdict(g) for g in result.content_gaps], ensure_ascii=False),
+        suggestions=json.dumps([dataclasses.asdict(s) for s in result.suggestions], ensure_ascii=False),
+        overall_assessment=result.overall_assessment,
+    )
+    db.add(compare_record)
+    db.commit()
+
+    return {
+        "blogger_id": result.blogger_id,
+        "competitor_id": result.competitor_id,
+        "style_comparisons": [dataclasses.asdict(c) for c in result.style_comparisons],
+        "content_gaps": [dataclasses.asdict(g) for g in result.content_gaps],
+        "suggestions": [dataclasses.asdict(s) for s in result.suggestions],
+        "overall_assessment": result.overall_assessment,
+    }
+
         result["summary"] = {
             "overall_score": summary.overall_score,
             "suggestion": summary.suggestion,
@@ -1405,6 +1891,249 @@ async def _run_video_analysis_v2(task_id: str, video_url: str, video_path: str, 
             db.commit()
     finally:
         db.close()
+
+
+# ═══════════════════════════════════════════════════════════════
+# V2.R6 博主附加服务 API
+# ═══════════════════════════════════════════════════════════════
+
+class BloggerAnalyzeRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    name: str = Field("", description="博主名称")
+    platform: str = Field("", description="平台")
+    contents: list = Field(default_factory=list, description="历史内容列表")
+
+
+class BloggerRecommendRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    hot_topics: list = Field(default_factory=list, description="可选热点列表")
+
+
+class CompetitorCompareRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    competitor_id: str = Field(..., description="竞品博主ID")
+    competitor_contents: list = Field(default_factory=list, description="竞品历史内容")
+
+
+@router.post("/blogger/analyze")
+async def analyze_blogger(req: BloggerAnalyzeRequest, db: Session = Depends(get_db)):
+    """生成博主风格画像"""
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    profiler = BloggerProfiler()
+    profile = await profiler.generate_profile(
+        blogger_id=req.blogger_id,
+        name=req.name,
+        platform=req.platform,
+        contents=req.contents,
+    )
+
+    # 保存到数据库
+    import dataclasses
+    existing = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    profile_data = {
+        "vocabulary_json": json.dumps(dataclasses.asdict(profile.vocabulary), ensure_ascii=False),
+        "expression_json": json.dumps(dataclasses.asdict(profile.expression), ensure_ascii=False),
+        "topics_json": json.dumps(dataclasses.asdict(profile.topics), ensure_ascii=False),
+        "audience_json": json.dumps(dataclasses.asdict(profile.audience), ensure_ascii=False),
+        "risk_json": json.dumps(dataclasses.asdict(profile.risk), ensure_ascii=False),
+        "overall_style": profile.overall_style,
+        "style_tags": json.dumps(profile.style_tags, ensure_ascii=False),
+        "confidence": profile.confidence,
+        "content_count": profile.content_count,
+        "name": req.name,
+        "platform": req.platform,
+    }
+
+    if existing:
+        for k, v in profile_data.items():
+            setattr(existing, k, v)
+        existing.updated_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    else:
+        record = BloggerProfileRecord(blogger_id=req.blogger_id, **profile_data)
+        db.add(record)
+
+    db.commit()
+
+    return {
+        "blogger_id": profile.blogger_id,
+        "name": profile.name,
+        "overall_style": profile.overall_style,
+        "style_tags": profile.style_tags,
+        "confidence": profile.confidence,
+        "vocabulary": dataclasses.asdict(profile.vocabulary),
+        "expression": dataclasses.asdict(profile.expression),
+        "topics": dataclasses.asdict(profile.topics),
+        "audience": dataclasses.asdict(profile.audience),
+        "risk": dataclasses.asdict(profile.risk),
+    }
+
+
+@router.get("/blogger/{blogger_id}/profile")
+async def get_blogger_profile(blogger_id: str, db: Session = Depends(get_db)):
+    """获取博主画像"""
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="博主画像不存在")
+
+    return {
+        "blogger_id": record.blogger_id,
+        "name": record.name,
+        "platform": record.platform,
+        "content_count": record.content_count,
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+        "confidence": record.confidence,
+        "updated_at": str(record.updated_at) if record.updated_at else "",
+    }
+
+
+@router.post("/blogger/recommend")
+async def recommend_topics(req: BloggerRecommendRequest, db: Session = Depends(get_db)):
+    """选题推荐"""
+    from backend.services.topic_recommender import TopicRecommender
+
+    # 获取博主画像
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    profile_data = {
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+    }
+
+    recommender = TopicRecommender()
+    result = await recommender.recommend(
+        blogger_profile=profile_data,
+        hot_topics=req.hot_topics if req.hot_topics else None,
+        blogger_id=req.blogger_id,
+        blogger_name=record.name,
+    )
+
+    return {
+        "blogger_id": result.blogger_id,
+        "blogger_name": result.blogger_name,
+        "hot_topics_used": result.hot_topics_used,
+        "recommendations": [
+            {
+                "topic": r.topic,
+                "angle": r.angle,
+                "reason": r.reason,
+                "trend_score": r.trend_score,
+                "style_match": r.style_match,
+                "risk_level": r.risk_level,
+                "risk_note": r.risk_note,
+                "estimated_reach": r.estimated_reach,
+                "priority": r.priority,
+            }
+            for r in result.recommendations
+        ],
+        "summary": result.summary,
+    }
+
+
+@router.post("/competitor/compare")
+async def compare_competitors(req: CompetitorCompareRequest, db: Session = Depends(get_db)):
+    """竞品对标分析"""
+    from backend.services.competitor_analyzer import CompetitorAnalyzer
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    # 获取博主画像
+    blogger_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not blogger_record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    blogger_data = {
+        "vocabulary": json.loads(blogger_record.vocabulary_json) if blogger_record.vocabulary_json else {},
+        "expression": json.loads(blogger_record.expression_json) if blogger_record.expression_json else {},
+        "topics": json.loads(blogger_record.topics_json) if blogger_record.topics_json else {},
+        "audience": json.loads(blogger_record.audience_json) if blogger_record.audience_json else {},
+        "risk": json.loads(blogger_record.risk_json) if blogger_record.risk_json else {},
+        "overall_style": blogger_record.overall_style,
+        "style_tags": json.loads(blogger_record.style_tags) if blogger_record.style_tags else [],
+    }
+
+    # 获取或生成竞品画像
+    competitor_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.competitor_id
+    ).first()
+
+    if competitor_record:
+        competitor_data = {
+            "vocabulary": json.loads(competitor_record.vocabulary_json) if competitor_record.vocabulary_json else {},
+            "expression": json.loads(competitor_record.expression_json) if competitor_record.expression_json else {},
+            "topics": json.loads(competitor_record.topics_json) if competitor_record.topics_json else {},
+            "audience": json.loads(competitor_record.audience_json) if competitor_record.audience_json else {},
+            "risk": json.loads(competitor_record.risk_json) if competitor_record.risk_json else {},
+            "overall_style": competitor_record.overall_style,
+            "style_tags": json.loads(competitor_record.style_tags) if competitor_record.style_tags else [],
+        }
+    elif req.competitor_contents:
+        # 实时生成竞品画像
+        profiler = BloggerProfiler()
+        comp_profile = await profiler.generate_profile(
+            blogger_id=req.competitor_id,
+            contents=req.competitor_contents,
+        )
+        import dataclasses
+        competitor_data = dataclasses.asdict(comp_profile)
+    else:
+        raise HTTPException(status_code=400, detail="竞品画像不存在且未提供内容，无法生成画像")
+
+    # 对比分析
+    analyzer = CompetitorAnalyzer()
+    result = await analyzer.compare(
+        blogger_profile=blogger_data,
+        competitor_profile=competitor_data,
+        blogger_id=req.blogger_id,
+        blogger_name=blogger_record.name,
+        competitor_id=req.competitor_id,
+    )
+
+    # 保存记录
+    import dataclasses
+    compare_record = CompetitorCompareRecord(
+        blogger_id=req.blogger_id,
+        competitor_id=req.competitor_id,
+        style_comparisons=json.dumps([dataclasses.asdict(c) for c in result.style_comparisons], ensure_ascii=False),
+        content_gaps=json.dumps([dataclasses.asdict(g) for g in result.content_gaps], ensure_ascii=False),
+        suggestions=json.dumps([dataclasses.asdict(s) for s in result.suggestions], ensure_ascii=False),
+        overall_assessment=result.overall_assessment,
+    )
+    db.add(compare_record)
+    db.commit()
+
+    return {
+        "blogger_id": result.blogger_id,
+        "competitor_id": result.competitor_id,
+        "style_comparisons": [dataclasses.asdict(c) for c in result.style_comparisons],
+        "content_gaps": [dataclasses.asdict(g) for g in result.content_gaps],
+        "suggestions": [dataclasses.asdict(s) for s in result.suggestions],
+        "overall_assessment": result.overall_assessment,
+    }
 
 
 # ── V2.R1 增强风控 API ──────────────────────────────────────
@@ -1916,6 +2645,249 @@ async def _run_video_analysis_v2(task_id: str, video_url: str, video_path: str, 
         db.close()
 
 
+# ═══════════════════════════════════════════════════════════════
+# V2.R6 博主附加服务 API
+# ═══════════════════════════════════════════════════════════════
+
+class BloggerAnalyzeRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    name: str = Field("", description="博主名称")
+    platform: str = Field("", description="平台")
+    contents: list = Field(default_factory=list, description="历史内容列表")
+
+
+class BloggerRecommendRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    hot_topics: list = Field(default_factory=list, description="可选热点列表")
+
+
+class CompetitorCompareRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    competitor_id: str = Field(..., description="竞品博主ID")
+    competitor_contents: list = Field(default_factory=list, description="竞品历史内容")
+
+
+@router.post("/blogger/analyze")
+async def analyze_blogger(req: BloggerAnalyzeRequest, db: Session = Depends(get_db)):
+    """生成博主风格画像"""
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    profiler = BloggerProfiler()
+    profile = await profiler.generate_profile(
+        blogger_id=req.blogger_id,
+        name=req.name,
+        platform=req.platform,
+        contents=req.contents,
+    )
+
+    # 保存到数据库
+    import dataclasses
+    existing = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    profile_data = {
+        "vocabulary_json": json.dumps(dataclasses.asdict(profile.vocabulary), ensure_ascii=False),
+        "expression_json": json.dumps(dataclasses.asdict(profile.expression), ensure_ascii=False),
+        "topics_json": json.dumps(dataclasses.asdict(profile.topics), ensure_ascii=False),
+        "audience_json": json.dumps(dataclasses.asdict(profile.audience), ensure_ascii=False),
+        "risk_json": json.dumps(dataclasses.asdict(profile.risk), ensure_ascii=False),
+        "overall_style": profile.overall_style,
+        "style_tags": json.dumps(profile.style_tags, ensure_ascii=False),
+        "confidence": profile.confidence,
+        "content_count": profile.content_count,
+        "name": req.name,
+        "platform": req.platform,
+    }
+
+    if existing:
+        for k, v in profile_data.items():
+            setattr(existing, k, v)
+        existing.updated_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    else:
+        record = BloggerProfileRecord(blogger_id=req.blogger_id, **profile_data)
+        db.add(record)
+
+    db.commit()
+
+    return {
+        "blogger_id": profile.blogger_id,
+        "name": profile.name,
+        "overall_style": profile.overall_style,
+        "style_tags": profile.style_tags,
+        "confidence": profile.confidence,
+        "vocabulary": dataclasses.asdict(profile.vocabulary),
+        "expression": dataclasses.asdict(profile.expression),
+        "topics": dataclasses.asdict(profile.topics),
+        "audience": dataclasses.asdict(profile.audience),
+        "risk": dataclasses.asdict(profile.risk),
+    }
+
+
+@router.get("/blogger/{blogger_id}/profile")
+async def get_blogger_profile(blogger_id: str, db: Session = Depends(get_db)):
+    """获取博主画像"""
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="博主画像不存在")
+
+    return {
+        "blogger_id": record.blogger_id,
+        "name": record.name,
+        "platform": record.platform,
+        "content_count": record.content_count,
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+        "confidence": record.confidence,
+        "updated_at": str(record.updated_at) if record.updated_at else "",
+    }
+
+
+@router.post("/blogger/recommend")
+async def recommend_topics(req: BloggerRecommendRequest, db: Session = Depends(get_db)):
+    """选题推荐"""
+    from backend.services.topic_recommender import TopicRecommender
+
+    # 获取博主画像
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    profile_data = {
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+    }
+
+    recommender = TopicRecommender()
+    result = await recommender.recommend(
+        blogger_profile=profile_data,
+        hot_topics=req.hot_topics if req.hot_topics else None,
+        blogger_id=req.blogger_id,
+        blogger_name=record.name,
+    )
+
+    return {
+        "blogger_id": result.blogger_id,
+        "blogger_name": result.blogger_name,
+        "hot_topics_used": result.hot_topics_used,
+        "recommendations": [
+            {
+                "topic": r.topic,
+                "angle": r.angle,
+                "reason": r.reason,
+                "trend_score": r.trend_score,
+                "style_match": r.style_match,
+                "risk_level": r.risk_level,
+                "risk_note": r.risk_note,
+                "estimated_reach": r.estimated_reach,
+                "priority": r.priority,
+            }
+            for r in result.recommendations
+        ],
+        "summary": result.summary,
+    }
+
+
+@router.post("/competitor/compare")
+async def compare_competitors(req: CompetitorCompareRequest, db: Session = Depends(get_db)):
+    """竞品对标分析"""
+    from backend.services.competitor_analyzer import CompetitorAnalyzer
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    # 获取博主画像
+    blogger_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not blogger_record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    blogger_data = {
+        "vocabulary": json.loads(blogger_record.vocabulary_json) if blogger_record.vocabulary_json else {},
+        "expression": json.loads(blogger_record.expression_json) if blogger_record.expression_json else {},
+        "topics": json.loads(blogger_record.topics_json) if blogger_record.topics_json else {},
+        "audience": json.loads(blogger_record.audience_json) if blogger_record.audience_json else {},
+        "risk": json.loads(blogger_record.risk_json) if blogger_record.risk_json else {},
+        "overall_style": blogger_record.overall_style,
+        "style_tags": json.loads(blogger_record.style_tags) if blogger_record.style_tags else [],
+    }
+
+    # 获取或生成竞品画像
+    competitor_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.competitor_id
+    ).first()
+
+    if competitor_record:
+        competitor_data = {
+            "vocabulary": json.loads(competitor_record.vocabulary_json) if competitor_record.vocabulary_json else {},
+            "expression": json.loads(competitor_record.expression_json) if competitor_record.expression_json else {},
+            "topics": json.loads(competitor_record.topics_json) if competitor_record.topics_json else {},
+            "audience": json.loads(competitor_record.audience_json) if competitor_record.audience_json else {},
+            "risk": json.loads(competitor_record.risk_json) if competitor_record.risk_json else {},
+            "overall_style": competitor_record.overall_style,
+            "style_tags": json.loads(competitor_record.style_tags) if competitor_record.style_tags else [],
+        }
+    elif req.competitor_contents:
+        # 实时生成竞品画像
+        profiler = BloggerProfiler()
+        comp_profile = await profiler.generate_profile(
+            blogger_id=req.competitor_id,
+            contents=req.competitor_contents,
+        )
+        import dataclasses
+        competitor_data = dataclasses.asdict(comp_profile)
+    else:
+        raise HTTPException(status_code=400, detail="竞品画像不存在且未提供内容，无法生成画像")
+
+    # 对比分析
+    analyzer = CompetitorAnalyzer()
+    result = await analyzer.compare(
+        blogger_profile=blogger_data,
+        competitor_profile=competitor_data,
+        blogger_id=req.blogger_id,
+        blogger_name=blogger_record.name,
+        competitor_id=req.competitor_id,
+    )
+
+    # 保存记录
+    import dataclasses
+    compare_record = CompetitorCompareRecord(
+        blogger_id=req.blogger_id,
+        competitor_id=req.competitor_id,
+        style_comparisons=json.dumps([dataclasses.asdict(c) for c in result.style_comparisons], ensure_ascii=False),
+        content_gaps=json.dumps([dataclasses.asdict(g) for g in result.content_gaps], ensure_ascii=False),
+        suggestions=json.dumps([dataclasses.asdict(s) for s in result.suggestions], ensure_ascii=False),
+        overall_assessment=result.overall_assessment,
+    )
+    db.add(compare_record)
+    db.commit()
+
+    return {
+        "blogger_id": result.blogger_id,
+        "competitor_id": result.competitor_id,
+        "style_comparisons": [dataclasses.asdict(c) for c in result.style_comparisons],
+        "content_gaps": [dataclasses.asdict(g) for g in result.content_gaps],
+        "suggestions": [dataclasses.asdict(s) for s in result.suggestions],
+        "overall_assessment": result.overall_assessment,
+    }
+
+
 @router.get("/risk/context")
 async def get_risk_context(db: Session = Depends(get_db)):
     """获取当前热点风险上下文"""
@@ -2058,6 +3030,249 @@ async def run_consistency_check(req: ConsistencyCheckRequest):
     finally:
         db.close()
 
+
+# ═══════════════════════════════════════════════════════════════
+# V2.R6 博主附加服务 API
+# ═══════════════════════════════════════════════════════════════
+
+class BloggerAnalyzeRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    name: str = Field("", description="博主名称")
+    platform: str = Field("", description="平台")
+    contents: list = Field(default_factory=list, description="历史内容列表")
+
+
+class BloggerRecommendRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    hot_topics: list = Field(default_factory=list, description="可选热点列表")
+
+
+class CompetitorCompareRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    competitor_id: str = Field(..., description="竞品博主ID")
+    competitor_contents: list = Field(default_factory=list, description="竞品历史内容")
+
+
+@router.post("/blogger/analyze")
+async def analyze_blogger(req: BloggerAnalyzeRequest, db: Session = Depends(get_db)):
+    """生成博主风格画像"""
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    profiler = BloggerProfiler()
+    profile = await profiler.generate_profile(
+        blogger_id=req.blogger_id,
+        name=req.name,
+        platform=req.platform,
+        contents=req.contents,
+    )
+
+    # 保存到数据库
+    import dataclasses
+    existing = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    profile_data = {
+        "vocabulary_json": json.dumps(dataclasses.asdict(profile.vocabulary), ensure_ascii=False),
+        "expression_json": json.dumps(dataclasses.asdict(profile.expression), ensure_ascii=False),
+        "topics_json": json.dumps(dataclasses.asdict(profile.topics), ensure_ascii=False),
+        "audience_json": json.dumps(dataclasses.asdict(profile.audience), ensure_ascii=False),
+        "risk_json": json.dumps(dataclasses.asdict(profile.risk), ensure_ascii=False),
+        "overall_style": profile.overall_style,
+        "style_tags": json.dumps(profile.style_tags, ensure_ascii=False),
+        "confidence": profile.confidence,
+        "content_count": profile.content_count,
+        "name": req.name,
+        "platform": req.platform,
+    }
+
+    if existing:
+        for k, v in profile_data.items():
+            setattr(existing, k, v)
+        existing.updated_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    else:
+        record = BloggerProfileRecord(blogger_id=req.blogger_id, **profile_data)
+        db.add(record)
+
+    db.commit()
+
+    return {
+        "blogger_id": profile.blogger_id,
+        "name": profile.name,
+        "overall_style": profile.overall_style,
+        "style_tags": profile.style_tags,
+        "confidence": profile.confidence,
+        "vocabulary": dataclasses.asdict(profile.vocabulary),
+        "expression": dataclasses.asdict(profile.expression),
+        "topics": dataclasses.asdict(profile.topics),
+        "audience": dataclasses.asdict(profile.audience),
+        "risk": dataclasses.asdict(profile.risk),
+    }
+
+
+@router.get("/blogger/{blogger_id}/profile")
+async def get_blogger_profile(blogger_id: str, db: Session = Depends(get_db)):
+    """获取博主画像"""
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="博主画像不存在")
+
+    return {
+        "blogger_id": record.blogger_id,
+        "name": record.name,
+        "platform": record.platform,
+        "content_count": record.content_count,
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+        "confidence": record.confidence,
+        "updated_at": str(record.updated_at) if record.updated_at else "",
+    }
+
+
+@router.post("/blogger/recommend")
+async def recommend_topics(req: BloggerRecommendRequest, db: Session = Depends(get_db)):
+    """选题推荐"""
+    from backend.services.topic_recommender import TopicRecommender
+
+    # 获取博主画像
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    profile_data = {
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+    }
+
+    recommender = TopicRecommender()
+    result = await recommender.recommend(
+        blogger_profile=profile_data,
+        hot_topics=req.hot_topics if req.hot_topics else None,
+        blogger_id=req.blogger_id,
+        blogger_name=record.name,
+    )
+
+    return {
+        "blogger_id": result.blogger_id,
+        "blogger_name": result.blogger_name,
+        "hot_topics_used": result.hot_topics_used,
+        "recommendations": [
+            {
+                "topic": r.topic,
+                "angle": r.angle,
+                "reason": r.reason,
+                "trend_score": r.trend_score,
+                "style_match": r.style_match,
+                "risk_level": r.risk_level,
+                "risk_note": r.risk_note,
+                "estimated_reach": r.estimated_reach,
+                "priority": r.priority,
+            }
+            for r in result.recommendations
+        ],
+        "summary": result.summary,
+    }
+
+
+@router.post("/competitor/compare")
+async def compare_competitors(req: CompetitorCompareRequest, db: Session = Depends(get_db)):
+    """竞品对标分析"""
+    from backend.services.competitor_analyzer import CompetitorAnalyzer
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    # 获取博主画像
+    blogger_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not blogger_record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    blogger_data = {
+        "vocabulary": json.loads(blogger_record.vocabulary_json) if blogger_record.vocabulary_json else {},
+        "expression": json.loads(blogger_record.expression_json) if blogger_record.expression_json else {},
+        "topics": json.loads(blogger_record.topics_json) if blogger_record.topics_json else {},
+        "audience": json.loads(blogger_record.audience_json) if blogger_record.audience_json else {},
+        "risk": json.loads(blogger_record.risk_json) if blogger_record.risk_json else {},
+        "overall_style": blogger_record.overall_style,
+        "style_tags": json.loads(blogger_record.style_tags) if blogger_record.style_tags else [],
+    }
+
+    # 获取或生成竞品画像
+    competitor_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.competitor_id
+    ).first()
+
+    if competitor_record:
+        competitor_data = {
+            "vocabulary": json.loads(competitor_record.vocabulary_json) if competitor_record.vocabulary_json else {},
+            "expression": json.loads(competitor_record.expression_json) if competitor_record.expression_json else {},
+            "topics": json.loads(competitor_record.topics_json) if competitor_record.topics_json else {},
+            "audience": json.loads(competitor_record.audience_json) if competitor_record.audience_json else {},
+            "risk": json.loads(competitor_record.risk_json) if competitor_record.risk_json else {},
+            "overall_style": competitor_record.overall_style,
+            "style_tags": json.loads(competitor_record.style_tags) if competitor_record.style_tags else [],
+        }
+    elif req.competitor_contents:
+        # 实时生成竞品画像
+        profiler = BloggerProfiler()
+        comp_profile = await profiler.generate_profile(
+            blogger_id=req.competitor_id,
+            contents=req.competitor_contents,
+        )
+        import dataclasses
+        competitor_data = dataclasses.asdict(comp_profile)
+    else:
+        raise HTTPException(status_code=400, detail="竞品画像不存在且未提供内容，无法生成画像")
+
+    # 对比分析
+    analyzer = CompetitorAnalyzer()
+    result = await analyzer.compare(
+        blogger_profile=blogger_data,
+        competitor_profile=competitor_data,
+        blogger_id=req.blogger_id,
+        blogger_name=blogger_record.name,
+        competitor_id=req.competitor_id,
+    )
+
+    # 保存记录
+    import dataclasses
+    compare_record = CompetitorCompareRecord(
+        blogger_id=req.blogger_id,
+        competitor_id=req.competitor_id,
+        style_comparisons=json.dumps([dataclasses.asdict(c) for c in result.style_comparisons], ensure_ascii=False),
+        content_gaps=json.dumps([dataclasses.asdict(g) for g in result.content_gaps], ensure_ascii=False),
+        suggestions=json.dumps([dataclasses.asdict(s) for s in result.suggestions], ensure_ascii=False),
+        overall_assessment=result.overall_assessment,
+    )
+    db.add(compare_record)
+    db.commit()
+
+    return {
+        "blogger_id": result.blogger_id,
+        "competitor_id": result.competitor_id,
+        "style_comparisons": [dataclasses.asdict(c) for c in result.style_comparisons],
+        "content_gaps": [dataclasses.asdict(g) for g in result.content_gaps],
+        "suggestions": [dataclasses.asdict(s) for s in result.suggestions],
+        "overall_assessment": result.overall_assessment,
+    }
+
     return {
         "content_hash": result.content_hash,
         "run_count": result.run_count,
@@ -2160,6 +3375,249 @@ async def predict_trend(req: TrendPredictRequest):
     finally:
         db.close()
 
+
+# ═══════════════════════════════════════════════════════════════
+# V2.R6 博主附加服务 API
+# ═══════════════════════════════════════════════════════════════
+
+class BloggerAnalyzeRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    name: str = Field("", description="博主名称")
+    platform: str = Field("", description="平台")
+    contents: list = Field(default_factory=list, description="历史内容列表")
+
+
+class BloggerRecommendRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    hot_topics: list = Field(default_factory=list, description="可选热点列表")
+
+
+class CompetitorCompareRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    competitor_id: str = Field(..., description="竞品博主ID")
+    competitor_contents: list = Field(default_factory=list, description="竞品历史内容")
+
+
+@router.post("/blogger/analyze")
+async def analyze_blogger(req: BloggerAnalyzeRequest, db: Session = Depends(get_db)):
+    """生成博主风格画像"""
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    profiler = BloggerProfiler()
+    profile = await profiler.generate_profile(
+        blogger_id=req.blogger_id,
+        name=req.name,
+        platform=req.platform,
+        contents=req.contents,
+    )
+
+    # 保存到数据库
+    import dataclasses
+    existing = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    profile_data = {
+        "vocabulary_json": json.dumps(dataclasses.asdict(profile.vocabulary), ensure_ascii=False),
+        "expression_json": json.dumps(dataclasses.asdict(profile.expression), ensure_ascii=False),
+        "topics_json": json.dumps(dataclasses.asdict(profile.topics), ensure_ascii=False),
+        "audience_json": json.dumps(dataclasses.asdict(profile.audience), ensure_ascii=False),
+        "risk_json": json.dumps(dataclasses.asdict(profile.risk), ensure_ascii=False),
+        "overall_style": profile.overall_style,
+        "style_tags": json.dumps(profile.style_tags, ensure_ascii=False),
+        "confidence": profile.confidence,
+        "content_count": profile.content_count,
+        "name": req.name,
+        "platform": req.platform,
+    }
+
+    if existing:
+        for k, v in profile_data.items():
+            setattr(existing, k, v)
+        existing.updated_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    else:
+        record = BloggerProfileRecord(blogger_id=req.blogger_id, **profile_data)
+        db.add(record)
+
+    db.commit()
+
+    return {
+        "blogger_id": profile.blogger_id,
+        "name": profile.name,
+        "overall_style": profile.overall_style,
+        "style_tags": profile.style_tags,
+        "confidence": profile.confidence,
+        "vocabulary": dataclasses.asdict(profile.vocabulary),
+        "expression": dataclasses.asdict(profile.expression),
+        "topics": dataclasses.asdict(profile.topics),
+        "audience": dataclasses.asdict(profile.audience),
+        "risk": dataclasses.asdict(profile.risk),
+    }
+
+
+@router.get("/blogger/{blogger_id}/profile")
+async def get_blogger_profile(blogger_id: str, db: Session = Depends(get_db)):
+    """获取博主画像"""
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="博主画像不存在")
+
+    return {
+        "blogger_id": record.blogger_id,
+        "name": record.name,
+        "platform": record.platform,
+        "content_count": record.content_count,
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+        "confidence": record.confidence,
+        "updated_at": str(record.updated_at) if record.updated_at else "",
+    }
+
+
+@router.post("/blogger/recommend")
+async def recommend_topics(req: BloggerRecommendRequest, db: Session = Depends(get_db)):
+    """选题推荐"""
+    from backend.services.topic_recommender import TopicRecommender
+
+    # 获取博主画像
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    profile_data = {
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+    }
+
+    recommender = TopicRecommender()
+    result = await recommender.recommend(
+        blogger_profile=profile_data,
+        hot_topics=req.hot_topics if req.hot_topics else None,
+        blogger_id=req.blogger_id,
+        blogger_name=record.name,
+    )
+
+    return {
+        "blogger_id": result.blogger_id,
+        "blogger_name": result.blogger_name,
+        "hot_topics_used": result.hot_topics_used,
+        "recommendations": [
+            {
+                "topic": r.topic,
+                "angle": r.angle,
+                "reason": r.reason,
+                "trend_score": r.trend_score,
+                "style_match": r.style_match,
+                "risk_level": r.risk_level,
+                "risk_note": r.risk_note,
+                "estimated_reach": r.estimated_reach,
+                "priority": r.priority,
+            }
+            for r in result.recommendations
+        ],
+        "summary": result.summary,
+    }
+
+
+@router.post("/competitor/compare")
+async def compare_competitors(req: CompetitorCompareRequest, db: Session = Depends(get_db)):
+    """竞品对标分析"""
+    from backend.services.competitor_analyzer import CompetitorAnalyzer
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    # 获取博主画像
+    blogger_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not blogger_record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    blogger_data = {
+        "vocabulary": json.loads(blogger_record.vocabulary_json) if blogger_record.vocabulary_json else {},
+        "expression": json.loads(blogger_record.expression_json) if blogger_record.expression_json else {},
+        "topics": json.loads(blogger_record.topics_json) if blogger_record.topics_json else {},
+        "audience": json.loads(blogger_record.audience_json) if blogger_record.audience_json else {},
+        "risk": json.loads(blogger_record.risk_json) if blogger_record.risk_json else {},
+        "overall_style": blogger_record.overall_style,
+        "style_tags": json.loads(blogger_record.style_tags) if blogger_record.style_tags else [],
+    }
+
+    # 获取或生成竞品画像
+    competitor_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.competitor_id
+    ).first()
+
+    if competitor_record:
+        competitor_data = {
+            "vocabulary": json.loads(competitor_record.vocabulary_json) if competitor_record.vocabulary_json else {},
+            "expression": json.loads(competitor_record.expression_json) if competitor_record.expression_json else {},
+            "topics": json.loads(competitor_record.topics_json) if competitor_record.topics_json else {},
+            "audience": json.loads(competitor_record.audience_json) if competitor_record.audience_json else {},
+            "risk": json.loads(competitor_record.risk_json) if competitor_record.risk_json else {},
+            "overall_style": competitor_record.overall_style,
+            "style_tags": json.loads(competitor_record.style_tags) if competitor_record.style_tags else [],
+        }
+    elif req.competitor_contents:
+        # 实时生成竞品画像
+        profiler = BloggerProfiler()
+        comp_profile = await profiler.generate_profile(
+            blogger_id=req.competitor_id,
+            contents=req.competitor_contents,
+        )
+        import dataclasses
+        competitor_data = dataclasses.asdict(comp_profile)
+    else:
+        raise HTTPException(status_code=400, detail="竞品画像不存在且未提供内容，无法生成画像")
+
+    # 对比分析
+    analyzer = CompetitorAnalyzer()
+    result = await analyzer.compare(
+        blogger_profile=blogger_data,
+        competitor_profile=competitor_data,
+        blogger_id=req.blogger_id,
+        blogger_name=blogger_record.name,
+        competitor_id=req.competitor_id,
+    )
+
+    # 保存记录
+    import dataclasses
+    compare_record = CompetitorCompareRecord(
+        blogger_id=req.blogger_id,
+        competitor_id=req.competitor_id,
+        style_comparisons=json.dumps([dataclasses.asdict(c) for c in result.style_comparisons], ensure_ascii=False),
+        content_gaps=json.dumps([dataclasses.asdict(g) for g in result.content_gaps], ensure_ascii=False),
+        suggestions=json.dumps([dataclasses.asdict(s) for s in result.suggestions], ensure_ascii=False),
+        overall_assessment=result.overall_assessment,
+    )
+    db.add(compare_record)
+    db.commit()
+
+    return {
+        "blogger_id": result.blogger_id,
+        "competitor_id": result.competitor_id,
+        "style_comparisons": [dataclasses.asdict(c) for c in result.style_comparisons],
+        "content_gaps": [dataclasses.asdict(g) for g in result.content_gaps],
+        "suggestions": [dataclasses.asdict(s) for s in result.suggestions],
+        "overall_assessment": result.overall_assessment,
+    }
+
     return {
         "prediction_id": result.prediction_id,
         "pattern": {"id": result.pattern.pattern_id, "name": result.pattern.pattern_name, "confidence": result.pattern.confidence} if result.pattern else None,
@@ -2248,6 +3706,249 @@ async def generate_risk_report(req: ReportRequest, background_tasks: BackgroundT
         db.rollback()
     finally:
         db.close()
+
+
+# ═══════════════════════════════════════════════════════════════
+# V2.R6 博主附加服务 API
+# ═══════════════════════════════════════════════════════════════
+
+class BloggerAnalyzeRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    name: str = Field("", description="博主名称")
+    platform: str = Field("", description="平台")
+    contents: list = Field(default_factory=list, description="历史内容列表")
+
+
+class BloggerRecommendRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    hot_topics: list = Field(default_factory=list, description="可选热点列表")
+
+
+class CompetitorCompareRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    competitor_id: str = Field(..., description="竞品博主ID")
+    competitor_contents: list = Field(default_factory=list, description="竞品历史内容")
+
+
+@router.post("/blogger/analyze")
+async def analyze_blogger(req: BloggerAnalyzeRequest, db: Session = Depends(get_db)):
+    """生成博主风格画像"""
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    profiler = BloggerProfiler()
+    profile = await profiler.generate_profile(
+        blogger_id=req.blogger_id,
+        name=req.name,
+        platform=req.platform,
+        contents=req.contents,
+    )
+
+    # 保存到数据库
+    import dataclasses
+    existing = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    profile_data = {
+        "vocabulary_json": json.dumps(dataclasses.asdict(profile.vocabulary), ensure_ascii=False),
+        "expression_json": json.dumps(dataclasses.asdict(profile.expression), ensure_ascii=False),
+        "topics_json": json.dumps(dataclasses.asdict(profile.topics), ensure_ascii=False),
+        "audience_json": json.dumps(dataclasses.asdict(profile.audience), ensure_ascii=False),
+        "risk_json": json.dumps(dataclasses.asdict(profile.risk), ensure_ascii=False),
+        "overall_style": profile.overall_style,
+        "style_tags": json.dumps(profile.style_tags, ensure_ascii=False),
+        "confidence": profile.confidence,
+        "content_count": profile.content_count,
+        "name": req.name,
+        "platform": req.platform,
+    }
+
+    if existing:
+        for k, v in profile_data.items():
+            setattr(existing, k, v)
+        existing.updated_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    else:
+        record = BloggerProfileRecord(blogger_id=req.blogger_id, **profile_data)
+        db.add(record)
+
+    db.commit()
+
+    return {
+        "blogger_id": profile.blogger_id,
+        "name": profile.name,
+        "overall_style": profile.overall_style,
+        "style_tags": profile.style_tags,
+        "confidence": profile.confidence,
+        "vocabulary": dataclasses.asdict(profile.vocabulary),
+        "expression": dataclasses.asdict(profile.expression),
+        "topics": dataclasses.asdict(profile.topics),
+        "audience": dataclasses.asdict(profile.audience),
+        "risk": dataclasses.asdict(profile.risk),
+    }
+
+
+@router.get("/blogger/{blogger_id}/profile")
+async def get_blogger_profile(blogger_id: str, db: Session = Depends(get_db)):
+    """获取博主画像"""
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="博主画像不存在")
+
+    return {
+        "blogger_id": record.blogger_id,
+        "name": record.name,
+        "platform": record.platform,
+        "content_count": record.content_count,
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+        "confidence": record.confidence,
+        "updated_at": str(record.updated_at) if record.updated_at else "",
+    }
+
+
+@router.post("/blogger/recommend")
+async def recommend_topics(req: BloggerRecommendRequest, db: Session = Depends(get_db)):
+    """选题推荐"""
+    from backend.services.topic_recommender import TopicRecommender
+
+    # 获取博主画像
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    profile_data = {
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+    }
+
+    recommender = TopicRecommender()
+    result = await recommender.recommend(
+        blogger_profile=profile_data,
+        hot_topics=req.hot_topics if req.hot_topics else None,
+        blogger_id=req.blogger_id,
+        blogger_name=record.name,
+    )
+
+    return {
+        "blogger_id": result.blogger_id,
+        "blogger_name": result.blogger_name,
+        "hot_topics_used": result.hot_topics_used,
+        "recommendations": [
+            {
+                "topic": r.topic,
+                "angle": r.angle,
+                "reason": r.reason,
+                "trend_score": r.trend_score,
+                "style_match": r.style_match,
+                "risk_level": r.risk_level,
+                "risk_note": r.risk_note,
+                "estimated_reach": r.estimated_reach,
+                "priority": r.priority,
+            }
+            for r in result.recommendations
+        ],
+        "summary": result.summary,
+    }
+
+
+@router.post("/competitor/compare")
+async def compare_competitors(req: CompetitorCompareRequest, db: Session = Depends(get_db)):
+    """竞品对标分析"""
+    from backend.services.competitor_analyzer import CompetitorAnalyzer
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    # 获取博主画像
+    blogger_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not blogger_record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    blogger_data = {
+        "vocabulary": json.loads(blogger_record.vocabulary_json) if blogger_record.vocabulary_json else {},
+        "expression": json.loads(blogger_record.expression_json) if blogger_record.expression_json else {},
+        "topics": json.loads(blogger_record.topics_json) if blogger_record.topics_json else {},
+        "audience": json.loads(blogger_record.audience_json) if blogger_record.audience_json else {},
+        "risk": json.loads(blogger_record.risk_json) if blogger_record.risk_json else {},
+        "overall_style": blogger_record.overall_style,
+        "style_tags": json.loads(blogger_record.style_tags) if blogger_record.style_tags else [],
+    }
+
+    # 获取或生成竞品画像
+    competitor_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.competitor_id
+    ).first()
+
+    if competitor_record:
+        competitor_data = {
+            "vocabulary": json.loads(competitor_record.vocabulary_json) if competitor_record.vocabulary_json else {},
+            "expression": json.loads(competitor_record.expression_json) if competitor_record.expression_json else {},
+            "topics": json.loads(competitor_record.topics_json) if competitor_record.topics_json else {},
+            "audience": json.loads(competitor_record.audience_json) if competitor_record.audience_json else {},
+            "risk": json.loads(competitor_record.risk_json) if competitor_record.risk_json else {},
+            "overall_style": competitor_record.overall_style,
+            "style_tags": json.loads(competitor_record.style_tags) if competitor_record.style_tags else [],
+        }
+    elif req.competitor_contents:
+        # 实时生成竞品画像
+        profiler = BloggerProfiler()
+        comp_profile = await profiler.generate_profile(
+            blogger_id=req.competitor_id,
+            contents=req.competitor_contents,
+        )
+        import dataclasses
+        competitor_data = dataclasses.asdict(comp_profile)
+    else:
+        raise HTTPException(status_code=400, detail="竞品画像不存在且未提供内容，无法生成画像")
+
+    # 对比分析
+    analyzer = CompetitorAnalyzer()
+    result = await analyzer.compare(
+        blogger_profile=blogger_data,
+        competitor_profile=competitor_data,
+        blogger_id=req.blogger_id,
+        blogger_name=blogger_record.name,
+        competitor_id=req.competitor_id,
+    )
+
+    # 保存记录
+    import dataclasses
+    compare_record = CompetitorCompareRecord(
+        blogger_id=req.blogger_id,
+        competitor_id=req.competitor_id,
+        style_comparisons=json.dumps([dataclasses.asdict(c) for c in result.style_comparisons], ensure_ascii=False),
+        content_gaps=json.dumps([dataclasses.asdict(g) for g in result.content_gaps], ensure_ascii=False),
+        suggestions=json.dumps([dataclasses.asdict(s) for s in result.suggestions], ensure_ascii=False),
+        overall_assessment=result.overall_assessment,
+    )
+    db.add(compare_record)
+    db.commit()
+
+    return {
+        "blogger_id": result.blogger_id,
+        "competitor_id": result.competitor_id,
+        "style_comparisons": [dataclasses.asdict(c) for c in result.style_comparisons],
+        "content_gaps": [dataclasses.asdict(g) for g in result.content_gaps],
+        "suggestions": [dataclasses.asdict(s) for s in result.suggestions],
+        "overall_assessment": result.overall_assessment,
+    }
 
     return {"report_id": report.report_id, "title": report.title, "summary": report.summary, "content": report.content}
 
@@ -3381,6 +5082,249 @@ async def create_simulation(req: SimulationCreateRequest, background_tasks: Back
     finally:
         db.close()
 
+
+# ═══════════════════════════════════════════════════════════════
+# V2.R6 博主附加服务 API
+# ═══════════════════════════════════════════════════════════════
+
+class BloggerAnalyzeRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    name: str = Field("", description="博主名称")
+    platform: str = Field("", description="平台")
+    contents: list = Field(default_factory=list, description="历史内容列表")
+
+
+class BloggerRecommendRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    hot_topics: list = Field(default_factory=list, description="可选热点列表")
+
+
+class CompetitorCompareRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    competitor_id: str = Field(..., description="竞品博主ID")
+    competitor_contents: list = Field(default_factory=list, description="竞品历史内容")
+
+
+@router.post("/blogger/analyze")
+async def analyze_blogger(req: BloggerAnalyzeRequest, db: Session = Depends(get_db)):
+    """生成博主风格画像"""
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    profiler = BloggerProfiler()
+    profile = await profiler.generate_profile(
+        blogger_id=req.blogger_id,
+        name=req.name,
+        platform=req.platform,
+        contents=req.contents,
+    )
+
+    # 保存到数据库
+    import dataclasses
+    existing = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    profile_data = {
+        "vocabulary_json": json.dumps(dataclasses.asdict(profile.vocabulary), ensure_ascii=False),
+        "expression_json": json.dumps(dataclasses.asdict(profile.expression), ensure_ascii=False),
+        "topics_json": json.dumps(dataclasses.asdict(profile.topics), ensure_ascii=False),
+        "audience_json": json.dumps(dataclasses.asdict(profile.audience), ensure_ascii=False),
+        "risk_json": json.dumps(dataclasses.asdict(profile.risk), ensure_ascii=False),
+        "overall_style": profile.overall_style,
+        "style_tags": json.dumps(profile.style_tags, ensure_ascii=False),
+        "confidence": profile.confidence,
+        "content_count": profile.content_count,
+        "name": req.name,
+        "platform": req.platform,
+    }
+
+    if existing:
+        for k, v in profile_data.items():
+            setattr(existing, k, v)
+        existing.updated_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    else:
+        record = BloggerProfileRecord(blogger_id=req.blogger_id, **profile_data)
+        db.add(record)
+
+    db.commit()
+
+    return {
+        "blogger_id": profile.blogger_id,
+        "name": profile.name,
+        "overall_style": profile.overall_style,
+        "style_tags": profile.style_tags,
+        "confidence": profile.confidence,
+        "vocabulary": dataclasses.asdict(profile.vocabulary),
+        "expression": dataclasses.asdict(profile.expression),
+        "topics": dataclasses.asdict(profile.topics),
+        "audience": dataclasses.asdict(profile.audience),
+        "risk": dataclasses.asdict(profile.risk),
+    }
+
+
+@router.get("/blogger/{blogger_id}/profile")
+async def get_blogger_profile(blogger_id: str, db: Session = Depends(get_db)):
+    """获取博主画像"""
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="博主画像不存在")
+
+    return {
+        "blogger_id": record.blogger_id,
+        "name": record.name,
+        "platform": record.platform,
+        "content_count": record.content_count,
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+        "confidence": record.confidence,
+        "updated_at": str(record.updated_at) if record.updated_at else "",
+    }
+
+
+@router.post("/blogger/recommend")
+async def recommend_topics(req: BloggerRecommendRequest, db: Session = Depends(get_db)):
+    """选题推荐"""
+    from backend.services.topic_recommender import TopicRecommender
+
+    # 获取博主画像
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    profile_data = {
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+    }
+
+    recommender = TopicRecommender()
+    result = await recommender.recommend(
+        blogger_profile=profile_data,
+        hot_topics=req.hot_topics if req.hot_topics else None,
+        blogger_id=req.blogger_id,
+        blogger_name=record.name,
+    )
+
+    return {
+        "blogger_id": result.blogger_id,
+        "blogger_name": result.blogger_name,
+        "hot_topics_used": result.hot_topics_used,
+        "recommendations": [
+            {
+                "topic": r.topic,
+                "angle": r.angle,
+                "reason": r.reason,
+                "trend_score": r.trend_score,
+                "style_match": r.style_match,
+                "risk_level": r.risk_level,
+                "risk_note": r.risk_note,
+                "estimated_reach": r.estimated_reach,
+                "priority": r.priority,
+            }
+            for r in result.recommendations
+        ],
+        "summary": result.summary,
+    }
+
+
+@router.post("/competitor/compare")
+async def compare_competitors(req: CompetitorCompareRequest, db: Session = Depends(get_db)):
+    """竞品对标分析"""
+    from backend.services.competitor_analyzer import CompetitorAnalyzer
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    # 获取博主画像
+    blogger_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not blogger_record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    blogger_data = {
+        "vocabulary": json.loads(blogger_record.vocabulary_json) if blogger_record.vocabulary_json else {},
+        "expression": json.loads(blogger_record.expression_json) if blogger_record.expression_json else {},
+        "topics": json.loads(blogger_record.topics_json) if blogger_record.topics_json else {},
+        "audience": json.loads(blogger_record.audience_json) if blogger_record.audience_json else {},
+        "risk": json.loads(blogger_record.risk_json) if blogger_record.risk_json else {},
+        "overall_style": blogger_record.overall_style,
+        "style_tags": json.loads(blogger_record.style_tags) if blogger_record.style_tags else [],
+    }
+
+    # 获取或生成竞品画像
+    competitor_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.competitor_id
+    ).first()
+
+    if competitor_record:
+        competitor_data = {
+            "vocabulary": json.loads(competitor_record.vocabulary_json) if competitor_record.vocabulary_json else {},
+            "expression": json.loads(competitor_record.expression_json) if competitor_record.expression_json else {},
+            "topics": json.loads(competitor_record.topics_json) if competitor_record.topics_json else {},
+            "audience": json.loads(competitor_record.audience_json) if competitor_record.audience_json else {},
+            "risk": json.loads(competitor_record.risk_json) if competitor_record.risk_json else {},
+            "overall_style": competitor_record.overall_style,
+            "style_tags": json.loads(competitor_record.style_tags) if competitor_record.style_tags else [],
+        }
+    elif req.competitor_contents:
+        # 实时生成竞品画像
+        profiler = BloggerProfiler()
+        comp_profile = await profiler.generate_profile(
+            blogger_id=req.competitor_id,
+            contents=req.competitor_contents,
+        )
+        import dataclasses
+        competitor_data = dataclasses.asdict(comp_profile)
+    else:
+        raise HTTPException(status_code=400, detail="竞品画像不存在且未提供内容，无法生成画像")
+
+    # 对比分析
+    analyzer = CompetitorAnalyzer()
+    result = await analyzer.compare(
+        blogger_profile=blogger_data,
+        competitor_profile=competitor_data,
+        blogger_id=req.blogger_id,
+        blogger_name=blogger_record.name,
+        competitor_id=req.competitor_id,
+    )
+
+    # 保存记录
+    import dataclasses
+    compare_record = CompetitorCompareRecord(
+        blogger_id=req.blogger_id,
+        competitor_id=req.competitor_id,
+        style_comparisons=json.dumps([dataclasses.asdict(c) for c in result.style_comparisons], ensure_ascii=False),
+        content_gaps=json.dumps([dataclasses.asdict(g) for g in result.content_gaps], ensure_ascii=False),
+        suggestions=json.dumps([dataclasses.asdict(s) for s in result.suggestions], ensure_ascii=False),
+        overall_assessment=result.overall_assessment,
+    )
+    db.add(compare_record)
+    db.commit()
+
+    return {
+        "blogger_id": result.blogger_id,
+        "competitor_id": result.competitor_id,
+        "style_comparisons": [dataclasses.asdict(c) for c in result.style_comparisons],
+        "content_gaps": [dataclasses.asdict(g) for g in result.content_gaps],
+        "suggestions": [dataclasses.asdict(s) for s in result.suggestions],
+        "overall_assessment": result.overall_assessment,
+    }
+
     # 初始化引擎
     await engine.initialize()
 
@@ -3393,6 +5337,249 @@ async def create_simulation(req: SimulationCreateRequest, background_tasks: Back
             db.commit()
     finally:
         db.close()
+
+
+# ═══════════════════════════════════════════════════════════════
+# V2.R6 博主附加服务 API
+# ═══════════════════════════════════════════════════════════════
+
+class BloggerAnalyzeRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    name: str = Field("", description="博主名称")
+    platform: str = Field("", description="平台")
+    contents: list = Field(default_factory=list, description="历史内容列表")
+
+
+class BloggerRecommendRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    hot_topics: list = Field(default_factory=list, description="可选热点列表")
+
+
+class CompetitorCompareRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    competitor_id: str = Field(..., description="竞品博主ID")
+    competitor_contents: list = Field(default_factory=list, description="竞品历史内容")
+
+
+@router.post("/blogger/analyze")
+async def analyze_blogger(req: BloggerAnalyzeRequest, db: Session = Depends(get_db)):
+    """生成博主风格画像"""
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    profiler = BloggerProfiler()
+    profile = await profiler.generate_profile(
+        blogger_id=req.blogger_id,
+        name=req.name,
+        platform=req.platform,
+        contents=req.contents,
+    )
+
+    # 保存到数据库
+    import dataclasses
+    existing = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    profile_data = {
+        "vocabulary_json": json.dumps(dataclasses.asdict(profile.vocabulary), ensure_ascii=False),
+        "expression_json": json.dumps(dataclasses.asdict(profile.expression), ensure_ascii=False),
+        "topics_json": json.dumps(dataclasses.asdict(profile.topics), ensure_ascii=False),
+        "audience_json": json.dumps(dataclasses.asdict(profile.audience), ensure_ascii=False),
+        "risk_json": json.dumps(dataclasses.asdict(profile.risk), ensure_ascii=False),
+        "overall_style": profile.overall_style,
+        "style_tags": json.dumps(profile.style_tags, ensure_ascii=False),
+        "confidence": profile.confidence,
+        "content_count": profile.content_count,
+        "name": req.name,
+        "platform": req.platform,
+    }
+
+    if existing:
+        for k, v in profile_data.items():
+            setattr(existing, k, v)
+        existing.updated_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    else:
+        record = BloggerProfileRecord(blogger_id=req.blogger_id, **profile_data)
+        db.add(record)
+
+    db.commit()
+
+    return {
+        "blogger_id": profile.blogger_id,
+        "name": profile.name,
+        "overall_style": profile.overall_style,
+        "style_tags": profile.style_tags,
+        "confidence": profile.confidence,
+        "vocabulary": dataclasses.asdict(profile.vocabulary),
+        "expression": dataclasses.asdict(profile.expression),
+        "topics": dataclasses.asdict(profile.topics),
+        "audience": dataclasses.asdict(profile.audience),
+        "risk": dataclasses.asdict(profile.risk),
+    }
+
+
+@router.get("/blogger/{blogger_id}/profile")
+async def get_blogger_profile(blogger_id: str, db: Session = Depends(get_db)):
+    """获取博主画像"""
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="博主画像不存在")
+
+    return {
+        "blogger_id": record.blogger_id,
+        "name": record.name,
+        "platform": record.platform,
+        "content_count": record.content_count,
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+        "confidence": record.confidence,
+        "updated_at": str(record.updated_at) if record.updated_at else "",
+    }
+
+
+@router.post("/blogger/recommend")
+async def recommend_topics(req: BloggerRecommendRequest, db: Session = Depends(get_db)):
+    """选题推荐"""
+    from backend.services.topic_recommender import TopicRecommender
+
+    # 获取博主画像
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    profile_data = {
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+    }
+
+    recommender = TopicRecommender()
+    result = await recommender.recommend(
+        blogger_profile=profile_data,
+        hot_topics=req.hot_topics if req.hot_topics else None,
+        blogger_id=req.blogger_id,
+        blogger_name=record.name,
+    )
+
+    return {
+        "blogger_id": result.blogger_id,
+        "blogger_name": result.blogger_name,
+        "hot_topics_used": result.hot_topics_used,
+        "recommendations": [
+            {
+                "topic": r.topic,
+                "angle": r.angle,
+                "reason": r.reason,
+                "trend_score": r.trend_score,
+                "style_match": r.style_match,
+                "risk_level": r.risk_level,
+                "risk_note": r.risk_note,
+                "estimated_reach": r.estimated_reach,
+                "priority": r.priority,
+            }
+            for r in result.recommendations
+        ],
+        "summary": result.summary,
+    }
+
+
+@router.post("/competitor/compare")
+async def compare_competitors(req: CompetitorCompareRequest, db: Session = Depends(get_db)):
+    """竞品对标分析"""
+    from backend.services.competitor_analyzer import CompetitorAnalyzer
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    # 获取博主画像
+    blogger_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not blogger_record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    blogger_data = {
+        "vocabulary": json.loads(blogger_record.vocabulary_json) if blogger_record.vocabulary_json else {},
+        "expression": json.loads(blogger_record.expression_json) if blogger_record.expression_json else {},
+        "topics": json.loads(blogger_record.topics_json) if blogger_record.topics_json else {},
+        "audience": json.loads(blogger_record.audience_json) if blogger_record.audience_json else {},
+        "risk": json.loads(blogger_record.risk_json) if blogger_record.risk_json else {},
+        "overall_style": blogger_record.overall_style,
+        "style_tags": json.loads(blogger_record.style_tags) if blogger_record.style_tags else [],
+    }
+
+    # 获取或生成竞品画像
+    competitor_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.competitor_id
+    ).first()
+
+    if competitor_record:
+        competitor_data = {
+            "vocabulary": json.loads(competitor_record.vocabulary_json) if competitor_record.vocabulary_json else {},
+            "expression": json.loads(competitor_record.expression_json) if competitor_record.expression_json else {},
+            "topics": json.loads(competitor_record.topics_json) if competitor_record.topics_json else {},
+            "audience": json.loads(competitor_record.audience_json) if competitor_record.audience_json else {},
+            "risk": json.loads(competitor_record.risk_json) if competitor_record.risk_json else {},
+            "overall_style": competitor_record.overall_style,
+            "style_tags": json.loads(competitor_record.style_tags) if competitor_record.style_tags else [],
+        }
+    elif req.competitor_contents:
+        # 实时生成竞品画像
+        profiler = BloggerProfiler()
+        comp_profile = await profiler.generate_profile(
+            blogger_id=req.competitor_id,
+            contents=req.competitor_contents,
+        )
+        import dataclasses
+        competitor_data = dataclasses.asdict(comp_profile)
+    else:
+        raise HTTPException(status_code=400, detail="竞品画像不存在且未提供内容，无法生成画像")
+
+    # 对比分析
+    analyzer = CompetitorAnalyzer()
+    result = await analyzer.compare(
+        blogger_profile=blogger_data,
+        competitor_profile=competitor_data,
+        blogger_id=req.blogger_id,
+        blogger_name=blogger_record.name,
+        competitor_id=req.competitor_id,
+    )
+
+    # 保存记录
+    import dataclasses
+    compare_record = CompetitorCompareRecord(
+        blogger_id=req.blogger_id,
+        competitor_id=req.competitor_id,
+        style_comparisons=json.dumps([dataclasses.asdict(c) for c in result.style_comparisons], ensure_ascii=False),
+        content_gaps=json.dumps([dataclasses.asdict(g) for g in result.content_gaps], ensure_ascii=False),
+        suggestions=json.dumps([dataclasses.asdict(s) for s in result.suggestions], ensure_ascii=False),
+        overall_assessment=result.overall_assessment,
+    )
+    db.add(compare_record)
+    db.commit()
+
+    return {
+        "blogger_id": result.blogger_id,
+        "competitor_id": result.competitor_id,
+        "style_comparisons": [dataclasses.asdict(c) for c in result.style_comparisons],
+        "content_gaps": [dataclasses.asdict(g) for g in result.content_gaps],
+        "suggestions": [dataclasses.asdict(s) for s in result.suggestions],
+        "overall_assessment": result.overall_assessment,
+    }
 
     _active_simulations[sim_id] = engine
 
@@ -3419,6 +5606,249 @@ async def start_simulation(sim_id: str, background_tasks: BackgroundTasks):
             db.commit()
     finally:
         db.close()
+
+
+# ═══════════════════════════════════════════════════════════════
+# V2.R6 博主附加服务 API
+# ═══════════════════════════════════════════════════════════════
+
+class BloggerAnalyzeRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    name: str = Field("", description="博主名称")
+    platform: str = Field("", description="平台")
+    contents: list = Field(default_factory=list, description="历史内容列表")
+
+
+class BloggerRecommendRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    hot_topics: list = Field(default_factory=list, description="可选热点列表")
+
+
+class CompetitorCompareRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    competitor_id: str = Field(..., description="竞品博主ID")
+    competitor_contents: list = Field(default_factory=list, description="竞品历史内容")
+
+
+@router.post("/blogger/analyze")
+async def analyze_blogger(req: BloggerAnalyzeRequest, db: Session = Depends(get_db)):
+    """生成博主风格画像"""
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    profiler = BloggerProfiler()
+    profile = await profiler.generate_profile(
+        blogger_id=req.blogger_id,
+        name=req.name,
+        platform=req.platform,
+        contents=req.contents,
+    )
+
+    # 保存到数据库
+    import dataclasses
+    existing = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    profile_data = {
+        "vocabulary_json": json.dumps(dataclasses.asdict(profile.vocabulary), ensure_ascii=False),
+        "expression_json": json.dumps(dataclasses.asdict(profile.expression), ensure_ascii=False),
+        "topics_json": json.dumps(dataclasses.asdict(profile.topics), ensure_ascii=False),
+        "audience_json": json.dumps(dataclasses.asdict(profile.audience), ensure_ascii=False),
+        "risk_json": json.dumps(dataclasses.asdict(profile.risk), ensure_ascii=False),
+        "overall_style": profile.overall_style,
+        "style_tags": json.dumps(profile.style_tags, ensure_ascii=False),
+        "confidence": profile.confidence,
+        "content_count": profile.content_count,
+        "name": req.name,
+        "platform": req.platform,
+    }
+
+    if existing:
+        for k, v in profile_data.items():
+            setattr(existing, k, v)
+        existing.updated_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    else:
+        record = BloggerProfileRecord(blogger_id=req.blogger_id, **profile_data)
+        db.add(record)
+
+    db.commit()
+
+    return {
+        "blogger_id": profile.blogger_id,
+        "name": profile.name,
+        "overall_style": profile.overall_style,
+        "style_tags": profile.style_tags,
+        "confidence": profile.confidence,
+        "vocabulary": dataclasses.asdict(profile.vocabulary),
+        "expression": dataclasses.asdict(profile.expression),
+        "topics": dataclasses.asdict(profile.topics),
+        "audience": dataclasses.asdict(profile.audience),
+        "risk": dataclasses.asdict(profile.risk),
+    }
+
+
+@router.get("/blogger/{blogger_id}/profile")
+async def get_blogger_profile(blogger_id: str, db: Session = Depends(get_db)):
+    """获取博主画像"""
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="博主画像不存在")
+
+    return {
+        "blogger_id": record.blogger_id,
+        "name": record.name,
+        "platform": record.platform,
+        "content_count": record.content_count,
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+        "confidence": record.confidence,
+        "updated_at": str(record.updated_at) if record.updated_at else "",
+    }
+
+
+@router.post("/blogger/recommend")
+async def recommend_topics(req: BloggerRecommendRequest, db: Session = Depends(get_db)):
+    """选题推荐"""
+    from backend.services.topic_recommender import TopicRecommender
+
+    # 获取博主画像
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    profile_data = {
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+    }
+
+    recommender = TopicRecommender()
+    result = await recommender.recommend(
+        blogger_profile=profile_data,
+        hot_topics=req.hot_topics if req.hot_topics else None,
+        blogger_id=req.blogger_id,
+        blogger_name=record.name,
+    )
+
+    return {
+        "blogger_id": result.blogger_id,
+        "blogger_name": result.blogger_name,
+        "hot_topics_used": result.hot_topics_used,
+        "recommendations": [
+            {
+                "topic": r.topic,
+                "angle": r.angle,
+                "reason": r.reason,
+                "trend_score": r.trend_score,
+                "style_match": r.style_match,
+                "risk_level": r.risk_level,
+                "risk_note": r.risk_note,
+                "estimated_reach": r.estimated_reach,
+                "priority": r.priority,
+            }
+            for r in result.recommendations
+        ],
+        "summary": result.summary,
+    }
+
+
+@router.post("/competitor/compare")
+async def compare_competitors(req: CompetitorCompareRequest, db: Session = Depends(get_db)):
+    """竞品对标分析"""
+    from backend.services.competitor_analyzer import CompetitorAnalyzer
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    # 获取博主画像
+    blogger_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not blogger_record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    blogger_data = {
+        "vocabulary": json.loads(blogger_record.vocabulary_json) if blogger_record.vocabulary_json else {},
+        "expression": json.loads(blogger_record.expression_json) if blogger_record.expression_json else {},
+        "topics": json.loads(blogger_record.topics_json) if blogger_record.topics_json else {},
+        "audience": json.loads(blogger_record.audience_json) if blogger_record.audience_json else {},
+        "risk": json.loads(blogger_record.risk_json) if blogger_record.risk_json else {},
+        "overall_style": blogger_record.overall_style,
+        "style_tags": json.loads(blogger_record.style_tags) if blogger_record.style_tags else [],
+    }
+
+    # 获取或生成竞品画像
+    competitor_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.competitor_id
+    ).first()
+
+    if competitor_record:
+        competitor_data = {
+            "vocabulary": json.loads(competitor_record.vocabulary_json) if competitor_record.vocabulary_json else {},
+            "expression": json.loads(competitor_record.expression_json) if competitor_record.expression_json else {},
+            "topics": json.loads(competitor_record.topics_json) if competitor_record.topics_json else {},
+            "audience": json.loads(competitor_record.audience_json) if competitor_record.audience_json else {},
+            "risk": json.loads(competitor_record.risk_json) if competitor_record.risk_json else {},
+            "overall_style": competitor_record.overall_style,
+            "style_tags": json.loads(competitor_record.style_tags) if competitor_record.style_tags else [],
+        }
+    elif req.competitor_contents:
+        # 实时生成竞品画像
+        profiler = BloggerProfiler()
+        comp_profile = await profiler.generate_profile(
+            blogger_id=req.competitor_id,
+            contents=req.competitor_contents,
+        )
+        import dataclasses
+        competitor_data = dataclasses.asdict(comp_profile)
+    else:
+        raise HTTPException(status_code=400, detail="竞品画像不存在且未提供内容，无法生成画像")
+
+    # 对比分析
+    analyzer = CompetitorAnalyzer()
+    result = await analyzer.compare(
+        blogger_profile=blogger_data,
+        competitor_profile=competitor_data,
+        blogger_id=req.blogger_id,
+        blogger_name=blogger_record.name,
+        competitor_id=req.competitor_id,
+    )
+
+    # 保存记录
+    import dataclasses
+    compare_record = CompetitorCompareRecord(
+        blogger_id=req.blogger_id,
+        competitor_id=req.competitor_id,
+        style_comparisons=json.dumps([dataclasses.asdict(c) for c in result.style_comparisons], ensure_ascii=False),
+        content_gaps=json.dumps([dataclasses.asdict(g) for g in result.content_gaps], ensure_ascii=False),
+        suggestions=json.dumps([dataclasses.asdict(s) for s in result.suggestions], ensure_ascii=False),
+        overall_assessment=result.overall_assessment,
+    )
+    db.add(compare_record)
+    db.commit()
+
+    return {
+        "blogger_id": result.blogger_id,
+        "competitor_id": result.competitor_id,
+        "style_comparisons": [dataclasses.asdict(c) for c in result.style_comparisons],
+        "content_gaps": [dataclasses.asdict(g) for g in result.content_gaps],
+        "suggestions": [dataclasses.asdict(s) for s in result.suggestions],
+        "overall_assessment": result.overall_assessment,
+    }
 
     background_tasks.add_task(engine.run)
 
@@ -3465,6 +5895,249 @@ async def stop_simulation(sim_id: str):
             db.commit()
     finally:
         db.close()
+
+
+# ═══════════════════════════════════════════════════════════════
+# V2.R6 博主附加服务 API
+# ═══════════════════════════════════════════════════════════════
+
+class BloggerAnalyzeRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    name: str = Field("", description="博主名称")
+    platform: str = Field("", description="平台")
+    contents: list = Field(default_factory=list, description="历史内容列表")
+
+
+class BloggerRecommendRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    hot_topics: list = Field(default_factory=list, description="可选热点列表")
+
+
+class CompetitorCompareRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    competitor_id: str = Field(..., description="竞品博主ID")
+    competitor_contents: list = Field(default_factory=list, description="竞品历史内容")
+
+
+@router.post("/blogger/analyze")
+async def analyze_blogger(req: BloggerAnalyzeRequest, db: Session = Depends(get_db)):
+    """生成博主风格画像"""
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    profiler = BloggerProfiler()
+    profile = await profiler.generate_profile(
+        blogger_id=req.blogger_id,
+        name=req.name,
+        platform=req.platform,
+        contents=req.contents,
+    )
+
+    # 保存到数据库
+    import dataclasses
+    existing = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    profile_data = {
+        "vocabulary_json": json.dumps(dataclasses.asdict(profile.vocabulary), ensure_ascii=False),
+        "expression_json": json.dumps(dataclasses.asdict(profile.expression), ensure_ascii=False),
+        "topics_json": json.dumps(dataclasses.asdict(profile.topics), ensure_ascii=False),
+        "audience_json": json.dumps(dataclasses.asdict(profile.audience), ensure_ascii=False),
+        "risk_json": json.dumps(dataclasses.asdict(profile.risk), ensure_ascii=False),
+        "overall_style": profile.overall_style,
+        "style_tags": json.dumps(profile.style_tags, ensure_ascii=False),
+        "confidence": profile.confidence,
+        "content_count": profile.content_count,
+        "name": req.name,
+        "platform": req.platform,
+    }
+
+    if existing:
+        for k, v in profile_data.items():
+            setattr(existing, k, v)
+        existing.updated_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    else:
+        record = BloggerProfileRecord(blogger_id=req.blogger_id, **profile_data)
+        db.add(record)
+
+    db.commit()
+
+    return {
+        "blogger_id": profile.blogger_id,
+        "name": profile.name,
+        "overall_style": profile.overall_style,
+        "style_tags": profile.style_tags,
+        "confidence": profile.confidence,
+        "vocabulary": dataclasses.asdict(profile.vocabulary),
+        "expression": dataclasses.asdict(profile.expression),
+        "topics": dataclasses.asdict(profile.topics),
+        "audience": dataclasses.asdict(profile.audience),
+        "risk": dataclasses.asdict(profile.risk),
+    }
+
+
+@router.get("/blogger/{blogger_id}/profile")
+async def get_blogger_profile(blogger_id: str, db: Session = Depends(get_db)):
+    """获取博主画像"""
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="博主画像不存在")
+
+    return {
+        "blogger_id": record.blogger_id,
+        "name": record.name,
+        "platform": record.platform,
+        "content_count": record.content_count,
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+        "confidence": record.confidence,
+        "updated_at": str(record.updated_at) if record.updated_at else "",
+    }
+
+
+@router.post("/blogger/recommend")
+async def recommend_topics(req: BloggerRecommendRequest, db: Session = Depends(get_db)):
+    """选题推荐"""
+    from backend.services.topic_recommender import TopicRecommender
+
+    # 获取博主画像
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    profile_data = {
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+    }
+
+    recommender = TopicRecommender()
+    result = await recommender.recommend(
+        blogger_profile=profile_data,
+        hot_topics=req.hot_topics if req.hot_topics else None,
+        blogger_id=req.blogger_id,
+        blogger_name=record.name,
+    )
+
+    return {
+        "blogger_id": result.blogger_id,
+        "blogger_name": result.blogger_name,
+        "hot_topics_used": result.hot_topics_used,
+        "recommendations": [
+            {
+                "topic": r.topic,
+                "angle": r.angle,
+                "reason": r.reason,
+                "trend_score": r.trend_score,
+                "style_match": r.style_match,
+                "risk_level": r.risk_level,
+                "risk_note": r.risk_note,
+                "estimated_reach": r.estimated_reach,
+                "priority": r.priority,
+            }
+            for r in result.recommendations
+        ],
+        "summary": result.summary,
+    }
+
+
+@router.post("/competitor/compare")
+async def compare_competitors(req: CompetitorCompareRequest, db: Session = Depends(get_db)):
+    """竞品对标分析"""
+    from backend.services.competitor_analyzer import CompetitorAnalyzer
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    # 获取博主画像
+    blogger_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not blogger_record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    blogger_data = {
+        "vocabulary": json.loads(blogger_record.vocabulary_json) if blogger_record.vocabulary_json else {},
+        "expression": json.loads(blogger_record.expression_json) if blogger_record.expression_json else {},
+        "topics": json.loads(blogger_record.topics_json) if blogger_record.topics_json else {},
+        "audience": json.loads(blogger_record.audience_json) if blogger_record.audience_json else {},
+        "risk": json.loads(blogger_record.risk_json) if blogger_record.risk_json else {},
+        "overall_style": blogger_record.overall_style,
+        "style_tags": json.loads(blogger_record.style_tags) if blogger_record.style_tags else [],
+    }
+
+    # 获取或生成竞品画像
+    competitor_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.competitor_id
+    ).first()
+
+    if competitor_record:
+        competitor_data = {
+            "vocabulary": json.loads(competitor_record.vocabulary_json) if competitor_record.vocabulary_json else {},
+            "expression": json.loads(competitor_record.expression_json) if competitor_record.expression_json else {},
+            "topics": json.loads(competitor_record.topics_json) if competitor_record.topics_json else {},
+            "audience": json.loads(competitor_record.audience_json) if competitor_record.audience_json else {},
+            "risk": json.loads(competitor_record.risk_json) if competitor_record.risk_json else {},
+            "overall_style": competitor_record.overall_style,
+            "style_tags": json.loads(competitor_record.style_tags) if competitor_record.style_tags else [],
+        }
+    elif req.competitor_contents:
+        # 实时生成竞品画像
+        profiler = BloggerProfiler()
+        comp_profile = await profiler.generate_profile(
+            blogger_id=req.competitor_id,
+            contents=req.competitor_contents,
+        )
+        import dataclasses
+        competitor_data = dataclasses.asdict(comp_profile)
+    else:
+        raise HTTPException(status_code=400, detail="竞品画像不存在且未提供内容，无法生成画像")
+
+    # 对比分析
+    analyzer = CompetitorAnalyzer()
+    result = await analyzer.compare(
+        blogger_profile=blogger_data,
+        competitor_profile=competitor_data,
+        blogger_id=req.blogger_id,
+        blogger_name=blogger_record.name,
+        competitor_id=req.competitor_id,
+    )
+
+    # 保存记录
+    import dataclasses
+    compare_record = CompetitorCompareRecord(
+        blogger_id=req.blogger_id,
+        competitor_id=req.competitor_id,
+        style_comparisons=json.dumps([dataclasses.asdict(c) for c in result.style_comparisons], ensure_ascii=False),
+        content_gaps=json.dumps([dataclasses.asdict(g) for g in result.content_gaps], ensure_ascii=False),
+        suggestions=json.dumps([dataclasses.asdict(s) for s in result.suggestions], ensure_ascii=False),
+        overall_assessment=result.overall_assessment,
+    )
+    db.add(compare_record)
+    db.commit()
+
+    return {
+        "blogger_id": result.blogger_id,
+        "competitor_id": result.competitor_id,
+        "style_comparisons": [dataclasses.asdict(c) for c in result.style_comparisons],
+        "content_gaps": [dataclasses.asdict(g) for g in result.content_gaps],
+        "suggestions": [dataclasses.asdict(s) for s in result.suggestions],
+        "overall_assessment": result.overall_assessment,
+    }
 
     return {"sim_id": sim_id, "status": "stopped"}
 
@@ -4142,4 +6815,247 @@ async def _run_video_analysis_v2(task_id: str, video_url: str, video_path: str, 
             db.commit()
     finally:
         db.close()
+
+
+# ═══════════════════════════════════════════════════════════════
+# V2.R6 博主附加服务 API
+# ═══════════════════════════════════════════════════════════════
+
+class BloggerAnalyzeRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    name: str = Field("", description="博主名称")
+    platform: str = Field("", description="平台")
+    contents: list = Field(default_factory=list, description="历史内容列表")
+
+
+class BloggerRecommendRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    hot_topics: list = Field(default_factory=list, description="可选热点列表")
+
+
+class CompetitorCompareRequest(BaseModel):
+    blogger_id: str = Field(..., description="博主ID")
+    competitor_id: str = Field(..., description="竞品博主ID")
+    competitor_contents: list = Field(default_factory=list, description="竞品历史内容")
+
+
+@router.post("/blogger/analyze")
+async def analyze_blogger(req: BloggerAnalyzeRequest, db: Session = Depends(get_db)):
+    """生成博主风格画像"""
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    profiler = BloggerProfiler()
+    profile = await profiler.generate_profile(
+        blogger_id=req.blogger_id,
+        name=req.name,
+        platform=req.platform,
+        contents=req.contents,
+    )
+
+    # 保存到数据库
+    import dataclasses
+    existing = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    profile_data = {
+        "vocabulary_json": json.dumps(dataclasses.asdict(profile.vocabulary), ensure_ascii=False),
+        "expression_json": json.dumps(dataclasses.asdict(profile.expression), ensure_ascii=False),
+        "topics_json": json.dumps(dataclasses.asdict(profile.topics), ensure_ascii=False),
+        "audience_json": json.dumps(dataclasses.asdict(profile.audience), ensure_ascii=False),
+        "risk_json": json.dumps(dataclasses.asdict(profile.risk), ensure_ascii=False),
+        "overall_style": profile.overall_style,
+        "style_tags": json.dumps(profile.style_tags, ensure_ascii=False),
+        "confidence": profile.confidence,
+        "content_count": profile.content_count,
+        "name": req.name,
+        "platform": req.platform,
+    }
+
+    if existing:
+        for k, v in profile_data.items():
+            setattr(existing, k, v)
+        existing.updated_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    else:
+        record = BloggerProfileRecord(blogger_id=req.blogger_id, **profile_data)
+        db.add(record)
+
+    db.commit()
+
+    return {
+        "blogger_id": profile.blogger_id,
+        "name": profile.name,
+        "overall_style": profile.overall_style,
+        "style_tags": profile.style_tags,
+        "confidence": profile.confidence,
+        "vocabulary": dataclasses.asdict(profile.vocabulary),
+        "expression": dataclasses.asdict(profile.expression),
+        "topics": dataclasses.asdict(profile.topics),
+        "audience": dataclasses.asdict(profile.audience),
+        "risk": dataclasses.asdict(profile.risk),
+    }
+
+
+@router.get("/blogger/{blogger_id}/profile")
+async def get_blogger_profile(blogger_id: str, db: Session = Depends(get_db)):
+    """获取博主画像"""
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="博主画像不存在")
+
+    return {
+        "blogger_id": record.blogger_id,
+        "name": record.name,
+        "platform": record.platform,
+        "content_count": record.content_count,
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+        "confidence": record.confidence,
+        "updated_at": str(record.updated_at) if record.updated_at else "",
+    }
+
+
+@router.post("/blogger/recommend")
+async def recommend_topics(req: BloggerRecommendRequest, db: Session = Depends(get_db)):
+    """选题推荐"""
+    from backend.services.topic_recommender import TopicRecommender
+
+    # 获取博主画像
+    record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    profile_data = {
+        "vocabulary": json.loads(record.vocabulary_json) if record.vocabulary_json else {},
+        "expression": json.loads(record.expression_json) if record.expression_json else {},
+        "topics": json.loads(record.topics_json) if record.topics_json else {},
+        "audience": json.loads(record.audience_json) if record.audience_json else {},
+        "risk": json.loads(record.risk_json) if record.risk_json else {},
+        "overall_style": record.overall_style,
+        "style_tags": json.loads(record.style_tags) if record.style_tags else [],
+    }
+
+    recommender = TopicRecommender()
+    result = await recommender.recommend(
+        blogger_profile=profile_data,
+        hot_topics=req.hot_topics if req.hot_topics else None,
+        blogger_id=req.blogger_id,
+        blogger_name=record.name,
+    )
+
+    return {
+        "blogger_id": result.blogger_id,
+        "blogger_name": result.blogger_name,
+        "hot_topics_used": result.hot_topics_used,
+        "recommendations": [
+            {
+                "topic": r.topic,
+                "angle": r.angle,
+                "reason": r.reason,
+                "trend_score": r.trend_score,
+                "style_match": r.style_match,
+                "risk_level": r.risk_level,
+                "risk_note": r.risk_note,
+                "estimated_reach": r.estimated_reach,
+                "priority": r.priority,
+            }
+            for r in result.recommendations
+        ],
+        "summary": result.summary,
+    }
+
+
+@router.post("/competitor/compare")
+async def compare_competitors(req: CompetitorCompareRequest, db: Session = Depends(get_db)):
+    """竞品对标分析"""
+    from backend.services.competitor_analyzer import CompetitorAnalyzer
+    from backend.services.blogger_profiler import BloggerProfiler
+
+    # 获取博主画像
+    blogger_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.blogger_id
+    ).first()
+
+    if not blogger_record:
+        raise HTTPException(status_code=404, detail="请先生成博主画像")
+
+    blogger_data = {
+        "vocabulary": json.loads(blogger_record.vocabulary_json) if blogger_record.vocabulary_json else {},
+        "expression": json.loads(blogger_record.expression_json) if blogger_record.expression_json else {},
+        "topics": json.loads(blogger_record.topics_json) if blogger_record.topics_json else {},
+        "audience": json.loads(blogger_record.audience_json) if blogger_record.audience_json else {},
+        "risk": json.loads(blogger_record.risk_json) if blogger_record.risk_json else {},
+        "overall_style": blogger_record.overall_style,
+        "style_tags": json.loads(blogger_record.style_tags) if blogger_record.style_tags else [],
+    }
+
+    # 获取或生成竞品画像
+    competitor_record = db.query(BloggerProfileRecord).filter(
+        BloggerProfileRecord.blogger_id == req.competitor_id
+    ).first()
+
+    if competitor_record:
+        competitor_data = {
+            "vocabulary": json.loads(competitor_record.vocabulary_json) if competitor_record.vocabulary_json else {},
+            "expression": json.loads(competitor_record.expression_json) if competitor_record.expression_json else {},
+            "topics": json.loads(competitor_record.topics_json) if competitor_record.topics_json else {},
+            "audience": json.loads(competitor_record.audience_json) if competitor_record.audience_json else {},
+            "risk": json.loads(competitor_record.risk_json) if competitor_record.risk_json else {},
+            "overall_style": competitor_record.overall_style,
+            "style_tags": json.loads(competitor_record.style_tags) if competitor_record.style_tags else [],
+        }
+    elif req.competitor_contents:
+        # 实时生成竞品画像
+        profiler = BloggerProfiler()
+        comp_profile = await profiler.generate_profile(
+            blogger_id=req.competitor_id,
+            contents=req.competitor_contents,
+        )
+        import dataclasses
+        competitor_data = dataclasses.asdict(comp_profile)
+    else:
+        raise HTTPException(status_code=400, detail="竞品画像不存在且未提供内容，无法生成画像")
+
+    # 对比分析
+    analyzer = CompetitorAnalyzer()
+    result = await analyzer.compare(
+        blogger_profile=blogger_data,
+        competitor_profile=competitor_data,
+        blogger_id=req.blogger_id,
+        blogger_name=blogger_record.name,
+        competitor_id=req.competitor_id,
+    )
+
+    # 保存记录
+    import dataclasses
+    compare_record = CompetitorCompareRecord(
+        blogger_id=req.blogger_id,
+        competitor_id=req.competitor_id,
+        style_comparisons=json.dumps([dataclasses.asdict(c) for c in result.style_comparisons], ensure_ascii=False),
+        content_gaps=json.dumps([dataclasses.asdict(g) for g in result.content_gaps], ensure_ascii=False),
+        suggestions=json.dumps([dataclasses.asdict(s) for s in result.suggestions], ensure_ascii=False),
+        overall_assessment=result.overall_assessment,
+    )
+    db.add(compare_record)
+    db.commit()
+
+    return {
+        "blogger_id": result.blogger_id,
+        "competitor_id": result.competitor_id,
+        "style_comparisons": [dataclasses.asdict(c) for c in result.style_comparisons],
+        "content_gaps": [dataclasses.asdict(g) for g in result.content_gaps],
+        "suggestions": [dataclasses.asdict(s) for s in result.suggestions],
+        "overall_assessment": result.overall_assessment,
+    }
 

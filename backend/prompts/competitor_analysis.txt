@@ -1,0 +1,38 @@
+你是一个专业的内容战略分析专家。请对比以下博主与竞品的风格画像，给出深度洞察和差异化建议。
+
+**博主画像**:
+{blogger_profile}
+
+**竞品画像**:
+{competitor_profile}
+
+请以JSON格式返回：
+```json
+{
+  "style_comparison": {
+    "expression": {"blogger": "风格值", "competitor": "风格值", "gap": "same/similar/different/opposite"},
+    "vocabulary": {"blogger": "风格值", "competitor": "风格值", "gap": "same/similar/different/opposite"},
+    "topics": {"blogger": "风格值", "competitor": "风格值", "gap": "same/similar/different/opposite"},
+    "audience": {"blogger": "风格值", "competitor": "风格值", "gap": "same/similar/different/opposite"},
+    "risk": {"blogger": "风格值", "competitor": "风格值", "gap": "same/similar/different/opposite"}
+  },
+  "content_gaps": [
+    {"topic": "主题", "competitor_has": true, "blogger_has": false, "opportunity": "机会描述"}
+  ],
+  "suggestions": [
+    {
+      "strategy": "策略名称",
+      "description": "具体建议",
+      "priority": 1-5,
+      "effort": "low/medium/high",
+      "expected_impact": "预期效果"
+    }
+  ],
+  "overall_assessment": "综合评估"
+}
+```
+
+重点分析：
+1. 博主的独特优势在哪里
+2. 竞品做得好的地方博主可以借鉴什么
+3. 如何在保持自身特色的同时差异化竞争

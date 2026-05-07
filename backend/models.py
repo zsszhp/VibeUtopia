@@ -333,3 +333,38 @@ class FrameRecord(Base):
     risk_level = Column(String, default="safe")             # 该帧风险等级
     risk_details = Column(Text, default="[]")               # JSON: 风险详情
     created_at = Column(DateTime, default=utcnow)
+
+
+class BloggerProfileRecord(Base):
+    """博主画像记录（V2.R6新增）"""
+    __tablename__ = "blogger_profiles"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    blogger_id = Column(String, index=True, unique=True)
+    name = Column(String)
+    platform = Column(String, default="")
+    content_count = Column(Integer, default=0)
+    vocabulary_json = Column(Text, default="{}")            # JSON: 词汇特征
+    expression_json = Column(Text, default="{}")            # JSON: 表达风格
+    topics_json = Column(Text, default="{}")                # JSON: 主题偏好
+    audience_json = Column(Text, default="{}")              # JSON: 受众画像
+    risk_json = Column(Text, default="{}")                  # JSON: 风险偏好
+    overall_style = Column(Text, default="")
+    style_tags = Column(Text, default="[]")                 # JSON: 风格标签
+    confidence = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow)
+
+
+class CompetitorCompareRecord(Base):
+    """竞品对标记录（V2.R6新增）"""
+    __tablename__ = "competitor_compares"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    blogger_id = Column(String, index=True)
+    competitor_id = Column(String, index=True)
+    style_comparisons = Column(Text, default="[]")          # JSON: 风格对比
+    content_gaps = Column(Text, default="[]")               # JSON: 内容缺口
+    suggestions = Column(Text, default="[]")                # JSON: 差异化建议
+    overall_assessment = Column(Text, default="")
+    created_at = Column(DateTime, default=utcnow)
