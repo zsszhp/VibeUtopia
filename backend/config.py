@@ -40,6 +40,13 @@ class Settings:
     NEO4J_USER: str = os.getenv("NEO4J_USER", "neo4j")
     NEO4J_PASSWORD: str = os.getenv("NEO4J_PASSWORD", "vibeutopia2024")
 
+    # MySQL配置（V2.R2新增，优先于SQLite）
+    MYSQL_HOST: str = os.getenv("MYSQL_HOST", "")
+    MYSQL_PORT: int = int(os.getenv("MYSQL_PORT", "3306"))
+    MYSQL_USER: str = os.getenv("MYSQL_USER", "root")
+    MYSQL_PASSWORD: str = os.getenv("MYSQL_PASSWORD", "")
+    MYSQL_DATABASE: str = os.getenv("MYSQL_DATABASE", "vibeutopia")
+
     # 人格工厂配置
     AGENTS_PER_PLATFORM: int = int(os.getenv("AGENTS_PER_PLATFORM", "5"))
     PERSONA_MAX_CONCURRENT: int = int(os.getenv("PERSONA_MAX_CONCURRENT", "5"))

@@ -12,3 +12,4 @@ apscheduler>=3.10.0
 feedparser>=6.0.0
 neo4j>=5.0.0
 pyvis>=0.3.2
+pymysql>=1.1.0
