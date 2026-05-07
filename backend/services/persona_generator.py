@@ -40,8 +40,13 @@ async def generate_persona(archetype: PersonaArchetype) -> Optional[dict]:
         result = parse_llm_json(response, fallback=None)
 
         if not result or "L1_basic" not in result:
-            logger.warning("人格生成结果缺少必要字段，原型: %s", archetype.archetype_id)
-            return None
+            # 重试一次
+            logger.warning("人格生成结果缺少必要字段，重试中，原型: %s", archetype.archetype_id)
+            response = await call_llm(prompt, task_type="persona_generation")
+            result = parse_llm_json(response, fallback=None)
+            if not result or "L1_basic" not in result:
+                logger.warning("人格生成重试仍失败，原型: %s", archetype.archetype_id)
+                return None
 
         # 确保persona_id存在
         if "persona_id" not in result:
@@ -79,8 +84,8 @@ async def generate_personas_batch(platform: str, count: int = 3) -> list[dict]:
         logger.warning("平台 %s 没有可用的人格原型", platform)
         return []
 
-    # 并行生成，3个并发
-    semaphore = asyncio.Semaphore(3)
+    # 并行生成，2个并发（避免API速率限制）
+    semaphore = asyncio.Semaphore(2)
 
     async def _generate_with_semaphore(arch):
         async with semaphore:
