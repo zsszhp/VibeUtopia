@@ -255,3 +255,34 @@ class ConsistencyRecord(Base):
     overall_consistency = Column(Float, default=0.0)
     run_details = Column(Text, default="[]")            # JSON: 各次运行详情
     created_at = Column(DateTime, default=utcnow)
+
+
+class TrendPredictionRecord(Base):
+    """趋势预测记录（V2.R3新增）"""
+    __tablename__ = "trend_predictions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    prediction_id = Column(String, index=True)
+    task_id = Column(String, nullable=True)
+    pattern_id = Column(String, default="")
+    pattern_name = Column(String, default="")
+    pattern_confidence = Column(Float, default=0.0)
+    predictions_json = Column(Text, default="[]")       # JSON: 短/中/长预测
+    risk_level = Column(String, default="green")
+    decision_action = Column(String, default="")
+    summary = Column(Text, default="")
+    created_at = Column(DateTime, default=utcnow)
+
+
+class ReportRecord(Base):
+    """报告记录（V2.R3新增）"""
+    __tablename__ = "report_records"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    report_id = Column(String, index=True)
+    report_type = Column(String)                        # risk/simulation/trend/decision
+    title = Column(String)
+    content = Column(Text)
+    summary = Column(Text, default="")
+    metadata_json = Column(Text, default="{}")
+    created_at = Column(DateTime, default=utcnow)
