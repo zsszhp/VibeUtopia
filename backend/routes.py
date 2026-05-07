@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.config import settings
 from backend.database import get_db
-from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord, AgentRecord, SocialRelation, AgentMemory, SimulationRecord, SimulationStatus, PropagationSnapshot, PropagationEdge, V2AnalysisResult, BacktestRecord, ConsistencyRecord
+from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord, AgentRecord, SocialRelation, AgentMemory, SimulationRecord, SimulationStatus, PropagationSnapshot, PropagationEdge, V2AnalysisResult, BacktestRecord, ConsistencyRecord, TrendPredictionRecord, ReportRecord
 from backend.services.analyzer import run_analysis, MAX_TEXT_LENGTH
 from backend.services.video_extractor import extract_video_text
 from backend.services.signal.fetcher import HotlistFetcher
@@ -431,6 +431,188 @@ async def get_db_status():
             "status": "error",
             "error": str(e),
         }
+
+
+# ── V2.R3 趋势预测与决策 API ────────────────────────────────
+
+
+class TrendPredictRequest(BaseModel):
+    simulation_data: dict = Field(default_factory=dict, description="仿真数据")
+    risk_dimensions: dict = Field(default_factory=dict, description="风险维度分值")
+    overall_score: int = Field(0, description="总风险分")
+
+
+@router.post("/prediction/trend")
+async def predict_trend(req: TrendPredictRequest):
+    """趋势预测"""
+    from backend.services.trend_predictor import TrendPredictor
+    predictor = TrendPredictor()
+    result = await predictor.predict(req.simulation_data, req.risk_dimensions, req.overall_score)
+
+    # 持久化
+    db = SessionLocal()
+    try:
+        record = TrendPredictionRecord(
+            prediction_id=result.prediction_id,
+            pattern_id=result.pattern.pattern_id if result.pattern else "",
+            pattern_name=result.pattern.pattern_name if result.pattern else "",
+            pattern_confidence=result.pattern.confidence if result.pattern else 0,
+            predictions_json=json.dumps(
+                [{"timeframe": p.timeframe, "direction": p.direction, "confidence": p.confidence} for p in result.predictions],
+                ensure_ascii=False,
+            ),
+            risk_level=result.decision.risk_level if result.decision else "green",
+            decision_action=result.decision.action if result.decision else "",
+            summary=result.summary,
+        )
+        db.add(record)
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
+    return {
+        "prediction_id": result.prediction_id,
+        "pattern": {"id": result.pattern.pattern_id, "name": result.pattern.pattern_name, "confidence": result.pattern.confidence} if result.pattern else None,
+        "predictions": [{"timeframe": p.timeframe, "direction": p.direction, "magnitude": p.magnitude, "confidence": p.confidence} for p in result.predictions],
+        "decision": {"risk_level": result.decision.risk_level, "action": result.decision.action, "suggestions": result.decision.suggestions} if result.decision else None,
+        "summary": result.summary,
+    }
+
+
+@router.post("/prediction/pattern")
+async def classify_pattern(req: TrendPredictRequest):
+    """舆论模式分类"""
+    from backend.services.trend_predictor import TrendPredictor
+    predictor = TrendPredictor()
+    situation = predictor._extract_situation(req.simulation_data, req.risk_dimensions)
+    pattern = await predictor._classify_pattern(situation)
+    return {
+        "pattern_id": pattern.pattern_id,
+        "pattern_name": pattern.pattern_name,
+        "confidence": pattern.confidence,
+        "similar_cases": pattern.similar_cases,
+    }
+
+
+class SimulationBranchRequest(BaseModel):
+    sim_id: str = Field(..., description="原始仿真ID")
+    intervention_type: str = Field("modify_text", description="干预类型")
+    content: str = Field("", description="干预内容")
+    platform: str = Field("weibo", description="干预平台")
+    tick: int = Field(0, description="注入tick")
+
+
+@router.post("/simulation/{sim_id}/branch")
+async def create_simulation_branch(sim_id: str, req: SimulationBranchRequest):
+    """创建反事实仿真分支"""
+    from backend.services.counterfactual import CounterfactualEngine, Intervention
+    engine = CounterfactualEngine()
+    intervention = Intervention(
+        intervention_type=req.intervention_type,
+        content=req.content,
+        platform=req.platform,
+        tick=req.tick,
+    )
+    branch_id = await engine.create_branch(sim_id, intervention)
+    return {"branch_id": branch_id, "original_sim_id": sim_id}
+
+
+class SimulationCompareRequest(BaseModel):
+    original_id: str
+    branch_ids: list[str]
+
+
+@router.post("/simulation/compare")
+async def compare_simulations(req: SimulationCompareRequest):
+    """对比仿真分支"""
+    from backend.services.counterfactual import CounterfactualEngine
+    engine = CounterfactualEngine()
+    result = await engine.compare_branches(req.original_id, req.branch_ids)
+    return {
+        "original_id": result.original_id,
+        "best_branch": result.best_branch,
+        "score_improvement": result.score_improvement,
+        "summary": result.summary,
+    }
+
+
+class ReportRequest(BaseModel):
+    report_type: str = Field(..., description="报告类型: risk/simulation/trend/decision")
+    data: dict = Field(default_factory=dict, description="报告数据")
+    task_id: str = Field("", description="关联任务ID")
+
+
+@router.post("/report/risk")
+async def generate_risk_report(req: ReportRequest, background_tasks: BackgroundTasks):
+    """生成风控报告"""
+    from backend.services.report_generator import ReportGenerator
+    gen = ReportGenerator()
+    report = await gen.generate_risk_report(req.task_id, req.data)
+
+    db = SessionLocal()
+    try:
+        record = ReportRecord(report_id=report.report_id, report_type="risk", title=report.title, content=report.content, summary=report.summary)
+        db.add(record)
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
+    return {"report_id": report.report_id, "title": report.title, "summary": report.summary, "content": report.content}
+
+
+@router.post("/report/simulation")
+async def generate_simulation_report(req: ReportRequest):
+    """生成仿真报告"""
+    from backend.services.report_generator import ReportGenerator
+    gen = ReportGenerator()
+    report = await gen.generate_simulation_report(req.data)
+    return {"report_id": report.report_id, "title": report.title, "summary": report.summary, "content": report.content}
+
+
+@router.post("/report/trend")
+async def generate_trend_report(req: ReportRequest):
+    """生成趋势报告"""
+    from backend.services.report_generator import ReportGenerator
+    gen = ReportGenerator()
+    report = await gen.generate_trend_report(req.data)
+    return {"report_id": report.report_id, "title": report.title, "summary": report.summary, "content": report.content}
+
+
+@router.post("/report/decision")
+async def generate_decision_report(req: ReportRequest):
+    """生成决策报告"""
+    from backend.services.report_generator import ReportGenerator
+    gen = ReportGenerator()
+    report = await gen.generate_decision_report(req.data)
+    return {"report_id": report.report_id, "title": report.title, "summary": report.summary, "content": report.content}
+
+
+class ConsensusRunRequest(BaseModel):
+    text: str = Field(..., min_length=10, description="待评估文案")
+    run_count: int = Field(3, ge=2, le=5, description="仿真次数")
+
+
+@router.post("/consensus/run")
+async def run_consensus(req: ConsensusRunRequest):
+    """运行多轮仿真共识"""
+    from backend.services.consensus_engine import ConsensusEngine
+    engine = ConsensusEngine(run_count=req.run_count)
+    result = await engine.run_consensus(req.text)
+    return {
+        "consensus_id": result.consensus_id,
+        "direction_consensus": result.direction_consensus,
+        "direction_confidence": result.direction_confidence,
+        "consensus_score": result.consensus_score,
+        "consensus_suggestion": result.consensus_suggestion,
+        "overall_confidence": result.overall_confidence,
+        "uncertainty_sources": result.uncertainty_sources,
+        "divergent_dimensions": result.divergent_dimensions,
+        "summary": result.summary,
+    }
 
 
 @router.get("/history")
