@@ -40,5 +40,12 @@ class Settings:
     NEO4J_USER: str = os.getenv("NEO4J_USER", "neo4j")
     NEO4J_PASSWORD: str = os.getenv("NEO4J_PASSWORD", "vibeutopia2024")
 
+    # 人格工厂配置
+    AGENTS_PER_PLATFORM: int = int(os.getenv("AGENTS_PER_PLATFORM", "5"))
+    PERSONA_MAX_CONCURRENT: int = int(os.getenv("PERSONA_MAX_CONCURRENT", "5"))
+    PERSONA_QUALITY_THRESHOLD: float = float(os.getenv("PERSONA_QUALITY_THRESHOLD", "0.6"))
+    AGENT_MEMORY_MAX_PER_AGENT: int = int(os.getenv("AGENT_MEMORY_MAX_PER_AGENT", "100"))
+    AGENT_MEMORY_HALF_LIFE_DAYS: int = int(os.getenv("AGENT_MEMORY_HALF_LIFE_DAYS", "7"))
+
 
 settings = Settings()

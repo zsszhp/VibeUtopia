@@ -102,3 +102,41 @@ class SeedEventRecord(Base):
     ttl = Column(Integer, default=72)
     status = Column(String, default="active")
     crawl_depth = Column(String, default="none")
+
+
+class AgentRecord(Base):
+    __tablename__ = "agent_records"
+
+    agent_id = Column(String, primary_key=True)
+    platform = Column(String, index=True)
+    archetype_base = Column(String)
+    persona_json = Column(Text)
+    quality_score = Column(Float, default=0.0)
+    status = Column(String, default="active")
+    version = Column(Integer, default=1)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow)
+
+
+class SocialRelation(Base):
+    __tablename__ = "social_relations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    agent_id_a = Column(String, index=True)
+    agent_id_b = Column(String, index=True)
+    relation_type = Column(String)
+    weight = Column(Float, default=1.0)
+    platform = Column(String, nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+
+
+class AgentMemory(Base):
+    __tablename__ = "agent_memories"
+
+    memory_id = Column(String, primary_key=True)
+    agent_id = Column(String, index=True)
+    memory_type = Column(String)
+    content = Column(Text)
+    weight = Column(Float, default=1.0)
+    source_task_id = Column(String, nullable=True)
+    created_at = Column(DateTime, default=utcnow)

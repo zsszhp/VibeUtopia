@@ -34,7 +34,7 @@ with st.sidebar:
         st.warning("后端未启动")
 
 # ---- 主区域: 输入 ----
-tab_text, tab_video, tab_signal, tab_graph = st.tabs(["📝 文案输入", "🎬 视频链接", "📡 信号采集", "🕸 知识图谱"])
+tab_text, tab_video, tab_signal, tab_graph, tab_persona = st.tabs(["📝 文案输入", "🎬 视频链接", "📡 信号采集", "🕸 知识图谱", "🧬 人格工厂"])
 
 with tab_text:
     text_input = st.text_area("在此粘贴你的文案/脚本...", height=200, placeholder="输入至少10个字符的文案内容...", key="text_input")
@@ -693,3 +693,226 @@ with tab_graph:
 
                 progress.empty()
                 st.success(f"图谱构建完成: {success_count}/{total} 个事件处理成功")
+
+# ---- 人格工厂 Tab ----
+with tab_persona:
+    st.subheader("🧬 人格工厂")
+
+    # 统计概览
+    col_stats, col_gen = st.columns([1, 1])
+
+    with col_stats:
+        st.markdown("**Agent统计**")
+        try:
+            resp = httpx.get(f"{API_BASE}/agents/stats", timeout=5)
+            if resp.status_code == 200:
+                stats = resp.json()
+                total = stats.get("total_agents", 0)
+                avg_q = stats.get("avg_quality_score", 0)
+                rels = stats.get("total_relations", 0)
+                mems = stats.get("total_memories", 0)
+                st.metric("活跃Agent", total)
+                st.metric("平均质量分", f"{avg_q:.2f}")
+                st.caption(f"社会关系: {rels} 条 | 记忆: {mems} 条")
+
+                by_platform = stats.get("by_platform", {})
+                if by_platform:
+                    platform_names = {"bilibili": "B站", "xiaohongshu": "小红书", "zhihu": "知乎", "douyin": "抖音"}
+                    plat_text = " | ".join(f"{platform_names.get(k, k)}: {v}" for k, v in by_platform.items())
+                    st.caption(plat_text)
+            else:
+                st.info("Agent服务不可用")
+        except Exception:
+            st.warning("后端未启动")
+
+    with col_gen:
+        st.markdown("**生成Agent**")
+        gen_platforms = st.multiselect(
+            "目标平台",
+            ["bilibili", "xiaohongshu", "zhihu", "douyin"],
+            default=["bilibili", "xiaohongshu", "zhihu", "douyin"],
+            format_func=lambda x: {"bilibili": "B站", "xiaohongshu": "小红书", "zhihu": "知乎", "douyin": "抖音"}.get(x, x),
+            key="gen_platforms",
+        )
+        gen_count = st.slider("每平台数量", 1, 20, 5, key="gen_count")
+        gen_graph = st.checkbox("注入知识图谱", value=False, key="gen_graph")
+
+        if st.button("🔨 生成Agent", type="primary", key="gen_agent_btn"):
+            if not gen_platforms:
+                st.error("请选择至少一个平台")
+            else:
+                with st.spinner(f"正在生成 {len(gen_platforms)} × {gen_count} = {len(gen_platforms)*gen_count} 个Agent..."):
+                    try:
+                        resp = httpx.post(
+                            f"{API_BASE}/agents/generate",
+                            json={
+                                "platforms": gen_platforms,
+                                "count_per_platform": gen_count,
+                                "inject_graph": gen_graph,
+                                "persist": True,
+                            },
+                            timeout=300,
+                        )
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            st.success(f"生成完成: {data.get('total_agents', 0)} 个Agent")
+                            by_plat = data.get("by_platform", {})
+                            for p, c in by_plat.items():
+                                pn = {"bilibili": "B站", "xiaohongshu": "小红书", "zhihu": "知乎", "douyin": "抖音"}.get(p, p)
+                                st.caption(f"{pn}: {c} 个")
+                        else:
+                            st.error(f"生成失败: {resp.text}")
+                    except Exception as e:
+                        st.error(f"连接失败: {e}")
+
+    # Agent列表
+    st.divider()
+    st.subheader("📋 Agent列表")
+
+    col_filter, col_search = st.columns([1, 2])
+    with col_filter:
+        filter_platform = st.selectbox(
+            "平台筛选",
+            ["全部", "bilibili", "xiaohongshu", "zhihu", "douyin"],
+            format_func=lambda x: {"全部": "全部", "bilibili": "B站", "xiaohongshu": "小红书", "zhihu": "知乎", "douyin": "抖音"}.get(x, x),
+            key="filter_platform",
+        )
+    with col_search:
+        filter_archetype = st.text_input("原型筛选", placeholder="输入原型ID关键词...", key="filter_archetype")
+
+    if st.button("🔄 刷新列表", key="refresh_agents"):
+        st.session_state.pop("agents_list", None)
+
+    agents_data = st.session_state.get("agents_list")
+    if agents_data is None:
+        try:
+            params = {"limit": 50, "status": "active"}
+            if filter_platform != "全部":
+                params["platform"] = filter_platform
+            if filter_archetype:
+                params["archetype"] = filter_archetype
+            resp = httpx.get(f"{API_BASE}/agents", params=params, timeout=10)
+            if resp.status_code == 200:
+                agents_data = resp.json()
+                st.session_state["agents_list"] = agents_data
+        except Exception:
+            agents_data = {"total": 0, "agents": []}
+
+    total_agents = agents_data.get("total", 0)
+    agents_list = agents_data.get("agents", [])
+
+    if agents_list:
+        st.caption(f"共 {total_agents} 个活跃Agent")
+        import pandas as pd
+        df = pd.DataFrame(agents_list)
+        display_cols = ["agent_id", "platform", "archetype_base", "quality_score", "name"]
+        available_cols = [c for c in display_cols if c in df.columns]
+        st.dataframe(df[available_cols], use_container_width=True, hide_index=True)
+    else:
+        st.info("暂无Agent，请先生成")
+
+    # Agent详情查看
+    st.divider()
+    st.markdown("**查看Agent详情**")
+    detail_agent_id = st.text_input("输入Agent ID", placeholder="从列表中选择Agent ID...", key="detail_agent_id")
+
+    if st.button("🔎 查看详情", key="view_agent_btn"):
+        if not detail_agent_id:
+            st.error("请输入Agent ID")
+        else:
+            try:
+                resp = httpx.get(f"{API_BASE}/agents/{detail_agent_id}", timeout=10)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    persona = data.get("persona", {})
+
+                    st.markdown(f"### {persona.get('L1_basic', {}).get('occupation', '未知')} ({data.get('platform', '')})")
+                    st.caption(f"原型: {data.get('archetype_base', '')} | 质量分: {data.get('quality_score', 0):.2f} | 版本: v{data.get('version', 1)}")
+
+                    # 7层人格展示
+                    layer_names = {
+                        "L1_basic": "L1 基础属性",
+                        "L2_values": "L2 价值观",
+                        "L3_knowledge": "L3 知识背景",
+                        "L4_behavior": "L4 行为模式",
+                        "L5_correction": "L5 校正层",
+                        "L6_social": "L6 社交关系",
+                        "L7_evolution": "L7 动态演化",
+                    }
+                    for layer_key, layer_name in layer_names.items():
+                        layer_data = persona.get(layer_key, {})
+                        if layer_data:
+                            with st.expander(layer_name, expanded=(layer_key in ("L1_basic", "L2_values"))):
+                                if isinstance(layer_data, dict):
+                                    for k, v in layer_data.items():
+                                        if isinstance(v, list):
+                                            st.markdown(f"**{k}**: {', '.join(str(i) for i in v)}")
+                                        else:
+                                            st.markdown(f"**{k}**: {v}")
+                                else:
+                                    st.markdown(str(layer_data))
+
+                    # 记忆查看
+                    mem_resp = httpx.get(f"{API_BASE}/agents/{detail_agent_id}/memories", timeout=10)
+                    if mem_resp.status_code == 200:
+                        mem_data = mem_resp.json()
+                        episodic = mem_data.get("episodic", [])
+                        semantic = mem_data.get("semantic", [])
+                        if episodic or semantic:
+                            with st.expander(f"🧠 记忆 (情景:{len(episodic)} 语义:{len(semantic)})"):
+                                if semantic:
+                                    st.markdown("**语义记忆**")
+                                    for s in semantic:
+                                        st.markdown(f"- {s['content']}")
+                                if episodic:
+                                    st.markdown("**情景记忆**")
+                                    for e in episodic[:10]:
+                                        st.markdown(f"- [{e['weight']:.2f}] {e['content']}")
+
+                    # 社会关系查看
+                    rel_resp = httpx.get(f"{API_BASE}/agents/{detail_agent_id}/relations", timeout=10)
+                    if rel_resp.status_code == 200:
+                        rel_data = rel_resp.json()
+                        relations = rel_data.get("relations", [])
+                        if relations:
+                            with st.expander(f"🔗 社会关系 ({len(relations)}条)"):
+                                type_icons = {"follow": "👉", "friend": "🤝", "oppose": "⚔", "mentor": "🎓", "same_org": "🏢"}
+                                for r in relations:
+                                    icon = type_icons.get(r["type"], "🔗")
+                                    st.markdown(f"{icon} **{r['type']}** → {r['other_agent_id'][:12]}... (权重: {r['weight']:.2f})")
+                else:
+                    st.error(f"Agent不存在: {resp.text}")
+            except Exception as e:
+                st.error(f"连接失败: {e}")
+
+    # 社会关系网络生成
+    st.divider()
+    st.markdown("**社会关系网络**")
+
+    col_net, col_net_info = st.columns([1, 1])
+    with col_net:
+        net_k = st.slider("邻居数(k)", 2, 10, 4, key="net_k")
+        net_beta = st.slider("重连概率(beta)", 0.0, 1.0, 0.3, step=0.1, key="net_beta")
+
+        if st.button("🕸 生成关系网络", type="primary", key="gen_network_btn"):
+            with st.spinner("正在生成社会关系网络..."):
+                try:
+                    resp = httpx.post(
+                        f"{API_BASE}/agents/network/generate",
+                        json={"k": net_k, "beta": net_beta, "oppose_ratio": 0.1, "persist": True},
+                        timeout=60,
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        st.success(f"网络生成完成: {data.get('total_relations', 0)} 条关系, {data.get('agent_count', 0)} 个Agent")
+                        type_dist = data.get("type_distribution", {})
+                        type_names = {"follow": "关注", "friend": "好友", "oppose": "对立", "mentor": "师徒", "same_org": "同组织"}
+                        for t, c in type_dist.items():
+                            st.markdown(f"- {type_names.get(t, t)}: {c} 条")
+                    else:
+                        st.error(f"生成失败: {resp.text}")
+                except Exception as e:
+                    st.error(f"连接失败: {e}")
+
+    with col_net_info:
+        st.info("社会关系网络基于Watts-Strogatz小世界模型生成，包含5种关系类型：关注、好友、对立、师徒、同组织。需要先有3个以上的活跃Agent。")

@@ -1,0 +1,1 @@
+﻿feat: V2.2 knowledge graph - ontology, entity extraction, Neo4j graph store, 6 API endpoints, frontend tab

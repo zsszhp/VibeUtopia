@@ -59,6 +59,40 @@ class PersonaArchetype:
     attitude_changes: list[str] = field(default_factory=list)
     memory_anchors: list[str] = field(default_factory=list)
 
+    # 变体种子：同一原型可生成多种差异化个体
+    variation_seeds: list[str] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# 变体种子模板 — 按原型特征自动匹配
+# ---------------------------------------------------------------------------
+
+_VARIATION_SEEDS_BY_OCCUPATION = {
+    "学生": ["刚入学的新生", "即将毕业的应届生", "休学创业的冒险者", "在读研究生", "复读生"],
+    "白领上班族": ["刚转行的新人", "工作5年的中层", "准备跳槽的犹豫者", "被裁后重新出发", "副业发展的斜杠青年"],
+    "程序员/工程师": ["大厂P7技术专家", "创业公司全栈", "转行自学的野生程序员", "开源社区贡献者", "准备转管理的架构师"],
+    "自由职业": ["刚辞职的自由职业者", "收入稳定的资深自由职业", "接不到单的焦虑期", "数字游民", "兼职自媒体的自由职业"],
+    "家庭主妇": ["刚当妈妈的新手", "二胎妈妈", "准备重返职场", "全职带娃5年以上", "做微商补贴家用的妈妈"],
+    "退休人员": ["刚退休适应期", "带孙辈的忙碌爷爷/奶奶", "学用智能手机的老人", "社区志愿者", "退休后环游世界"],
+    "创业者/小老板": ["第一次创业", "连续创业者", "小店铺经营者", "融资A轮的CEO", "创业失败准备再战"],
+    "文娱从业者": ["小网红起步期", "签约MCN的创作者", "独立音乐人", "短视频运营", "兼职写手"],
+    "蓝领工人": ["工厂流水线工人", "外卖骑手", "建筑工人", "网约车司机", "快递员"],
+    "公务员/体制内": ["基层公务员", "刚考入体制", "准备下海的体制人", "事业编教师", "国企中层"],
+    "品质生活追求者": ["初入职场开始注重品质", "资深中产消费升级", "从极简转向品质", "注重性价比的理性消费者", "追求小众设计师品牌"],
+    "学者/研究员": ["刚入职的助理教授", "获得终身教职的教授", "跨学科研究者", "青年千人学者", "独立智库研究员"],
+}
+
+_DEFAULT_SEEDS = ["当前状态的典型代表", "经历重大变故后的转折期", "比同龄人更早熟的个体", "刚刚开始反思人生的阶段", "处于人生十字路口的犹豫者"]
+
+
+def _get_variation_seeds(archetype: PersonaArchetype) -> list[str]:
+    """根据原型职业类别匹配变体种子"""
+    occupation = archetype.occupation_category
+    for key, seeds in _VARIATION_SEEDS_BY_OCCUPATION.items():
+        if key in occupation:
+            return seeds
+    return _DEFAULT_SEEDS
+
 
 # ---------------------------------------------------------------------------
 # B站原型 (4个)
@@ -781,26 +815,41 @@ def get_archetypes_for_platform(platform: str) -> list[PersonaArchetype]:
     return PLATFORM_ARCHETYPES.get(platform, [])
 
 
-def get_random_archetypes(platform: str, count: int = 3) -> list[PersonaArchetype]:
-    """从指定平台随机选择N个原型"""
+def get_random_archetypes(platform: str, count: int = 3, with_variation: bool = False) -> list[PersonaArchetype]:
+    """从指定平台随机选择N个原型
+
+    Args:
+        platform: 平台标识
+        count: 需要的原型数量
+        with_variation: 是否在选择时附带随机变体种子
+    """
     import random
     archetypes = get_archetypes_for_platform(platform)
     if not archetypes:
         return []
     # 如果要求数量超过原型数量，允许重复选择
     if count <= len(archetypes):
-        return random.sample(archetypes, count)
+        selected = random.sample(archetypes, count)
     else:
-        return [random.choice(archetypes) for _ in range(count)]
+        selected = [random.choice(archetypes) for _ in range(count)]
+
+    if with_variation:
+        for a in selected:
+            if not a.variation_seeds:
+                a.variation_seeds = _get_variation_seeds(a)
+
+    return selected
 
 
 def archetype_to_dict(archetype: PersonaArchetype) -> dict:
     """将原型转换为dict用于LLM Prompt"""
+    seeds = archetype.variation_seeds or _get_variation_seeds(archetype)
     return {
         "archetype_id": archetype.archetype_id,
         "name": archetype.name,
         "platform": archetype.platform,
         "description": archetype.description,
+        "variation_seeds": seeds,
         "L1_basic": {
             "age_range": f"{archetype.age_range[0]}-{archetype.age_range[1]}",
             "gender": archetype.gender,

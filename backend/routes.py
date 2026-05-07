@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from backend.config import settings
 from backend.database import get_db
-from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord
+from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord, AgentRecord, SocialRelation, AgentMemory
 from backend.services.analyzer import run_analysis, MAX_TEXT_LENGTH
 from backend.services.video_extractor import extract_video_text
 from backend.services.signal.fetcher import HotlistFetcher
@@ -484,3 +484,263 @@ async def get_graph_stats():
     """获取图谱统计信息"""
     store = _get_graph_store()
     return store.get_stats()
+
+
+# ============ 人格工厂 API ============
+
+class AgentGenerateRequest(BaseModel):
+    platforms: list[str] = Field(default_factory=lambda: ["bilibili", "xiaohongshu", "zhihu", "douyin"], description="目标平台列表")
+    count_per_platform: int = Field(5, ge=1, le=50, description="每平台生成数量")
+    inject_graph: bool = Field(False, description="是否注入知识图谱实体")
+    persist: bool = Field(True, description="是否持久化到数据库")
+
+
+class AgentUpdateRequest(BaseModel):
+    persona_json: str = Field("", description="更新的人格JSON")
+    status: str = Field("", description="更新状态: active/archived/evolved")
+
+
+class NetworkGenerateRequest(BaseModel):
+    k: int = Field(4, ge=2, le=10, description="小世界网络邻居数")
+    beta: float = Field(0.3, ge=0.0, le=1.0, description="重连概率")
+    oppose_ratio: float = Field(0.1, ge=0.0, le=0.5, description="对立关系占比")
+    persist: bool = Field(True, description="是否持久化到数据库")
+
+
+@router.post("/agents/generate")
+async def generate_agents(req: AgentGenerateRequest):
+    """批量生成Agent"""
+    from backend.services.persona_generator import generate_agents_cross_platform
+    from backend.services.persona.graph_injector import GraphInjector
+
+    graph_injector = None
+    if req.inject_graph:
+        store = _get_graph_store()
+        graph_injector = GraphInjector(store)
+
+    result = await generate_agents_cross_platform(
+        platforms=req.platforms,
+        count_per_platform=req.count_per_platform,
+        graph_injector=graph_injector,
+        persist=req.persist,
+    )
+
+    total = sum(len(v) for v in result.values())
+    return {
+        "status": "completed",
+        "total_agents": total,
+        "by_platform": {k: len(v) for k, v in result.items()},
+    }
+
+
+@router.get("/agents")
+async def list_agents(
+    platform: str = None,
+    archetype: str = None,
+    status: str = "active",
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+):
+    """列出Agent"""
+    query = db.query(AgentRecord)
+    if platform:
+        query = query.filter(AgentRecord.platform == platform)
+    if archetype:
+        query = query.filter(AgentRecord.archetype_base.contains(archetype))
+    if status:
+        query = query.filter(AgentRecord.status == status)
+
+    total = query.count()
+    records = query.order_by(AgentRecord.created_at.desc()).offset(offset).limit(limit).all()
+
+    agents = []
+    for r in records:
+        persona = json.loads(r.persona_json) if r.persona_json else {}
+        agents.append({
+            "agent_id": r.agent_id,
+            "platform": r.platform,
+            "archetype_base": r.archetype_base,
+            "quality_score": r.quality_score,
+            "status": r.status,
+            "version": r.version,
+            "name": persona.get("L1_basic", {}).get("occupation", "未知"),
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        })
+
+    return {"total": total, "agents": agents}
+
+
+@router.get("/agents/stats")
+async def get_agent_stats(db: Session = Depends(get_db)):
+    """获取Agent统计信息"""
+    from sqlalchemy import func
+    total = db.query(AgentRecord).filter(AgentRecord.status == "active").count()
+
+    platform_stats = db.query(
+        AgentRecord.platform, func.count(AgentRecord.agent_id)
+    ).filter(AgentRecord.status == "active").group_by(AgentRecord.platform).all()
+
+    archetype_stats = db.query(
+        AgentRecord.archetype_base, func.count(AgentRecord.agent_id)
+    ).filter(AgentRecord.status == "active").group_by(AgentRecord.archetype_base).all()
+
+    relation_count = db.query(SocialRelation).count()
+    memory_count = db.query(AgentMemory).count()
+    avg_quality = db.query(func.avg(AgentRecord.quality_score)).filter(
+        AgentRecord.status == "active"
+    ).scalar() or 0.0
+
+    return {
+        "total_agents": total,
+        "by_platform": dict(platform_stats),
+        "by_archetype": dict(archetype_stats),
+        "total_relations": relation_count,
+        "total_memories": memory_count,
+        "avg_quality_score": round(float(avg_quality), 3),
+    }
+
+
+@router.get("/agents/{agent_id}")
+async def get_agent(agent_id: str, db: Session = Depends(get_db)):
+    """获取Agent详情"""
+    record = db.query(AgentRecord).filter(AgentRecord.agent_id == agent_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Agent不存在")
+
+    persona = json.loads(record.persona_json) if record.persona_json else {}
+    return {
+        "agent_id": record.agent_id,
+        "platform": record.platform,
+        "archetype_base": record.archetype_base,
+        "persona": persona,
+        "quality_score": record.quality_score,
+        "status": record.status,
+        "version": record.version,
+        "created_at": record.created_at.isoformat() if record.created_at else None,
+        "updated_at": record.updated_at.isoformat() if record.updated_at else None,
+    }
+
+
+@router.put("/agents/{agent_id}")
+async def update_agent(agent_id: str, req: AgentUpdateRequest, db: Session = Depends(get_db)):
+    """更新Agent"""
+    record = db.query(AgentRecord).filter(AgentRecord.agent_id == agent_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Agent不存在")
+
+    if req.persona_json:
+        record.persona_json = req.persona_json
+        record.version += 1
+    if req.status:
+        record.status = req.status
+
+    from datetime import datetime, timezone
+    record.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    return {"status": "updated", "agent_id": agent_id, "version": record.version}
+
+
+@router.delete("/agents/{agent_id}")
+async def delete_agent(agent_id: str, db: Session = Depends(get_db)):
+    """删除Agent"""
+    record = db.query(AgentRecord).filter(AgentRecord.agent_id == agent_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Agent不存在")
+
+    db.delete(record)
+    # 同时删除关联记忆和社会关系
+    db.query(AgentMemory).filter(AgentMemory.agent_id == agent_id).delete()
+    db.query(SocialRelation).filter(
+        (SocialRelation.agent_id_a == agent_id) | (SocialRelation.agent_id_b == agent_id)
+    ).delete()
+    db.commit()
+
+    return {"status": "deleted", "agent_id": agent_id}
+
+
+@router.get("/agents/{agent_id}/relations")
+async def get_agent_relations(agent_id: str, db: Session = Depends(get_db)):
+    """获取Agent的社会关系"""
+    record = db.query(AgentRecord).filter(AgentRecord.agent_id == agent_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Agent不存在")
+
+    relations = db.query(SocialRelation).filter(
+        (SocialRelation.agent_id_a == agent_id) | (SocialRelation.agent_id_b == agent_id)
+    ).all()
+
+    result = []
+    for r in relations:
+        other_id = r.agent_id_b if r.agent_id_a == agent_id else r.agent_id_a
+        direction = "outgoing" if r.agent_id_a == agent_id else "incoming"
+        result.append({
+            "relation_id": r.id,
+            "other_agent_id": other_id,
+            "type": r.relation_type,
+            "weight": r.weight,
+            "direction": direction,
+            "platform": r.platform,
+        })
+
+    return {"agent_id": agent_id, "relations": result, "total": len(result)}
+
+
+@router.get("/agents/{agent_id}/memories")
+async def get_agent_memories(agent_id: str, limit: int = 20, db: Session = Depends(get_db)):
+    """获取Agent的记忆"""
+    from backend.services.persona.memory import MemoryManager
+    mm = MemoryManager()
+
+    episodic = mm.get_episodic_memories(agent_id, limit=limit)
+    semantic = mm.get_semantic_memories(agent_id, limit=5)
+    working = mm.get_working_memory(agent_id)
+
+    return {
+        "agent_id": agent_id,
+        "episodic": episodic,
+        "semantic": semantic,
+        "working_memory_count": len(working),
+    }
+
+
+@router.post("/agents/network/generate")
+async def generate_social_network(req: NetworkGenerateRequest, db: Session = Depends(get_db)):
+    """生成社会关系网络"""
+    from backend.services.persona.social_network import SocialNetworkGenerator
+
+    # 获取所有活跃Agent
+    records = db.query(AgentRecord).filter(AgentRecord.status == "active").all()
+
+    if len(records) < 3:
+        raise HTTPException(status_code=400, detail="活跃Agent数量不足3个，无法生成关系网络")
+
+    agents = []
+    for r in records:
+        persona = json.loads(r.persona_json) if r.persona_json else {}
+        persona["persona_id"] = r.agent_id
+        persona["platform"] = r.platform
+        agents.append(persona)
+
+    generator = SocialNetworkGenerator(
+        k=req.k, beta=req.beta, oppose_ratio=req.oppose_ratio
+    )
+    relations = generator.generate(agents)
+
+    if req.persist:
+        generator.persist_relations(relations)
+
+    # 统计
+    type_counts = {}
+    for r in relations:
+        t = r.get("type", "unknown")
+        type_counts[t] = type_counts.get(t, 0) + 1
+
+    return {
+        "status": "completed",
+        "total_relations": len(relations),
+        "agent_count": len(agents),
+        "type_distribution": type_counts,
+    }
+

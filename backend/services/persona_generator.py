@@ -2,14 +2,17 @@
 
 核心能力：
 1. 基于原型模板生成具体人格（LLM增加变异）
-2. 一致性校验（L1-L7逻辑自洽）
-3. 批量并行生成
+2. 变体种子注入（同一原型生成不同变体）
+3. 一致性校验与自动修复（QualityValidator）
+4. 图谱知识注入（GraphInjector）
+5. 持久化存储（AgentRecord）
+6. 批量并行生成（Semaphore并发控制）
 """
 import asyncio
 import json
 import logging
 import uuid
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from backend.services.llm_client import call_llm, load_prompt, parse_llm_json
 from backend.services.persona_archetypes import (
@@ -17,22 +20,39 @@ from backend.services.persona_archetypes import (
     get_archetypes_for_platform,
     get_random_archetypes,
     archetype_to_dict,
+    _get_variation_seeds,
 )
+from backend.services.persona.quality_validator import QualityValidator
+from backend.services.persona.graph_injector import GraphInjector
 
 logger = logging.getLogger(__name__)
 
 
-async def generate_persona(archetype: PersonaArchetype) -> Optional[dict]:
+async def generate_persona(
+    archetype: PersonaArchetype,
+    variation_seed: Optional[str] = None,
+    graph_injector: Optional[GraphInjector] = None,
+    validate: bool = True,
+) -> Optional[dict]:
     """基于原型模板生成一个完整的7层人格
 
     Args:
         archetype: 人格原型
+        variation_seed: 变体种子，让同一原型生成不同变体
+        graph_injector: 图谱注入器实例
+        validate: 是否执行质量校验
 
     Returns:
         完整的7层人格dict，或None（生成失败时）
     """
     prompt_template = load_prompt("persona_generation.txt")
-    archetype_json = json.dumps(archetype_to_dict(archetype), ensure_ascii=False, indent=2)
+    archetype_dict = archetype_to_dict(archetype)
+
+    # 注入变体种子到prompt
+    if variation_seed:
+        archetype_dict["variation_direction"] = variation_seed
+
+    archetype_json = json.dumps(archetype_dict, ensure_ascii=False, indent=2)
     prompt = prompt_template.replace("{archetype_json}", archetype_json)
 
     try:
@@ -40,7 +60,6 @@ async def generate_persona(archetype: PersonaArchetype) -> Optional[dict]:
         result = parse_llm_json(response, fallback=None)
 
         if not result or "L1_basic" not in result:
-            # 重试一次
             logger.warning("人格生成结果缺少必要字段，重试中，原型: %s", archetype.archetype_id)
             response = await call_llm(prompt, task_type="persona_generation")
             result = parse_llm_json(response, fallback=None)
@@ -55,11 +74,17 @@ async def generate_persona(archetype: PersonaArchetype) -> Optional[dict]:
         result["archetype_base"] = archetype.archetype_id
         result["platform"] = archetype.platform
 
-        # 一致性校验
-        issues = _validate_consistency(result)
-        if issues:
-            logger.info("人格 %s 一致性问题: %s（已接受，LLM生成的人格允许适度偏差）",
-                        result["persona_id"], issues)
+        # 图谱注入
+        if graph_injector:
+            result = graph_injector.inject(result)
+
+        # 质量校验与修复
+        if validate:
+            validator = QualityValidator()
+            result, quality_score = await validator.validate_and_fix(result)
+            result["quality_score"] = quality_score
+        else:
+            result["quality_score"] = 0.5
 
         return result
 
@@ -68,28 +93,40 @@ async def generate_persona(archetype: PersonaArchetype) -> Optional[dict]:
         return None
 
 
-async def generate_personas_batch(platform: str, count: int = 3) -> list[dict]:
+async def generate_personas_batch(
+    platform: str,
+    count: int = 5,
+    graph_injector: Optional[GraphInjector] = None,
+    persist: bool = False,
+    max_concurrent: int = 5,
+) -> List[dict]:
     """批量并行生成指定平台的Agent人格
 
     Args:
         platform: 平台标识
         count: 生成数量
+        graph_injector: 图谱注入器
+        persist: 是否持久化到数据库
+        max_concurrent: 最大并发数
 
     Returns:
         成功生成的人格列表
     """
-    archetypes = get_random_archetypes(platform, count)
+    archetypes = get_random_archetypes(platform, count, with_variation=True)
 
     if not archetypes:
         logger.warning("平台 %s 没有可用的人格原型", platform)
         return []
 
-    # 并行生成，2个并发（避免API速率限制）
-    semaphore = asyncio.Semaphore(2)
+    semaphore = asyncio.Semaphore(max_concurrent)
 
     async def _generate_with_semaphore(arch):
         async with semaphore:
-            return await generate_persona(arch)
+            # 选择随机变体种子
+            seeds = arch.variation_seeds or _get_variation_seeds(arch)
+            import random
+            seed = random.choice(seeds) if seeds else None
+            return await generate_persona(arch, variation_seed=seed, graph_injector=graph_injector)
 
     tasks = [_generate_with_semaphore(a) for a in archetypes]
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -103,56 +140,78 @@ async def generate_personas_batch(platform: str, count: int = 3) -> list[dict]:
             personas.append(r)
 
     logger.info("平台 %s: 请求生成 %d 个人格，成功 %d 个", platform, count, len(personas))
+
+    # 持久化
+    if persist and personas:
+        _persist_personas(personas)
+
     return personas
 
 
-def _validate_consistency(persona: dict) -> list[str]:
-    """校验7层人格的一致性
+async def generate_agents_cross_platform(
+    platforms: Optional[List[str]] = None,
+    count_per_platform: int = 5,
+    graph_injector: Optional[GraphInjector] = None,
+    persist: bool = False,
+) -> Dict[str, List[dict]]:
+    """跨平台批量生成Agent
+
+    Args:
+        platforms: 平台列表，None则使用全部4平台
+        count_per_platform: 每平台生成数量
+        graph_injector: 图谱注入器
+        persist: 是否持久化
 
     Returns:
-        一致性问题列表（空列表表示完全一致）
+        {platform: [persona_list]}
     """
-    issues = []
+    if platforms is None:
+        platforms = ["bilibili", "xiaohongshu", "zhihu", "douyin"]
 
-    l1 = persona.get("L1_basic", {})
-    l2 = persona.get("L2_values", {})
-    l3 = persona.get("L3_knowledge", {})
-    l4 = persona.get("L4_behavior", {})
-    l5 = persona.get("L5_correction", {})
-    l7 = persona.get("L7_evolution", {})
+    result = {}
+    for platform in platforms:
+        result[platform] = await generate_personas_batch(
+            platform=platform,
+            count=count_per_platform,
+            graph_injector=graph_injector,
+            persist=persist,
+        )
 
-    # 检查1：教育程度与认知水平匹配
-    education = l1.get("education", "")
-    cognitive = l3.get("cognitive_level", "中等")
-    if "博士" in education or "硕士" in education:
-        if cognitive == "初级":
-            issues.append("高学历但认知水平为初级，不一致")
+    return result
 
-    # 检查2：收入与消费观匹配
-    income = l1.get("income", "")
-    consumerism = l2.get("consumerism", 5.0)
-    if "低" in str(income) and consumerism > 7.0:
-        issues.append("低收入但高消费主义倾向，可能不一致")
 
-    # 检查3：表达风格与互动偏好匹配
-    expression = l4.get("expression_style", "")
-    interaction = l4.get("interaction_preference", "")
-    if "激进" in expression and "潜水" in interaction:
-        issues.append("激进表达风格但潜水偏好，不一致")
+def _persist_personas(personas: List[dict]):
+    """将生成的人格持久化到数据库"""
+    from datetime import datetime, timezone
+    from backend.database import SessionLocal
+    from backend.models import AgentRecord
 
-    # 检查4：自我审查与禁忌触发匹配
-    self_censorship = l5.get("self_censorship", "中等")
-    triggers = l5.get("sensitive_triggers", [])
-    if self_censorship == "高" and len(triggers) == 0:
-        issues.append("高自我审查但没有敏感触发点，可能不一致")
+    db = SessionLocal()
+    try:
+        for persona in personas:
+            record = AgentRecord(
+                agent_id=persona.get("persona_id", str(uuid.uuid4())),
+                platform=persona.get("platform", "unknown"),
+                archetype_base=persona.get("archetype_base", ""),
+                persona_json=json.dumps(persona, ensure_ascii=False),
+                quality_score=persona.get("quality_score", 0.0),
+                status="active",
+                version=1,
+            )
+            db.merge(record)
+        db.commit()
+        logger.info(f"持久化 {len(personas)} 个Agent到数据库")
+    except Exception as e:
+        logger.error(f"持久化Agent失败: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
-    # 检查5：情绪基线与近期经历匹配
-    baseline = l7.get("emotional_baseline", "平稳")
-    recent = l7.get("recent_experiences", [])
-    if baseline in ("积极", "亢奋") and any(
-        any(w in str(e) for w in ["失败", "失业", "崩溃", "悲剧"])
-        for e in recent
-    ):
-        issues.append("积极情绪基线但有负面近期经历，可能不一致")
 
+# ── 兼容旧接口 ──────────────────────────────────────
+
+def _validate_consistency(persona: dict) -> list[str]:
+    """兼容旧调用：使用QualityValidator进行校验"""
+    validator = QualityValidator()
+    _, issues = validator.validate(persona)
     return issues
