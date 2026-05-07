@@ -1,1 +1,1 @@
-﻿feat: V2.3 persona factory - 7-layer persona, quality validator, graph injector, social network, memory system, 9 API endpoints, frontend tab
+﻿feat: V2.4 social simulation - 5 platform simulators, ABC-tier agents, rule engine, decision engine, message bus, time model, 8 API endpoints, frontend tab, 3 test cases
