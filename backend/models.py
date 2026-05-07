@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, String, Text, Integer, Float, DateTime, ForeignKey
+from sqlalchemy import Boolean, Column, String, Text, Integer, Float, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 
 from backend.database import Base
@@ -63,3 +63,42 @@ class AnalysisSummary(Base):
     dimension_weights = Column(Text, nullable=True)
     cross_effects = Column(Text, nullable=True)
     agents_json = Column(Text, nullable=True)
+
+
+class SignalRecord(Base):
+    __tablename__ = "signal_records"
+
+    signal_id = Column(String, primary_key=True)
+    source_platform = Column(String, index=True)
+    title = Column(String, index=True)
+    url = Column(String, nullable=True)
+    rank = Column(Integer, nullable=True)
+    rank_timeline = Column(Text, default="[]")
+    first_seen = Column(DateTime, default=utcnow)
+    last_seen = Column(DateTime, default=utcnow)
+    appearance_count = Column(Integer, default=1)
+    is_new = Column(Boolean, default=False)
+    signal_type = Column(String, default="hotlist")
+    category = Column(String, nullable=True)
+    raw_data = Column(Text, nullable=True)
+
+
+class SeedEventRecord(Base):
+    __tablename__ = "seed_events"
+
+    event_id = Column(String, primary_key=True)
+    title = Column(String, index=True)
+    description = Column(Text)
+    category = Column(String)
+    signal_strength = Column(Float, default=0.0)
+    source_platforms = Column(Text, default="[]")
+    source_urls = Column(Text, default="[]")
+    comments_json = Column(Text, default="[]")
+    related_events = Column(Text, default="[]")
+    causal_parents = Column(Text, default="[]")
+    causal_children = Column(Text, default="[]")
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow)
+    ttl = Column(Integer, default=72)
+    status = Column(String, default="active")
+    crawl_depth = Column(String, default="none")

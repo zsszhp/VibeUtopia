@@ -34,7 +34,7 @@ with st.sidebar:
         st.warning("后端未启动")
 
 # ---- 主区域: 输入 ----
-tab_text, tab_video = st.tabs(["📝 文案输入", "🎬 视频链接"])
+tab_text, tab_video, tab_signal = st.tabs(["📝 文案输入", "🎬 视频链接", "📡 信号采集"])
 
 with tab_text:
     text_input = st.text_area("在此粘贴你的文案/脚本...", height=200, placeholder="输入至少10个字符的文案内容...", key="text_input")
@@ -341,3 +341,182 @@ if result:
                             with st.expander("内心推理"):
                                 st.markdown(reasoning)
                     st.markdown("---")
+
+# ---- 信号采集 Tab ----
+with tab_signal:
+    st.subheader("📡 信号采集控制台")
+
+    # 调度器状态与控制
+    col_ctrl, col_status = st.columns([1, 1])
+
+    with col_ctrl:
+        st.markdown("**调度模式**")
+        schedule_mode = st.radio(
+            "选择调度模式",
+            ["standard", "realtime", "economy", "manual"],
+            format_func=lambda x: {
+                "realtime": "🔴 实时监控 (5分钟/次)",
+                "standard": "🟡 标准模式 (10分钟/次)",
+                "economy": "🟢 经济模式 (30分钟/次)",
+                "manual": "⚪ 手动模式",
+            }[x],
+            horizontal=True,
+            key="schedule_mode",
+        )
+
+        col_start, col_stop = st.columns(2)
+        with col_start:
+            if st.button("▶ 启动调度", type="primary", use_container_width=True):
+                try:
+                    resp = httpx.post(
+                        f"{API_BASE}/signals/scheduler",
+                        json={"action": "start", "mode": schedule_mode},
+                        timeout=10,
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        st.success(f"调度已启动，模式: {data.get('mode', 'unknown')}")
+                    else:
+                        st.error(f"启动失败: {resp.text}")
+                except Exception as e:
+                    st.error(f"连接失败: {e}")
+
+        with col_stop:
+            if st.button("⏹ 停止调度", use_container_width=True):
+                try:
+                    resp = httpx.post(
+                        f"{API_BASE}/signals/scheduler",
+                        json={"action": "stop"},
+                        timeout=10,
+                    )
+                    if resp.status_code == 200:
+                        st.success("调度已停止")
+                    else:
+                        st.error(f"停止失败: {resp.text}")
+                except Exception as e:
+                    st.error(f"连接失败: {e}")
+
+    with col_status:
+        st.markdown("**当前状态**")
+        st.info("调度器默认为手动模式，点击"启动调度"开始自动采集")
+
+    # 手动爬取
+    st.divider()
+    st.markdown("**手动深度爬取**")
+    col_kw, col_plat = st.columns([2, 1])
+    with col_kw:
+        manual_keyword = st.text_input("搜索关键词", placeholder="输入关键词手动爬取评论...", key="manual_keyword")
+    with col_plat:
+        manual_platforms = st.multiselect("搜索平台", ["微博", "知乎", "B站"], default=["微博", "知乎"], key="manual_platforms")
+
+    if st.button("🔍 手动爬取评论", key="manual_crawl_btn"):
+        if not manual_keyword:
+            st.error("请输入关键词")
+        else:
+            with st.spinner(f"正在爬取 '{manual_keyword}' 的评论..."):
+                try:
+                    resp = httpx.post(
+                        f"{API_BASE}/signals/crawl",
+                        json={"keyword": manual_keyword, "platforms": manual_platforms},
+                        timeout=60,
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        count = data.get("comments_count", 0)
+                        st.success(f"爬取完成，共 {count} 条评论")
+                        comments = data.get("comments", [])
+                        if comments:
+                            import pandas as pd
+                            df = pd.DataFrame(comments)
+                            st.dataframe(df, use_container_width=True, hide_index=True)
+                    else:
+                        st.error(f"爬取失败: {resp.text}")
+                except Exception as e:
+                    st.error(f"连接失败: {e}")
+
+    # 热榜数据展示
+    st.divider()
+    st.subheader("📊 各平台热榜")
+
+    if st.button("🔄 刷新热榜", key="refresh_hotlist"):
+        st.session_state.pop("hotlist_data", None)
+
+    hotlist_data = st.session_state.get("hotlist_data")
+    if hotlist_data is None:
+        try:
+            resp = httpx.get(f"{API_BASE}/signals/hot", params={"limit": 10}, timeout=10)
+            if resp.status_code == 200:
+                hotlist_data = resp.json().get("platforms", {})
+                st.session_state["hotlist_data"] = hotlist_data
+        except Exception:
+            hotlist_data = {}
+
+    if hotlist_data:
+        # 按平台分组展示
+        cols = st.columns(min(len(hotlist_data), 4))
+        for idx, (platform_name, items) in enumerate(hotlist_data.items()):
+            col_idx = idx % len(cols)
+            with cols[col_idx]:
+                with st.expander(f"📱 {platform_name} ({len(items)}条)", expanded=(idx < 2)):
+                    for item in items[:10]:
+                        rank = item.get("rank", "-")
+                        title = item.get("title", "")
+                        is_new = item.get("is_new", False)
+                        new_tag = " 🆕" if is_new else ""
+                        url = item.get("url")
+                        if url:
+                            st.markdown(f"{rank}. [{title}]({url}){new_tag}")
+                        else:
+                            st.markdown(f"{rank}. {title}{new_tag}")
+    else:
+        st.info("暂无热榜数据，请启动调度器或等待采集")
+
+    # 种子事件列表
+    st.divider()
+    st.subheader("🌱 种子事件")
+
+    if st.button("🔄 刷新事件", key="refresh_events"):
+        st.session_state.pop("events_data", None)
+
+    events_data = st.session_state.get("events_data")
+    if events_data is None:
+        try:
+            resp = httpx.get(f"{API_BASE}/signals/events", params={"limit": 20}, timeout=10)
+            if resp.status_code == 200:
+                events_data = resp.json()
+                st.session_state["events_data"] = events_data
+        except Exception:
+            events_data = {"total": 0, "events": []}
+
+    total_events = events_data.get("total", 0)
+    events_list = events_data.get("events", [])
+
+    if events_list:
+        st.caption(f"共 {total_events} 个种子事件")
+        for event in events_list:
+            strength = event.get("signal_strength", 0)
+            strength_pct = int(strength * 100)
+            strength_color = "green" if strength < 0.4 else ("orange" if strength < 0.7 else "red")
+            category = event.get("category", "")
+            crawl_depth = event.get("crawl_depth", "none")
+            depth_icon = "🔍" if crawl_depth == "deep" else ("🔎" if crawl_depth == "shallow" else "")
+
+            with st.expander(
+                f"{depth_icon} [{category}] {event['title']} — 强度 {strength_pct}%",
+                expanded=(strength >= 0.7),
+            ):
+                col_detail, col_strength = st.columns([3, 1])
+                with col_detail:
+                    st.markdown(f"**分类**: {category}")
+                    st.markdown(f"**来源平台**: {', '.join(event.get('source_platforms', []))}")
+                    st.markdown(f"**爬取深度**: {crawl_depth}")
+                    st.markdown(f"**创建时间**: {event.get('created_at', '未知')}")
+                with col_strength:
+                    st.markdown(
+                        f'<div style="text-align:center;padding:10px;">'
+                        f'<span style="font-size:28px;font-weight:bold;color:{strength_color}">{strength_pct}%</span>'
+                        f'<br><small>信号强度</small></div>',
+                        unsafe_allow_html=True,
+                    )
+    else:
+        st.info("暂无种子事件，请启动调度器并等待事件检测")

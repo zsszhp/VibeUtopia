@@ -1,0 +1,77 @@
+signal:
+  hotlist:
+    api_url: "https://newsnow.busiyi.world/api/s"
+    request_interval: 0.1
+    max_retries: 2
+    retry_backoff: [3, 5]
+    platforms:
+      - id: "weibo"
+        name: "微博"
+      - id: "baidu"
+        name: "百度"
+      - id: "zhihu"
+        name: "知乎"
+      - id: "bilibili-hot-search"
+        name: "B站"
+      - id: "douyin"
+        name: "抖音"
+      - id: "toutiao"
+        name: "今日头条"
+      - id: "tieba"
+        name: "贴吧"
+      - id: "thepaper"
+        name: "澎湃新闻"
+      - id: "wallstreetcn-hot"
+        name: "华尔街见闻"
+      - id: "cls-hot"
+        name: "财联社"
+      - id: "ifeng"
+        name: "凤凰网"
+
+  rss:
+    freshness_filter:
+      enabled: true
+      max_age_days: 1
+    feeds:
+      - id: "hacker-news"
+        name: "Hacker News"
+        url: "https://hnrss.org/frontpage"
+        category: "tech"
+      - id: "yahoo-finance"
+        name: "雅虎财经"
+        url: "https://finance.yahoo.com/news/rssindex"
+        category: "finance"
+      - id: "thepaper-rss"
+        name: "澎湃新闻"
+        url: "https://rsshub.app/thepaper/newsDetail/25"
+        category: "news"
+
+  schedule:
+    default_mode: "standard"
+    presets:
+      realtime:
+        hotlist_interval: 300
+        rss_interval: 1800
+        deep_crawl_threshold: 0.7
+        event_detect_interval: 3600
+      standard:
+        hotlist_interval: 600
+        rss_interval: 3600
+        deep_crawl_threshold: 0.7
+        event_detect_interval: 3600
+      economy:
+        hotlist_interval: 1800
+        rss_interval: 7200
+        deep_crawl_threshold: 0.9
+        event_detect_interval: 7200
+
+  deep_crawl:
+    max_comments_per_keyword: 50
+    max_keywords_per_event: 5
+    sentiment_batch_size: 10
+    fallback_to_rules: true
+
+  event_detection:
+    similarity_threshold: 0.6
+    min_cluster_size: 2
+    llm_clustering: false

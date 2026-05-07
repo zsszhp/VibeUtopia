@@ -24,5 +24,12 @@ class Settings:
     DEFAULT_PROVIDER: str = os.getenv("DEFAULT_PROVIDER", "")
     DEFAULT_MODEL: str = os.getenv("DEFAULT_MODEL", "")
 
+    # 信号采集配置
+    SIGNAL_CONFIG_PATH: str = os.getenv(
+        "SIGNAL_CONFIG_PATH",
+        str(Path(__file__).parent.parent / "config" / "signal_config.yaml"),
+    )
+    SIGNAL_DEFAULT_MODE: str = os.getenv("SIGNAL_DEFAULT_MODE", "standard")
+
 
 settings = Settings()

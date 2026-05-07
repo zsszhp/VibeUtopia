@@ -5,15 +5,22 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.database import init_db
 from backend.routes import router
+from backend.services.signal.scheduler import SignalScheduler
+
+# 全局调度器实例
+signal_scheduler = SignalScheduler()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     yield
+    # 关闭时停止调度器
+    if signal_scheduler.is_running:
+        signal_scheduler.stop()
 
 
-app = FastAPI(title="VibeUtopia", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="VibeUtopia", version="0.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
