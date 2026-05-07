@@ -35,14 +35,45 @@ PLATFORM_MAP = {
     "douyin": DouyinSimulator,
 }
 
+# 轻量仿真配置（V2.R1）- 100Agent × 6h，成本<1元/次
+LIGHTWEIGHT_SIM_CONFIG = {
+    "agent_count": 100,           # 50A级 + 30B级 + 20C级
+    "simulation_hours": 6,        # 仿真6小时
+    "time_acceleration": 6,       # 1仿真小时=10真实秒
+    "platforms": ["weibo", "bilibili", "xiaohongshu", "zhihu", "douyin"],
+    "llm_tier": "tier2",          # 使用Tier2模型降低成本
+    "seed_injection": True,       # 自动注入文案作为种子事件
+    "max_llm_calls": 200,         # 限制LLM调用次数
+    "skip_coordinators": True,    # 跳过Director/Watcher/Guardian降低成本
+    "tick_interval": 0.2,         # 快速tick间隔
+    "b_agent_per_tick": 3,        # 每tick最多3个B级Agent调用LLM
+}
+
 
 class SimulationEngine:
     """仿真引擎（V2.5 集成传播动力学）"""
+
+    @classmethod
+    def create_lightweight(cls, sim_id: str, topic: str, seed_content: str = "") -> "SimulationEngine":
+        """创建轻量仿真引擎（V2.R1）
+
+        100Agent × 6h，成本<1元/次，跳过Director/Watcher/Guardian
+        """
+        config = LIGHTWEIGHT_SIM_CONFIG.copy()
+        config["lightweight"] = True
+        config["max_ticks"] = config["simulation_hours"] * 6  # 6h × 6 ticks/h = 36 ticks
+        config["seed_content"] = seed_content or topic
+
+        engine = cls(sim_id=sim_id, topic=topic, config=config)
+        return engine
 
     def __init__(self, sim_id: str, topic: str, config: Dict = None):
         self.sim_id = sim_id
         self.topic = topic
         self.config = config or {}
+
+        # 轻量仿真模式标记
+        self.is_lightweight = self.config.get("lightweight", False)
 
         # 核心组件
         self.message_bus = MessageBus()
@@ -91,9 +122,14 @@ class SimulationEngine:
         # 从数据库加载Agent
         await self._load_agents()
 
+        # 轻量模式：如果Agent不足100，补充生成
+        if self.is_lightweight and len(self.agents) < self.config.get("agent_count", 100):
+            await self._supplement_agents(self.config["agent_count"])
+
         # 向每个平台注入种子话题
+        seed_content = self.config.get("seed_content", self.topic)
         for pname, platform in self.platforms.items():
-            platform.seed_topic(self.topic, author_id="system_director")
+            platform.seed_topic(seed_content, author_id="system_director")
 
         # 消息总线通知
         await self.message_bus.publish(CHANNEL_SYSTEM_EVENTS, {
@@ -136,6 +172,58 @@ class SimulationEngine:
                 active_hours = l4.get("active_hours", "晚间") if isinstance(l4, dict) else "晚间"
                 self.time_model.set_agent_schedule(r.agent_id, active_hours)
 
+    async def _supplement_agents(self, target_count: int):
+        """轻量模式：补充Agent到目标数量"""
+        import random as rng
+        from backend.services.persona_archetypes import ARCHETYPE_TEMPLATES
+
+        current = len(self.agents)
+        needed = target_count - current
+        if needed <= 0:
+            return
+
+        platforms = self.config.get("platforms", list(PLATFORM_MAP.keys()))
+        per_platform = needed // len(platforms)
+        remainder = needed % len(platforms)
+
+        for pname in platforms:
+            count = per_platform + (1 if remainder > 0 else 0)
+            remainder = max(0, remainder - 1)
+
+            for i in range(count):
+                agent_id = f"lightweight_{pname}_{i}_{uuid.uuid4().hex[:6]}"
+
+                # 简化人格：从原型模板随机选择
+                archetype = rng.choice(list(ARCHETYPE_TEMPLATES.keys())) if ARCHETYPE_TEMPLATES else "普通用户"
+                persona = {
+                    "persona_id": agent_id,
+                    "platform": pname,
+                    "archetype": archetype,
+                    "L1_demographics": {"age": rng.randint(18, 45), "gender": rng.choice(["男", "女"])},
+                    "L2_personality": {"openness": rng.random(), "conscientiousness": rng.random()},
+                    "L3_values": {"political_lean": rng.choice(["左", "中", "右"])},
+                    "L4_behavior": {"active_hours": rng.choice(["早晨", "午间", "晚间", "深夜"])},
+                    "L5_knowledge": {},
+                    "L6_social": {"influence_level": rng.choice(["KOL", "活跃分子", "普通用户"])},
+                    "L7_narrative": {"style": rng.choice(["理性分析", "情绪表达", "幽默调侃"])},
+                }
+
+                self.agents[agent_id] = persona
+
+                # 分配层级
+                influence = persona["L6_social"]["influence_level"]
+                if i < count // 2:
+                    self.agent_tiers[agent_id] = AgentTier.A
+                elif influence in ("KOL", "活跃分子"):
+                    self.agent_tiers[agent_id] = AgentTier.B
+                else:
+                    self.agent_tiers[agent_id] = AgentTier.C
+
+                self.agent_platform_map[agent_id] = pname
+                self.time_model.set_agent_schedule(agent_id, persona["L4_behavior"]["active_hours"])
+
+        logger.info(f"轻量仿真补充 {needed} 个Agent，总计 {len(self.agents)} 个")
+
         finally:
             db.close()
 
@@ -177,12 +265,12 @@ class SimulationEngine:
         logger.info(f"仿真 {self.sim_id} 完成: {self.current_tick} ticks")
 
     async def _execute_tick(self):
-        """执行一个tick（V2.5 集成传播动力学）"""
+        """执行一个tick（V2.5 集成传播动力学，轻量模式跳过协调器）"""
         # 1. 推进时间
         sim_time = self.time_model.advance()
 
-        # 2. Director调度决策（每12个tick）
-        if self.current_tick % 12 == 0:
+        # 2. Director调度决策（每12个tick）— 轻量模式跳过
+        if not self.is_lightweight and self.current_tick % 12 == 0:
             await self._director_tick()
 
         # 3. B层Agent行为（LLM驱动，并发控制）
@@ -215,8 +303,8 @@ class SimulationEngine:
             recent_edges = self.spread_model.propagation_tree.edges[-new_edges:]
             self._propagation_edges_buffer.extend(recent_edges)
 
-        # 7. Watcher监控（每6个tick）
-        if self.current_tick % 6 == 0:
+        # 7. Watcher监控（每6个tick）— 轻量模式跳过
+        if not self.is_lightweight and self.current_tick % 6 == 0:
             await self._watcher_tick()
 
             # Guardian干预
