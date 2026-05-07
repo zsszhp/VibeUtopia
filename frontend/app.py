@@ -440,6 +440,58 @@ if result:
 
             st.caption(f"分析耗时: {v2_enhanced.get('analysis_time', 0):.1f}s")
 
+        # V2.R3: 趋势预测和报告
+        if v2_enhanced.get("v2_score", 0) > 0:
+            st.divider()
+            st.markdown("#### 📈 趋势预测与报告")
+
+            col_pred, col_report = st.columns(2)
+            with col_pred:
+                if st.button("🔮 运行趋势预测", key="run_prediction"):
+                    with st.spinner("趋势预测中..."):
+                        try:
+                            resp = httpx.post(f"{API_BASE}/prediction/trend", json={
+                                "simulation_data": v2_enhanced.get("simulation_summary", {}),
+                                "risk_dimensions": v2_enhanced.get("dynamic_weights", {}),
+                                "overall_score": v2_enhanced.get("v2_score", 0),
+                            }, timeout=60)
+                            if resp.status_code == 200:
+                                pred = resp.json()
+                                pattern = pred.get("pattern", {})
+                                if pattern:
+                                    st.metric("舆论模式", f"{pattern.get('name', '')} ({pattern.get('confidence', 0):.0%})")
+                                for p in pred.get("predictions", []):
+                                    timeframe_labels = {"short_term": "短期(1-6h)", "medium_term": "中期(1-3天)", "long_term": "长期(1-2周)"}
+                                    st.markdown(f"- **{timeframe_labels.get(p.get('timeframe', ''), p.get('timeframe', ''))}**: {p.get('direction', '')} (置信度 {p.get('confidence', 0):.0%})")
+                                decision = pred.get("decision", {})
+                                if decision:
+                                    risk_colors = {"red": "🔴", "orange": "🟠", "yellow": "🟡", "green": "🟢"}
+                                    st.markdown(f"{risk_colors.get(decision.get('risk_level', ''), '⚪')} **{decision.get('action', '')}**")
+                            else:
+                                st.error(f"预测失败: {resp.text}")
+                        except Exception as e:
+                            st.error(f"连接后端失败: {e}")
+
+            with col_report:
+                report_type = st.selectbox("报告类型", ["risk", "simulation", "trend", "decision"],
+                    format_func=lambda x: {"risk": "风控报告", "simulation": "仿真报告", "trend": "趋势报告", "decision": "决策报告"}[x],
+                    key="report_type")
+                if st.button("📄 生成报告", key="gen_report"):
+                    with st.spinner("生成报告中..."):
+                        try:
+                            resp = httpx.post(f"{API_BASE}/report/{report_type}", json={
+                                "report_type": report_type,
+                                "data": {"score": v2_enhanced.get("v2_score", 0)},
+                                "task_id": task_id or "",
+                            }, timeout=60)
+                            if resp.status_code == 200:
+                                report = resp.json()
+                                st.markdown(report.get("content", ""))
+                            else:
+                                st.error(f"生成失败: {resp.text}")
+                        except Exception as e:
+                            st.error(f"连接后端失败: {e}")
+
 # ---- 信号采集 Tab ----
 with tab_signal:
     st.subheader("📡 信号采集控制台")
