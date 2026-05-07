@@ -21,7 +21,7 @@ PLATFORM_NAMES = {
 
 logger = logging.getLogger(__name__)
 
-AGENTS_PER_PLATFORM = 3  # 每个平台生成的Agent数量
+AGENTS_PER_PLATFORM = 5  # 每个平台生成的Agent数量
 
 
 async def _agent_react(persona: dict, text: str, platform_name: str) -> Optional[dict]:

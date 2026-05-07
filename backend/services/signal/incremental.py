@@ -149,12 +149,6 @@ class IncrementalDetector:
 
     def _save_signal(self, signal: Signal) -> SignalRecord:
         """将新信号持久化到数据库"""
-        timeline_json = json.dumps(
-            [{"timestamp": rp.timestamp.isoformat(), "rank": rp.rank}]
-            for rp in signal.rank_timeline
-        ) if signal.rank_timeline else "[]"
-
-        # 简化rank_timeline存储
         if signal.rank_timeline:
             timeline_json = json.dumps([
                 {"timestamp": rp.timestamp.isoformat(), "rank": rp.rank}
