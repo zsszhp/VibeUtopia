@@ -55,14 +55,27 @@ with tab_text:
 
 with tab_video:
     video_url = st.text_input("视频链接", placeholder="粘贴B站/抖音等视频链接...", key="video_url")
-    col_extract, col_analyze = st.columns(2)
-    with col_extract:
-        extract_btn = st.button("📋 提取文案", use_container_width=True)
-    with col_analyze:
-        analyze_video_btn = st.button("🔍 提取并评估", type="primary", use_container_width=True)
+    video_path = st.text_input("本地视频路径(可选)", placeholder="F:/videos/test.mp4", key="video_path")
+
+    # V2.R4: 多模态分析模式
+    st.markdown("**分析模式**")
+    col_mm1, col_mm2, col_mm3 = st.columns(3)
+    with col_mm1:
+        extract_btn = st.button("📋 提取文案", use_container_width=True, key="mm_extract")
+    with col_mm2:
+        quick_video_btn = st.button("⚡ 快速审核(帧+OCR)", type="primary", use_container_width=True, key="mm_quick")
+    with col_mm3:
+        deep_video_btn = st.button("🔬 深度审核(全模态)", type="secondary", use_container_width=True, key="mm_deep")
+
+    # 高级选项
+    with st.expander("多模态选项", expanded=False):
+        mm_max_frames = st.slider("最大关键帧数", 10, 100, 50, key="mm_max_frames")
+        mm_enable_ocr = st.checkbox("启用OCR文字识别", value=True, key="mm_ocr")
+        mm_enable_risk = st.checkbox("启用画面风险评估", value=True, key="mm_risk")
+        mm_enable_audio = st.checkbox("启用音频分析(深度模式)", value=True, key="mm_audio")
 
     # 提取文案展示
-    if extract_btn or analyze_video_btn:
+    if extract_btn:
         if not video_url:
             st.error("请输入视频链接")
         else:
@@ -74,28 +87,134 @@ with tab_video:
                         st.success(f"提取成功 (来源: {extract_data.get('source', '未知')})")
                         st.markdown(f"**标题**: {extract_data.get('title', '')}")
                         if extract_data.get("subtitles"):
-                            st.markdown(f"**字幕内容**:")
+                            st.markdown("**字幕内容**:")
                             st.text(extract_data["subtitles"][:2000])
                         elif extract_data.get("description"):
-                            st.markdown(f"**简介内容**:")
+                            st.markdown("**简介内容**:")
                             st.text(extract_data["description"][:2000])
-
-                        if analyze_video_btn:
-                            text_input = extract_data.get("text", "")
-                            if len(text_input.strip()) < 10:
-                                st.error("视频提取的文案太短，无法进行分析")
-                            else:
-                                resp = httpx.post(f"{API_BASE}/analyze", json={"text": text_input}, timeout=10)
-                                if resp.status_code == 200:
-                                    task_id = resp.json()["task_id"]
-                                    st.session_state["current_task"] = task_id
-                                    st.session_state.pop("analysis_result", None)
-                                else:
-                                    st.error(f"提交失败: {resp.text}")
                     else:
                         st.error(f"提取失败: {resp.text}")
                 except Exception as e:
                     st.error(f"连接后端失败: {e}")
+
+    # V2.R4: 多模态分析
+    if quick_video_btn or deep_video_btn:
+        if not video_url and not video_path:
+            st.error("请输入视频链接或本地视频路径")
+        else:
+            mode = "deep" if deep_video_btn else "quick"
+            with st.spinner(f"正在进行{('深度' if mode == 'deep' else '快速')}多模态审核..."):
+                try:
+                    resp = httpx.post(
+                        f"{API_BASE}/analyze-video/v2",
+                        json={
+                            "url": video_url,
+                            "video_path": video_path,
+                            "mode": mode,
+                            "max_frames": mm_max_frames,
+                        },
+                        timeout=30,
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        task_id = data["task_id"]
+                        st.session_state["video_task_id"] = task_id
+                        st.session_state["video_mode"] = mode
+                        st.success(f"多模态审核已提交 (模式: {mode})，任务ID: {task_id}")
+                    else:
+                        st.error(f"提交失败: {resp.text}")
+                except Exception as e:
+                    st.error(f"连接后端失败: {e}")
+
+    # 多模态审核结果展示
+    if "video_task_id" in st.session_state:
+        vtask_id = st.session_state["video_task_id"]
+        with st.spinner("加载多模态审核结果..."):
+            try:
+                resp = httpx.get(f"{API_BASE}/frames/{vtask_id}", timeout=30)
+                if resp.status_code == 200:
+                    vdata = resp.json()
+
+                    if vdata.get("status") == "processing":
+                        st.info("审核进行中，请稍后再查看...")
+                    elif vdata.get("status") == "failed":
+                        st.error(f"审核失败: {vdata.get('error', '未知错误')}")
+                    elif vdata.get("status") == "completed":
+                        # 综合风险概览
+                        st.markdown("### 多模态审核结果")
+                        risk_level = vdata.get("overall_risk_level", "safe")
+                        risk_score = vdata.get("overall_risk_score", 0)
+                        risk_colors = {"safe": "🟢", "low": "🟡", "medium": "🟠", "high": "🔴", "critical": "⛔"}
+                        st.markdown(f"**综合风险等级**: {risk_colors.get(risk_level, '⚪')} {risk_level.upper()} ({risk_score}分)")
+
+                        # 分模态风险
+                        col_r1, col_r2, col_r3 = st.columns(3)
+                        with col_r1:
+                            st.metric("画面风险", vdata.get("frame_risk_level", "safe"))
+                        with col_r2:
+                            st.metric("OCR引擎", vdata.get("ocr_engine", "未启用"))
+                        with col_r3:
+                            st.metric("音频引擎", vdata.get("audio_engine", "未启用"))
+
+                        # OCR文字
+                        if vdata.get("ocr_text"):
+                            with st.expander("📝 OCR识别文字", expanded=True):
+                                st.text(vdata["ocr_text"][:3000])
+
+                        # 音频转写
+                        if vdata.get("audio_text"):
+                            with st.expander("🎙 音频转写", expanded=True):
+                                st.text(vdata["audio_text"][:3000])
+
+                        # 关键帧展示
+                        frames = vdata.get("frames", [])
+                        if frames:
+                            with st.expander("🖼 关键帧详情", expanded=False):
+                                # 分页显示
+                                page_size = 6
+                                total_pages = max(1, (len(frames) + page_size - 1) // page_size)
+                                page = st.number_input("页码", 1, total_pages, 1, key="frame_page")
+                                start_idx = (page - 1) * page_size
+                                page_frames = frames[start_idx:start_idx + page_size]
+
+                                cols = st.columns(min(3, len(page_frames)))
+                                for i, frame in enumerate(page_frames):
+                                    with cols[i % 3]:
+                                        st.markdown(f"**帧 {frame.get('frame_index', '?')}** ({frame.get('timestamp', 0):.1f}s)")
+                                        # 尝试显示帧图片
+                                        fpath = frame.get("file_path", "")
+                                        if fpath and os.path.exists(fpath):
+                                            st.image(fpath, use_container_width=True)
+                                        else:
+                                            st.caption("帧图片不可用")
+                                        # OCR文字
+                                        if frame.get("ocr_text"):
+                                            st.caption(f"OCR: {frame['ocr_text'][:100]}")
+                                        # 风险等级
+                                        risk = frame.get("risk_level", "safe")
+                                        risk_emoji = risk_colors.get(risk, "⚪")
+                                        st.markdown(f"{risk_emoji} 风险: {risk}")
+
+                        st.caption(f"分析耗时: {vdata.get('analysis_time', 0):.1f}s | 关键帧: {vdata.get('keyframe_count', 0)} | 方法: {vdata.get('keyframe_method', '')}")
+
+                        # 交叉风险详情
+                        try:
+                            cross_resp = httpx.get(f"{API_BASE}/cross-modal/{vtask_id}", timeout=10)
+                            if cross_resp.status_code == 200:
+                                cross_data = cross_resp.json()
+                                cross_risks = cross_data.get("cross_modal_risks", [])
+                                if cross_risks:
+                                    with st.expander("⚠️ 交叉模态风险", expanded=True):
+                                        for cr in cross_risks:
+                                            severity = cr.get("severity", "low")
+                                            st.markdown(f"- **{cr.get('risk_type', '')}** ({severity}): {cr.get('description', '')}")
+                                else:
+                                    st.success("未检测到交叉模态风险")
+                        except Exception:
+                            pass
+
+            except Exception as e:
+                st.warning(f"加载结果失败: {e}")
 
 # 文案分析提交 (V2.R1: 支持quick/deep模式)
 if quick_btn or deep_btn:
