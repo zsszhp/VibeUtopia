@@ -41,6 +41,12 @@ const routes = [
     component: () => import('../views/Settings.vue'),
     meta: { title: '系统设置', icon: 'Setting' },
   },
+  {
+    path: '/blogger',
+    name: 'Blogger',
+    component: () => import('../views/Blogger.vue'),
+    meta: { title: '博主服务', icon: 'User' },
+  },
 ]
 
 const router = createRouter({

@@ -35,6 +35,10 @@
           <el-icon><Setting /></el-icon>
           <span>系统设置</span>
         </el-menu-item>
+        <el-menu-item index="/blogger">
+          <el-icon><User /></el-icon>
+          <span>博主服务</span>
+        </el-menu-item>
       </el-menu>
     </el-aside>
     <el-main class="bg-gray-50 p-6 overflow-auto">
@@ -46,7 +50,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Monitor, Film, Connection, DataLine, Document, Setting } from '@element-plus/icons-vue'
+import { Monitor, Film, Connection, DataLine, Document, Setting, User } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
