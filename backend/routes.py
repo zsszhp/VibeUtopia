@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.config import settings
 from backend.database import get_db
-from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord, AgentRecord, SocialRelation, AgentMemory, SimulationRecord, SimulationStatus, PropagationSnapshot, PropagationEdge, V2AnalysisResult
+from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord, AgentRecord, SocialRelation, AgentMemory, SimulationRecord, SimulationStatus, PropagationSnapshot, PropagationEdge, V2AnalysisResult, BacktestRecord, ConsistencyRecord
 from backend.services.analyzer import run_analysis, MAX_TEXT_LENGTH
 from backend.services.video_extractor import extract_video_text
 from backend.services.signal.fetcher import HotlistFetcher
@@ -287,6 +287,150 @@ async def get_entity_risk_chain(name: str):
         "dimension_boosts": result.risk_dimension_boosts,
         "summary": result.analysis_summary,
     }
+
+
+# ── V2.R2 回测与一致性 API ──────────────────────────────────
+
+
+class BacktestRunRequest(BaseModel):
+    case_ids: list[str] = Field(default_factory=list, description="指定案例ID列表，空则运行全部")
+
+
+@router.post("/backtest/run")
+async def run_backtest(req: BacktestRunRequest, background_tasks: BackgroundTasks):
+    """运行回测"""
+    from backend.services.backtest import BacktestRunner, PREDEFINED_CASES
+
+    async def _run():
+        runner = BacktestRunner()
+        cases = PREDEFINED_CASES
+        if req.case_ids:
+            cases = [c for c in cases if c.case_id in req.case_ids]
+        report = await runner.run_backtest(cases)
+        runner.persist_report(report)
+
+    background_tasks.add_task(_run)
+    return {"status": "started", "message": f"回测已启动，{len(req.case_ids) or '全部'}案例"}
+
+
+@router.get("/backtest/results")
+async def get_backtest_results(skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
+    """获取回测结果"""
+    records = (
+        db.query(BacktestRecord)
+        .order_by(BacktestRecord.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "case_id": r.case_id,
+            "title": r.title,
+            "accuracy_scores": json.loads(r.accuracy_scores) if r.accuracy_scores else {},
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in records
+    ]
+
+
+class ConsistencyCheckRequest(BaseModel):
+    text: str = Field(..., min_length=10, description="待检查文案")
+    run_count: int = Field(3, ge=2, le=5, description="运行次数(2-5)")
+
+
+@router.post("/consistency/check")
+async def run_consistency_check(req: ConsistencyCheckRequest):
+    """运行一致性检查"""
+    from backend.services.consistency_checker import ConsistencyChecker
+
+    checker = ConsistencyChecker(run_count=req.run_count)
+    result = await checker.check(req.text)
+
+    # 持久化
+    db = SessionLocal()
+    try:
+        record = ConsistencyRecord(
+            content_hash=result.content_hash,
+            run_count=result.run_count,
+            direction_consistency=result.direction_consistency,
+            platform_consistency=result.platform_consistency,
+            dimension_consistency=result.dimension_consistency,
+            overall_consistency=result.overall_consistency,
+            run_details=json.dumps(
+                [{"index": r.run_index, "score": r.overall_score, "error": r.error} for r in result.runs],
+                ensure_ascii=False,
+            ),
+        )
+        db.add(record)
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
+    return {
+        "content_hash": result.content_hash,
+        "run_count": result.run_count,
+        "direction_consistency": result.direction_consistency,
+        "platform_consistency": result.platform_consistency,
+        "dimension_consistency": result.dimension_consistency,
+        "overall_consistency": result.overall_consistency,
+        "score_range": list(result.score_range),
+        "score_std": result.score_std,
+        "divergent_dimensions": result.divergent_dimensions,
+        "summary": result.summary,
+    }
+
+
+@router.get("/consistency/results")
+async def get_consistency_results(skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
+    """获取一致性检查结果"""
+    records = (
+        db.query(ConsistencyRecord)
+        .order_by(ConsistencyRecord.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "content_hash": r.content_hash,
+            "run_count": r.run_count,
+            "direction_consistency": r.direction_consistency,
+            "platform_consistency": r.platform_consistency,
+            "dimension_consistency": r.dimension_consistency,
+            "overall_consistency": r.overall_consistency,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in records
+    ]
+
+
+@router.get("/system/db-status")
+async def get_db_status():
+    """获取数据库状态"""
+    from backend.database import get_db_type, engine
+    from sqlalchemy import inspect
+
+    db_type = get_db_type()
+    try:
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        return {
+            "db_type": db_type,
+            "tables": tables,
+            "table_count": len(tables),
+            "status": "connected",
+        }
+    except Exception as e:
+        return {
+            "db_type": db_type,
+            "status": "error",
+            "error": str(e),
+        }
 
 
 @router.get("/history")

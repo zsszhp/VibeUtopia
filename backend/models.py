@@ -225,3 +225,33 @@ class V2AnalysisResult(Base):
     confidence_sources = Column(Text, default="{}")     # JSON: 可信度来源
     analysis_time = Column(Float, default=0.0)          # 分析耗时(秒)
     created_at = Column(DateTime, default=utcnow)
+
+
+class BacktestRecord(Base):
+    """回测记录（V2.R2新增）"""
+    __tablename__ = "backtest_records"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    case_id = Column(String, index=True)
+    title = Column(String)
+    seed_content = Column(Text)
+    actual_outcome = Column(Text, default="{}")         # JSON: 实际结果
+    mvp_prediction = Column(Text, default="{}")         # JSON: MVP预测
+    v2_prediction = Column(Text, default="{}")          # JSON: V2预测
+    accuracy_scores = Column(Text, default="{}")        # JSON: 准确率评分
+    created_at = Column(DateTime, default=utcnow)
+
+
+class ConsistencyRecord(Base):
+    """一致性检查记录（V2.R2新增）"""
+    __tablename__ = "consistency_records"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    content_hash = Column(String, index=True)
+    run_count = Column(Integer, default=3)
+    direction_consistency = Column(Float, default=0.0)
+    platform_consistency = Column(Float, default=0.0)
+    dimension_consistency = Column(Float, default=0.0)
+    overall_consistency = Column(Float, default=0.0)
+    run_details = Column(Text, default="[]")            # JSON: 各次运行详情
+    created_at = Column(DateTime, default=utcnow)
