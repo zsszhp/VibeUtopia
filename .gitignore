@@ -28,7 +28,7 @@ data/
 *~
 
 # 编辑器/AI 配置
-# .comate/ 下的 spec 文档需要上传到 git
+.comate/
 
 # 系统文件
 .DS_Store
