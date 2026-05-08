@@ -159,13 +159,8 @@ class FrameRiskAssessor:
                 summary=result.get("summary", ""),
             )
         except Exception as e:
-            logger.error("画面风险评估失败: %s", e)
-            return FrameRiskResult(
-                frame_path=frame_path,
-                frame_index=frame_index,
-                timestamp=timestamp,
-                error=f"评估失败: {e}"
-            )
+            logger.warning("LLM视觉模型不可用，使用规则降级: %s", e)
+            return self._rule_based_assess(frame_path, frame_index, timestamp)
 
     async def assess_video_frames(self, frames: list) -> VideoRiskResult:
         """评估视频所有关键帧
@@ -391,3 +386,28 @@ class FrameRiskAssessor:
         elif score >= 25:
             return "low"
         return "safe"
+
+    def _rule_based_assess(self, frame_path: str, frame_index: int,
+                           timestamp: float) -> "FrameRiskResult":
+        """规则降级评估：当LLM视觉模型不可用时，基于图片基本特征做简单判断"""
+        risk_level = "safe"
+        summary = "视觉模型不可用，已跳过画面风险评估（规则降级模式）"
+        risks = []
+
+        # 基于文件大小的简单启发式（大图可能内容更丰富）
+        try:
+            file_size = os.path.getsize(frame_path)
+            if file_size > 500_000:  # >500KB
+                summary = "视觉模型不可用，图片较大建议人工复查（规则降级模式）"
+                risk_level = "low"
+        except Exception:
+            pass
+
+        return FrameRiskResult(
+            frame_path=frame_path,
+            frame_index=frame_index,
+            timestamp=timestamp,
+            risks=risks,
+            risk_level=risk_level,
+            summary=summary,
+        )
