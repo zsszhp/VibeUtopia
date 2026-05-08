@@ -83,12 +83,24 @@ class FrameOCR:
         """懒加载PaddleOCR引擎"""
         if self._paddle_engine is None and _HAS_PADDLEOCR:
             try:
+                # PaddleOCR 3.5+ API (基于PaddleX)
                 self._paddle_engine = PaddleOCR(
-                    use_angle_cls=True,
+                    use_doc_orientation_classify=False,
+                    use_doc_unwarping=False,
+                    use_textline_orientation=True,
                     lang="ch",
-                    show_log=False,
-                    use_gpu=False,
                 )
+            except TypeError:
+                # 旧版PaddleOCR API兼容
+                try:
+                    self._paddle_engine = PaddleOCR(
+                        use_angle_cls=True,
+                        lang="ch",
+                        show_log=False,
+                    )
+                except Exception as e:
+                    logger.warning("PaddleOCR旧版初始化也失败: %s", e)
+                    self._paddle_engine = None
             except Exception as e:
                 logger.warning("PaddleOCR初始化失败: %s", e)
                 self._paddle_engine = None
@@ -236,25 +248,52 @@ class FrameOCR:
         return video_result
 
     def _paddle_ocr_sync(self, engine, frame_path: str) -> Optional[list[OCRItem]]:
-        """同步PaddleOCR识别"""
-        result = engine.ocr(frame_path, cls=True)
-        if not result or not result[0]:
-            return []
-
+        """同步PaddleOCR识别（兼容3.x和旧版API）"""
         items = []
-        for line in result[0]:
-            bbox = line[0]  # [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
-            text = line[1][0]
-            confidence = line[1][1]
 
-            position = self._infer_position(bbox)
+        # PaddleOCR 3.x (基于PaddleX) 使用 predict() 方法
+        try:
+            result = engine.predict(frame_path)
+            for res in result:
+                if hasattr(res, 'rec_texts') and res.rec_texts:
+                    for i, text in enumerate(res.rec_texts):
+                        confidence = res.rec_scores[i] if hasattr(res, 'rec_scores') and i < len(res.rec_scores) else 0.9
+                        bbox = res.dt_polys[i] if hasattr(res, 'dt_polys') and i < len(res.dt_polys) else []
+                        position = self._infer_position(bbox) if bbox else "center"
+                        items.append(OCRItem(
+                            text=text,
+                            confidence=float(confidence),
+                            bbox=bbox,
+                            position=position,
+                        ))
+                elif hasattr(res, 'keys'):
+                    # 旧格式兼容
+                    for key in res:
+                        pass
+            if items:
+                return items
+        except Exception as e:
+            logger.debug("PaddleOCR predict() 失败，尝试旧版ocr(): %s", e)
 
-            items.append(OCRItem(
-                text=text,
-                confidence=confidence,
-                bbox=bbox,
-                position=position,
-            ))
+        # 旧版PaddleOCR 使用 ocr() 方法
+        try:
+            result = engine.ocr(frame_path, cls=True)
+            if result and result[0]:
+                for line in result[0]:
+                    bbox = line[0]
+                    text = line[1][0]
+                    confidence = line[1][1]
+                    position = self._infer_position(bbox)
+                    items.append(OCRItem(
+                        text=text,
+                        confidence=confidence,
+                        bbox=bbox,
+                        position=position,
+                    ))
+        except Exception as e:
+            logger.warning("PaddleOCR识别失败: %s", e)
+
+        return items
 
         return items
 

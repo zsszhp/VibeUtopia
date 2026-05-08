@@ -131,6 +131,22 @@ class ModelRegistry:
             result.append(ep)
         return result
 
+    def get_available_providers(self) -> list[dict]:
+        """返回所有有 API key 的厂商及其模型，供前端选择器使用"""
+        provider_map: dict[str, dict] = {}
+        for ep in self.endpoints:
+            if ep.provider not in provider_map:
+                provider_map[ep.provider] = {
+                    "id": ep.provider,
+                    "name": ep.provider_name,
+                    "models": [],
+                }
+            provider_map[ep.provider]["models"].append({
+                "id": ep.model_id,
+                "tier": ep.tier,
+            })
+        return list(provider_map.values())
+
 
 # ---------------------------------------------------------------------------
 # ModelRouter: 路由选择 + fallback + 冷却管理
@@ -146,15 +162,29 @@ class ModelRouter:
         self.registry = registry
         self._cooldown_seconds = cooldown_seconds
         self._cooling: dict[str, float] = {}  # "provider:model_id" -> resume_timestamp
+        self._runtime_provider: str = ""  # 运行时覆盖：厂商
+        self._runtime_model: str = ""     # 运行时覆盖：模型
+
+    def set_override(self, provider: str = "", model: str = ""):
+        """运行时设置覆盖，立即生效，无需重启"""
+        self._runtime_provider = provider
+        self._runtime_model = model
+        logger.info("模型运行时覆盖已更新: provider=%s, model=%s", provider, model)
+
+    def get_override(self) -> dict:
+        """获取当前运行时覆盖设置"""
+        return {"provider": self._runtime_provider, "model": self._runtime_model}
 
     def route(self, task_type: str = "default", exclude: set[str] | None = None) -> ModelEndpoint | None:
         """根据 task_type 路由到最优可用模型"""
         exclude = exclude or set()
         tier = self.registry.get_tier(task_type)
 
-        # 1. 检查 DEFAULT_PROVIDER / DEFAULT_MODEL 覆盖
-        if settings.DEFAULT_PROVIDER or settings.DEFAULT_MODEL:
-            override = self._find_override(tier, exclude)
+        # 1. 检查运行时覆盖 / DEFAULT_PROVIDER / DEFAULT_MODEL
+        effective_provider = self._runtime_provider or settings.DEFAULT_PROVIDER
+        effective_model = self._runtime_model or settings.DEFAULT_MODEL
+        if effective_provider or effective_model:
+            override = self._find_override(tier, exclude, effective_provider, effective_model)
             if override:
                 return override
 
@@ -163,17 +193,17 @@ class ModelRouter:
         candidates = self._build_candidates(tier, strategy, exclude)
         return candidates[0] if candidates else None
 
-    def _find_override(self, tier: str, exclude: set[str]) -> ModelEndpoint | None:
-        """查找 DEFAULT_PROVIDER / DEFAULT_MODEL 指定的模型"""
+    def _find_override(self, tier: str, exclude: set[str], provider: str, model: str) -> ModelEndpoint | None:
+        """查找指定的覆盖模型"""
         for ep in self.registry.get_endpoints():
             key = f"{ep.provider}:{ep.model_id}"
             if key in exclude:
                 continue
             if not self.is_available(ep.provider, ep.model_id):
                 continue
-            if settings.DEFAULT_MODEL and ep.model_id == settings.DEFAULT_MODEL:
+            if model and ep.model_id == model:
                 return ep
-            if settings.DEFAULT_PROVIDER and ep.provider == settings.DEFAULT_PROVIDER:
+            if provider and ep.provider == provider:
                 if ep.tier == tier:
                     return ep
         return None

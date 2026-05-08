@@ -190,31 +190,89 @@ class KeyframeExtractor:
         tmp_dir = tempfile.mkdtemp(prefix="vibe_video_")
         output_template = os.path.join(tmp_dir, "%(id)s.%(ext)s")
 
+        # 根据URL判断视频来源，选择合适的格式策略
+        is_bilibili = "bilibili.com" in url or "b23.tv" in url
+
+        if is_bilibili:
+            # B站格式策略：B站用数字格式ID，通用格式选择器无效
+            format_strategies = [
+                "30016+30216",              # B站360P视频+最低音质
+                "100022+30216",             # B站360P备选+最低音质
+                "30032+30216",              # B站480P视频+最低音质
+                "30016",                    # 仅360P视频
+                "100022",                   # 仅360P备选视频
+                # 最后兜底：让yt-dlp自动选择
+            ]
+        else:
+            # 通用格式策略
+            format_strategies = [
+                "worst[ext=mp4]/worst",
+                "worstvideo[ext=mp4]+worstaudio",
+                "worst",
+                "best[height<=480]",
+                "best[height<=360]",
+            ]
+
+        for fmt in format_strategies:
+            try:
+                ydl_opts = {
+                    "quiet": True,
+                    "no_warnings": True,
+                    "format": fmt,
+                    "outtmpl": output_template,
+                    "merge_output_format": "mp4",
+                }
+                loop = asyncio.get_event_loop()
+                info = await loop.run_in_executor(
+                    None,
+                    lambda f=fmt: self._ytdlp_download(url, {
+                        "quiet": True,
+                        "no_warnings": True,
+                        "format": f,
+                        "outtmpl": output_template,
+                        "merge_output_format": "mp4",
+                    }),
+                )
+                if info:
+                    for f in os.listdir(tmp_dir):
+                        filepath = os.path.join(tmp_dir, f)
+                        if os.path.getsize(filepath) > 0:
+                            logger.info("视频下载成功: %s (格式: %s)", info.get("title", ""), fmt)
+                            return filepath
+            except Exception as e:
+                logger.debug("格式策略 '%s' 失败: %s", fmt, e)
+                continue
+
+        # 所有指定格式都失败，尝试让yt-dlp自动选择
         try:
-            ydl_opts = {
+            import yt_dlp as _ytdlp
+            ydl_opts_auto = {
                 "quiet": True,
                 "no_warnings": True,
-                "format": "worst[ext=mp4]/worst",
+                "format": None,  # 让yt-dlp自动选择最佳格式
                 "outtmpl": output_template,
-                "merge_output_format": "mp4",
             }
             loop = asyncio.get_event_loop()
             info = await loop.run_in_executor(
                 None,
-                lambda: self._ytdlp_download(url, ydl_opts),
+                lambda: self._ytdlp_download(url, ydl_opts_auto),
             )
             if info:
-                # 找到下载的文件
                 for f in os.listdir(tmp_dir):
-                    return os.path.join(tmp_dir, f)
+                    filepath = os.path.join(tmp_dir, f)
+                    if os.path.getsize(filepath) > 0:
+                        logger.info("视频下载成功(自动格式): %s", info.get("title", ""))
+                        return filepath
         except Exception as e:
-            logger.warning("视频下载失败: %s", e)
+            logger.warning("自动格式下载也失败: %s", e)
 
+        logger.warning("所有下载策略均失败，URL: %s", url)
         return None
 
     @staticmethod
     def _ytdlp_download(url: str, opts: dict) -> Optional[dict]:
         """同步yt-dlp下载"""
+        import yt_dlp
         with yt_dlp.YoutubeDL(opts) as ydl:
             return ydl.extract_info(url, download=True)
 
@@ -258,6 +316,37 @@ class KeyframeExtractor:
                     return info
             except Exception:
                 pass
+
+        # 降级：用ffprobe命令行
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["ffprobe", "-v", "quiet", "-print_format", "json",
+                 "-show_format", "-show_streams", video_path],
+                capture_output=True, text=True, timeout=10,
+            )
+            if result.returncode == 0:
+                import json as _json
+                probe_data = _json.loads(result.stdout)
+                video_stream = next(
+                    (s for s in probe_data.get("streams", []) if s.get("codec_type") == "video"),
+                    None,
+                )
+                if video_stream:
+                    info["width"] = int(video_stream.get("width", 0))
+                    info["height"] = int(video_stream.get("height", 0))
+                    r_frame = video_stream.get("r_frame_rate", "25/1")
+                    if "/" in str(r_frame):
+                        num, den = r_frame.split("/")
+                        info["fps"] = float(num) / float(den) if float(den) > 0 else 25.0
+                    else:
+                        info["fps"] = float(r_frame)
+                    duration_str = probe_data.get("format", {}).get("duration", "0")
+                    info["duration"] = float(duration_str)
+                    info["total_frames"] = int(info["duration"] * info["fps"])
+                    return info
+        except Exception:
+            pass
 
         return None
 

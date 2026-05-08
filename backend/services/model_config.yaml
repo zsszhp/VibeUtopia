@@ -9,6 +9,8 @@ providers:
     models:
       - id: "LongCat-Flash-Thinking-2601"
         tier: advanced
+      - id: "LongCat-Flash-Omni"
+        tier: advanced
       - id: "LongCat-Flash-Standard"
         tier: standard
       - id: "LongCat-Flash-Lite"
