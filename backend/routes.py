@@ -3304,6 +3304,48 @@ async def get_db_status():
         }
 
 
+# ── 模型管理 API ────────────────────────────────────────────────
+
+
+class ModelSettingRequest(BaseModel):
+    provider: str = Field("", description="厂商ID，留空表示不覆盖")
+    model: str = Field("", description="模型ID，留空表示不覆盖")
+
+
+@router.get("/models")
+async def list_models():
+    """获取所有可用的厂商和模型列表"""
+    from backend.services.llm_client import registry
+    if not registry.is_loaded:
+        return {"providers": []}
+    return {"providers": registry.get_available_providers()}
+
+
+@router.get("/settings/model")
+async def get_model_setting():
+    """获取当前模型设置（运行时覆盖 + 环境变量默认值）"""
+    from backend.services.llm_client import router as llm_router
+    override = llm_router.get_override()
+    return {
+        "runtime": override,
+        "env": {
+            "provider": settings.DEFAULT_PROVIDER,
+            "model": settings.DEFAULT_MODEL,
+        },
+    }
+
+
+@router.post("/settings/model")
+async def set_model_setting(req: ModelSettingRequest):
+    """运行时切换模型，立即生效无需重启"""
+    from backend.services.llm_client import router as llm_router
+    llm_router.set_override(provider=req.provider, model=req.model)
+    return {
+        "success": True,
+        "runtime": {"provider": req.provider, "model": req.model},
+    }
+
+
 # ── V2.R3 趋势预测与决策 API ────────────────────────────────
 
 

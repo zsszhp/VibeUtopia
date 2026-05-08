@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE = '/api'
+const API_BASE = '/api/v1'
 
 export const api = {
   // 文字风控
@@ -78,4 +78,14 @@ export const api = {
   // 系统
   getDbStatus: () =>
     axios.get(`${API_BASE}/system/db-status`),
+
+  // 模型管理
+  getModels: () =>
+    axios.get(`${API_BASE}/models`),
+
+  getModelSetting: () =>
+    axios.get(`${API_BASE}/settings/model`),
+
+  setModel: (provider: string, model: string) =>
+    axios.post(`${API_BASE}/settings/model`, { provider, model }),
 }
