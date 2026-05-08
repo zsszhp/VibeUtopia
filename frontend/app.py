@@ -667,7 +667,7 @@ with tab_signal:
 
     with col_status:
         st.markdown("**当前状态**")
-        st.info("调度器默认为手动模式，点击"启动调度"开始自动采集")
+        st.info('调度器默认为手动模式，点击「启动调度」开始自动采集')
 
     # 手动爬取
     st.divider()

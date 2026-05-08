@@ -1437,39 +1437,6 @@ async def compare_competitors(req: CompetitorCompareRequest, db: Session = Depen
         "overall_assessment": result.overall_assessment,
     }
 
-        result["summary"] = {
-            "overall_score": summary.overall_score,
-            "suggestion": summary.suggestion,
-            "risk_dimensions": json.loads(summary.dimensions_json) if summary.dimensions_json else {},
-            "transcript_quality": json.loads(summary.transcript_quality) if summary.transcript_quality else None,
-            "dimension_weights": json.loads(summary.dimension_weights) if summary.dimension_weights else None,
-            "cross_effects": json.loads(summary.cross_effects) if summary.cross_effects else [],
-            "agents": json.loads(summary.agents_json) if summary.agents_json else [],
-        }
-        result["risk_items"] = [
-            {
-                "sentence": r.sentence,
-                "dimension": r.dimension,
-                "severity": r.severity,
-                "evidence": r.evidence,
-                "affected_groups": r.affected_groups.split(",") if r.affected_groups else [],
-                "dimension_weight": r.dimension_weight,
-            }
-            for r in risk_items
-        ]
-        result["platform_reactions"] = {
-            r.platform: {
-                "positive": r.positive,
-                "neutral": r.neutral,
-                "negative": r.negative,
-                "reason": r.reason,
-            }
-            for r in reactions
-        }
-        result["rewrites"] = json.loads(summary.rewrites_json) if summary.rewrites_json else []
-
-    return result
-
 
 # ═══════════════════════════════════════════════════════════════
 # V2.R4 多模态风控 API
@@ -4450,7 +4417,7 @@ async def _run_video_analysis_v2(task_id: str, video_url: str, video_path: str, 
             record.error = str(e)
             db.commit()
     finally:
-        db.close()s
+        db.close()
 
 
 # ============ 信号采集 API ============
