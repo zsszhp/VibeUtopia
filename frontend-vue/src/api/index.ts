@@ -76,21 +76,21 @@ export interface ModelsResponse {
 export const api = {
   /** 提交内容预审（统一入口） */
   submitReview: (req: ReviewRequest) =>
-    axios.post<ReviewResponse>(`${API_BASE}/api/review`, req),
+    axios.post<ReviewResponse>(`${API_BASE}/review`, req),
 
   /** 获取预审结果 */
   getReviewResult: (taskId: string) =>
-    axios.get<ReviewResult>(`${API_BASE}/api/review/${taskId}`),
+    axios.get<ReviewResult>(`${API_BASE}/review/${taskId}`),
 
   /** 获取分析进度 */
   getReviewProgress: (taskId: string) =>
-    axios.get<ProgressResponse>(`${API_BASE}/api/review/${taskId}/progress`),
+    axios.get<ProgressResponse>(`${API_BASE}/review/${taskId}/progress`),
 
   /** 历史记录 */
   getHistory: (page: number = 1, perPage: number = 20, riskLevel?: string) =>
-    axios.get<HistoryResponse>(`${API_BASE}/api/history`, { params: { page, per_page: perPage, risk_level: riskLevel } }),
+    axios.get<HistoryResponse>(`${API_BASE}/history`, { params: { page, per_page: perPage, risk_level: riskLevel } }),
 
   /** 当前可用模型 */
   getModels: () =>
-    axios.get<ModelsResponse>(`${API_BASE}/api/models`),
+    axios.get<ModelsResponse>(`${API_BASE}/models`),
 }
