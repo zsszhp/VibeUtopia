@@ -45,6 +45,9 @@
       </div>
       <span class="footer-percent">{{ Math.round(progressPercent) }}%</span>
     </footer>
+
+    <!-- WebSocket连接管理 -->
+    <WebSocketManager />
   </div>
 </template>
 
@@ -55,6 +58,7 @@ import { SettingsOutline } from '@vicons/ionicons5'
 import { useReviewStore, useModelsStore } from './stores'
 import LeftPanel from './components/LeftPanel.vue'
 import RightPanel from './components/RightPanel.vue'
+import WebSocketManager from './components/WebSocketManager.vue'
 
 const reviewStore = useReviewStore()
 const modelsStore = useModelsStore()
