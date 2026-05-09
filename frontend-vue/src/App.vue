@@ -18,7 +18,7 @@
     <div class="app-body">
       <!-- 左栏 -->
       <aside class="panel-left">
-        <router-view name="left" />
+        <LeftPanel />
       </aside>
 
       <!-- 主内容区 -->
@@ -32,7 +32,7 @@
           {{ rightCollapsed ? '<' : '>' }}
         </button>
         <div v-show="!rightCollapsed" class="panel-right-content">
-          <router-view name="right" />
+          <RightPanel />
         </div>
       </aside>
     </div>
@@ -53,6 +53,8 @@ import { ref, computed } from 'vue'
 import { NTag, NButton } from 'naive-ui'
 import { SettingsOutline } from '@vicons/ionicons5'
 import { useReviewStore, useModelsStore } from './stores'
+import LeftPanel from './components/LeftPanel.vue'
+import RightPanel from './components/RightPanel.vue'
 
 const reviewStore = useReviewStore()
 const modelsStore = useModelsStore()
