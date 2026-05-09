@@ -7069,3 +7069,225 @@ async def compare_competitors(req: CompetitorCompareRequest, db: Session = Depen
         "overall_assessment": result.overall_assessment,
     }
 
+
+
+# ─── 5个核心API端点（主链路架构） ─────────────────────────────────────────
+# 按设计文档(02_系统架构设计/09_分析决策层/10_仿真增强风控)收敛自38+端点
+# 旧端点标记deprecated，保留不删避免前端过渡期断裂
+
+
+class ReviewRequest(BaseModel):
+    """内容预审请求"""
+    mode: str = Field("text", description="输入模式: video/text/mixed")
+    video_files: list[str] = Field(default_factory=list, description="本地视频文件路径")
+    texts: list[dict] = Field(default_factory=list, description="文案列表 [{type, content}]")
+    options: dict = Field(default_factory=dict, description="分析选项 {depth, platforms, enable_simulation}")
+
+
+class ReviewResponse(BaseModel):
+    """内容预审响应"""
+    task_id: str
+    status: str
+    estimated_depth: str = ""
+    estimated_duration_seconds: int = 0
+
+
+class ProgressResponse(BaseModel):
+    """分析进度响应"""
+    task_id: str
+    current_step: str = ""
+    progress: float = 0.0
+    detail: str = ""
+    completed_dimensions: list[str] = Field(default_factory=list)
+    remaining_dimensions: list[str] = Field(default_factory=list)
+
+
+@router.post("/api/review", response_model=ReviewResponse)
+async def submit_review(req: ReviewRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """提交内容进行预审（统一入口）- 支持text/video/mixed三种模式"""
+    mode = req.mode
+    depth = req.options.get("depth", "standard")
+    texts = req.texts
+    video_files = req.video_files
+
+    combined_text = ""
+    for t in texts:
+        content = t.get("content", "")
+        if content:
+            combined_text += content + "\n"
+
+    if mode in ("video", "mixed") and video_files:
+        for video_path in video_files:
+            try:
+                extract_result = await extract_video_text(video_path)
+                if extract_result.get("text"):
+                    combined_text += extract_result["text"] + "\n"
+            except Exception as e:
+                logger.warning("视频文案提取失败 %s: %s", video_path, e)
+
+    if len(combined_text.strip()) < 10:
+        raise HTTPException(status_code=400, detail="有效文案内容不足10字符，无法分析")
+
+    task_id = str(uuid.uuid4())
+    task = Task(id=task_id, text=combined_text.strip(), status="processing", model=settings.DEEPSEEK_MODEL)
+    db.add(task)
+    db.commit()
+
+    depth_map = {
+        "quick": ("quick", 60),
+        "standard": ("standard", 180),
+        "deep": ("deep", 600),
+        "large_scale": ("large_scale", 1800),
+    }
+    est_depth, est_seconds = depth_map.get(depth, ("standard", 180))
+
+    background_tasks.add_task(run_analysis, task_id, combined_text.strip())
+
+    return ReviewResponse(
+        task_id=task_id,
+        status="analyzing",
+        estimated_depth=est_depth,
+        estimated_duration_seconds=est_seconds,
+    )
+
+
+@router.get("/api/review/{task_id}")
+async def get_review_result(task_id: str, db: Session = Depends(get_db)):
+    """获取预审结果：7维评估+证据链+置信度+平台反应+改写建议"""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    result = {"task_id": task.id, "status": task.status}
+
+    if task.status == "completed":
+        summary = db.query(AnalysisSummary).filter(AnalysisSummary.task_id == task_id).first()
+        risk_items = db.query(RiskItem).filter(RiskItem.task_id == task_id).all()
+        reactions = db.query(PlatformReaction).filter(PlatformReaction.task_id == task_id).all()
+
+        if summary:
+            result["overall_risk"] = summary.overall_risk
+            result["risk_level"] = _score_to_level(summary.overall_risk)
+            result["method"] = "static"
+
+        if risk_items:
+            result["dimensions"] = [
+                {
+                    "name": item.dimension,
+                    "score": item.risk_score,
+                    "severity": _score_to_level(item.risk_score),
+                    "evidence": item.evidence,
+                    "evidence_source": {
+                        "type": "text",
+                        "content": item.original_text or "",
+                        "location": item.sentence_index or "",
+                    },
+                    "confidence": getattr(item, "confidence", 0.7),
+                    "suggestion": item.suggestion or "",
+                }
+                for item in risk_items
+            ]
+
+        if reactions:
+            result["platform_reactions"] = {
+                r.platform: {
+                    "positive": r.positive_ratio,
+                    "neutral": r.neutral_ratio,
+                    "negative": r.negative_ratio,
+                }
+                for r in reactions
+            }
+
+        result["suggestions"] = [
+            {"original": item.original_text, "suggestion": item.suggestion, "dimension": item.dimension}
+            for item in risk_items
+            if item.suggestion
+        ]
+    elif task.status == "failed":
+        result["error"] = "分析失败"
+
+    return result
+
+
+@router.get("/api/review/{task_id}/progress", response_model=ProgressResponse)
+async def get_review_progress(task_id: str, db: Session = Depends(get_db)):
+    """获取分析进度"""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    status_map = {
+        "processing": ("assessment", 0.3, "7维风险评估进行中"),
+        "completed": ("report", 1.0, "报告已生成"),
+        "failed": ("assessment", 0.0, "分析失败"),
+    }
+    step, progress, detail = status_map.get(task.status, ("understanding", 0.1, "内容理解中"))
+
+    return ProgressResponse(task_id=task_id, current_step=step, progress=progress, detail=detail)
+
+
+@router.get("/api/history")
+async def get_history(page: int = 1, per_page: int = 20, risk_level: str = None, db: Session = Depends(get_db)):
+    """历史记录"""
+    query = db.query(Task).order_by(Task.created_at.desc())
+    total = query.count()
+    items = query.offset((page - 1) * per_page).limit(per_page).all()
+
+    result_items = []
+    for task in items:
+        summary = db.query(AnalysisSummary).filter(AnalysisSummary.task_id == task.id).first()
+        item = {
+            "task_id": task.id,
+            "status": task.status,
+            "created_at": str(task.created_at) if task.created_at else None,
+        }
+        if summary:
+            item["overall_risk"] = summary.overall_risk
+            item["risk_level"] = _score_to_level(summary.overall_risk)
+        result_items.append(item)
+
+    return {"total": total, "items": result_items}
+
+
+@router.get("/api/models")
+async def get_models():
+    """当前可用模型列表（基于硬件自适应）"""
+    try:
+        import torch
+
+        has_gpu = torch.cuda.is_available()
+        if has_gpu:
+            vram_gb = torch.cuda.get_device_properties(0).total_mem // (1024**3)
+            tier = "pro" if vram_gb >= 24 else "standard" if vram_gb >= 12 else "lite"
+        else:
+            tier = "lite"
+    except ImportError:
+        tier = "lite"
+
+    models = {
+        "risk_assessment": {"primary": "deepseek-v4-pro", "fallback": "qwen3.6-plus"},
+        "persona_simulation": {"primary": "deepseek-v4-flash", "fallback": "qwen3.6-plus"},
+        "frame_understanding": {"primary": "qwen3-vl-plus", "fallback": "glm-5v-turbo"},
+        "ocr": {"primary": "glm-ocr" if tier != "lite" else "qwen3-vl-plus", "fallback": "paddleocr-vl-1.5"},
+        "audio_transcription": {
+            "primary": "faster-whisper-large-v3" if tier != "lite" else "aliyun-paraformer",
+            "fallback": "aliyun-paraformer",
+        },
+    }
+
+    return {"hardware_tier": tier, "models": models}
+
+
+def _score_to_level(score) -> str:
+    """将风险分数转换为等级"""
+    if score is None:
+        return "green"
+    score = int(score)
+    if score >= 75:
+        return "red"
+    elif score >= 55:
+        return "orange"
+    elif score >= 35:
+        return "yellow"
+    else:
+        return "green"
