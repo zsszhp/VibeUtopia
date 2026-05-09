@@ -92,21 +92,17 @@ class KeyframeExtractor:
         """从视频提取关键帧
 
         Args:
-            video_path: 视频文件路径或URL
+            video_path: 本地视频文件路径（仅支持本地文件）
             output_dir: 帧图片输出目录(默认临时目录)
 
         Returns:
             KeyFrameResult
         """
         if not os.path.exists(video_path):
-            # 尝试下载视频（yt-dlp）
-            downloaded = await self._download_video(video_path)
-            if not downloaded:
-                return KeyFrameResult(
-                    video_path=video_path,
-                    error=f"视频文件不存在或无法下载: {video_path}"
-                )
-            video_path = downloaded
+            return KeyFrameResult(
+                video_path=video_path,
+                error=f"视频文件不存在: {video_path}（仅支持本地视频文件）"
+            )
 
         # 准备输出目录
         if output_dir is None:
@@ -179,102 +175,6 @@ class KeyframeExtractor:
         result.scene_count = sum(1 for f in frames if f.scene_index >= 0)
 
         return result
-
-    async def _download_video(self, url: str) -> Optional[str]:
-        """使用yt-dlp下载视频到临时文件"""
-        try:
-            import yt_dlp
-        except ImportError:
-            return None
-
-        tmp_dir = tempfile.mkdtemp(prefix="vibe_video_")
-        output_template = os.path.join(tmp_dir, "%(id)s.%(ext)s")
-
-        # 根据URL判断视频来源，选择合适的格式策略
-        is_bilibili = "bilibili.com" in url or "b23.tv" in url
-
-        if is_bilibili:
-            # B站格式策略：B站用数字格式ID，通用格式选择器无效
-            format_strategies = [
-                "30016+30216",              # B站360P视频+最低音质
-                "100022+30216",             # B站360P备选+最低音质
-                "30032+30216",              # B站480P视频+最低音质
-                "30016",                    # 仅360P视频
-                "100022",                   # 仅360P备选视频
-                # 最后兜底：让yt-dlp自动选择
-            ]
-        else:
-            # 通用格式策略
-            format_strategies = [
-                "worst[ext=mp4]/worst",
-                "worstvideo[ext=mp4]+worstaudio",
-                "worst",
-                "best[height<=480]",
-                "best[height<=360]",
-            ]
-
-        for fmt in format_strategies:
-            try:
-                ydl_opts = {
-                    "quiet": True,
-                    "no_warnings": True,
-                    "format": fmt,
-                    "outtmpl": output_template,
-                    "merge_output_format": "mp4",
-                }
-                loop = asyncio.get_event_loop()
-                info = await loop.run_in_executor(
-                    None,
-                    lambda f=fmt: self._ytdlp_download(url, {
-                        "quiet": True,
-                        "no_warnings": True,
-                        "format": f,
-                        "outtmpl": output_template,
-                        "merge_output_format": "mp4",
-                    }),
-                )
-                if info:
-                    for f in os.listdir(tmp_dir):
-                        filepath = os.path.join(tmp_dir, f)
-                        if os.path.getsize(filepath) > 0:
-                            logger.info("视频下载成功: %s (格式: %s)", info.get("title", ""), fmt)
-                            return filepath
-            except Exception as e:
-                logger.debug("格式策略 '%s' 失败: %s", fmt, e)
-                continue
-
-        # 所有指定格式都失败，尝试让yt-dlp自动选择
-        try:
-            import yt_dlp as _ytdlp
-            ydl_opts_auto = {
-                "quiet": True,
-                "no_warnings": True,
-                "format": None,  # 让yt-dlp自动选择最佳格式
-                "outtmpl": output_template,
-            }
-            loop = asyncio.get_event_loop()
-            info = await loop.run_in_executor(
-                None,
-                lambda: self._ytdlp_download(url, ydl_opts_auto),
-            )
-            if info:
-                for f in os.listdir(tmp_dir):
-                    filepath = os.path.join(tmp_dir, f)
-                    if os.path.getsize(filepath) > 0:
-                        logger.info("视频下载成功(自动格式): %s", info.get("title", ""))
-                        return filepath
-        except Exception as e:
-            logger.warning("自动格式下载也失败: %s", e)
-
-        logger.warning("所有下载策略均失败，URL: %s", url)
-        return None
-
-    @staticmethod
-    def _ytdlp_download(url: str, opts: dict) -> Optional[dict]:
-        """同步yt-dlp下载"""
-        import yt_dlp
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            return ydl.extract_info(url, download=True)
 
     def _get_video_info(self, video_path: str) -> Optional[dict]:
         """获取视频基本信息"""

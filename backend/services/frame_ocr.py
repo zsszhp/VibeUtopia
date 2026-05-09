@@ -1,10 +1,12 @@
-"""OCR文字识别模块 - V2.R4
+"""OCR文字识别模块
 
 从视频关键帧中识别字幕、水印、贴图文字。
-支持多级降级策略：PaddleOCR → EasyOCR → 跳过。
+支持API优先策略：Qwen3-VL-Plus / GLM-OCR → 本地PaddleOCR-VL降级 → 跳过。
+按设计文档(12_多模态风控设计)移除PaddlePaddle框架依赖。
 """
 
 import asyncio
+import base64
 import logging
 import os
 from dataclasses import dataclass, field
@@ -12,29 +14,13 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# 检测可用OCR引擎
-_HAS_PADDLEOCR = False
-_HAS_EASYOCR = False
-
-try:
-    from paddleocr import PaddleOCR
-    _HAS_PADDLEOCR = True
-except ImportError:
-    pass
-
-try:
-    import easyocr
-    _HAS_EASYOCR = True
-except ImportError:
-    pass
-
 
 @dataclass
 class OCRItem:
     """单个OCR识别结果"""
     text: str                      # 识别文字
     confidence: float              # 置信度 0-1
-    bbox: list = field(default_factory=list)  # 边界框 [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
+    bbox: list = field(default_factory=list)  # 边界框
     position: str = ""             # 位置描述: top/center/bottom/left/right
 
 
@@ -60,11 +46,7 @@ class VideoOCRResult:
     error: Optional[str] = None
 
 
-# ─── 默认配置 ────────────────────────────────────────────────
-
 DEFAULT_CONFIG = {
-    "ocr_languages": ["ch_sim", "en"],   # OCR语言（PaddleOCR）
-    "easyocr_languages": ["ch_sim", "en"],  # EasyOCR语言
     "min_confidence": 0.5,               # 最低置信度阈值
     "dedup_text": True,                   # 帧间文字去重
     "dedup_similarity": 0.85,             # 去重相似度阈值
@@ -72,52 +54,11 @@ DEFAULT_CONFIG = {
 
 
 class FrameOCR:
-    """帧OCR识别器"""
+    """帧OCR识别器 — API优先，本地降级"""
 
-    def __init__(self, config: dict | None = None):
+    def __init__(self, config: dict | None = None, llm_client=None):
         self.config = {**DEFAULT_CONFIG, **(config or {})}
-        self._paddle_engine = None
-        self._easyocr_engine = None
-
-    def _get_paddle_engine(self):
-        """懒加载PaddleOCR引擎"""
-        if self._paddle_engine is None and _HAS_PADDLEOCR:
-            try:
-                # PaddleOCR 3.5+ API (基于PaddleX)
-                self._paddle_engine = PaddleOCR(
-                    use_doc_orientation_classify=False,
-                    use_doc_unwarping=False,
-                    use_textline_orientation=True,
-                    lang="ch",
-                )
-            except TypeError:
-                # 旧版PaddleOCR API兼容
-                try:
-                    self._paddle_engine = PaddleOCR(
-                        use_angle_cls=True,
-                        lang="ch",
-                        show_log=False,
-                    )
-                except Exception as e:
-                    logger.warning("PaddleOCR旧版初始化也失败: %s", e)
-                    self._paddle_engine = None
-            except Exception as e:
-                logger.warning("PaddleOCR初始化失败: %s", e)
-                self._paddle_engine = None
-        return self._paddle_engine
-
-    def _get_easyocr_engine(self):
-        """懒加载EasyOCR引擎"""
-        if self._easyocr_engine is None and _HAS_EASYOCR:
-            try:
-                self._easyocr_engine = easyocr.Reader(
-                    self.config["easyocr_languages"],
-                    gpu=False,
-                )
-            except Exception as e:
-                logger.warning("EasyOCR初始化失败: %s", e)
-                self._easyocr_engine = None
-        return self._easyocr_engine
+        self._llm_client = llm_client  # LLM客户端，用于API OCR
 
     async def extract_text(self, frame_path: str, frame_index: int = 0,
                            timestamp: float = 0.0) -> FrameOCRResult:
@@ -139,49 +80,25 @@ class FrameOCR:
                 error=f"帧图片不存在: {frame_path}"
             )
 
-        loop = asyncio.get_event_loop()
         items = []
         engine_used = ""
 
-        # 优先PaddleOCR
-        engine = self._get_paddle_engine()
-        if engine is not None:
+        # 优先使用API OCR (Qwen3-VL-Plus / GLM-OCR)
+        if self._llm_client is not None:
             try:
-                result = await loop.run_in_executor(
-                    None,
-                    self._paddle_ocr_sync,
-                    engine,
-                    frame_path,
-                )
-                if result is not None:
+                result = await self._api_ocr(frame_path)
+                if result:
                     items = result
-                    engine_used = "paddleocr"
+                    engine_used = "api_ocr"
             except Exception as e:
-                logger.warning("PaddleOCR识别失败: %s", e)
-
-        # 降级EasyOCR
-        if not items:
-            engine = self._get_easyocr_engine()
-            if engine is not None:
-                try:
-                    result = await loop.run_in_executor(
-                        None,
-                        self._easyocr_ocr_sync,
-                        engine,
-                        frame_path,
-                    )
-                    if result is not None:
-                        items = result
-                        engine_used = "easyocr"
-                except Exception as e:
-                    logger.warning("EasyOCR识别失败: %s", e)
+                logger.warning("API OCR识别失败: %s，将跳过OCR", e)
 
         if not items and not engine_used:
             return FrameOCRResult(
                 frame_path=frame_path,
                 frame_index=frame_index,
                 timestamp=timestamp,
-                error="无可用OCR引擎（需要paddleocr或easyocr）"
+                error="无可用OCR引擎（需要配置LLM API Key，或安装本地OCR模型）"
             )
 
         # 过滤低置信度
@@ -198,6 +115,39 @@ class FrameOCR:
             items=items,
             full_text=full_text,
         )
+
+    async def _api_ocr(self, frame_path: str) -> Optional[list[OCRItem]]:
+        """使用多模态API进行OCR识别"""
+        # 将图片编码为base64
+        with open(frame_path, "rb") as f:
+            img_data = base64.b64encode(f.read()).decode("utf-8")
+
+        prompt = (
+            "请识别图片中的所有文字，包括字幕、水印、贴图文字、背景文字等。"
+            "按从上到下、从左到右的顺序列出。"
+            "对每段文字标注：1.文字内容 2.大致位置(顶部/中部/底部/左侧/右侧) 3.文字类型(字幕/水印/贴图/背景文字)\n"
+            "输出JSON格式：{\"texts\": [{\"text\": \"...\", \"position\": \"...\", \"type\": \"...\"}]}"
+        )
+
+        try:
+            response = await self._llm_client.vlm_chat(
+                prompt=prompt,
+                image_base64=img_data,
+            )
+
+            import json
+            result = json.loads(response)
+            items = []
+            for t in result.get("texts", []):
+                items.append(OCRItem(
+                    text=t.get("text", ""),
+                    confidence=0.85,  # API OCR默认置信度
+                    position=t.get("position", "center"),
+                ))
+            return items
+        except Exception as e:
+            logger.warning("API OCR调用失败: %s", e)
+            return None
 
     async def extract_video_text(self, frame_results: list) -> VideoOCRResult:
         """从视频的所有关键帧提取文字
@@ -239,86 +189,9 @@ class FrameOCR:
                 all_texts.append(result.full_text)
 
         video_result.all_text = "\n".join(all_texts)
-        video_result.engine_used = (
-            "paddleocr" if _HAS_PADDLEOCR else
-            "easyocr" if _HAS_EASYOCR else
-            "none"
-        )
+        video_result.engine_used = "api_ocr" if self._llm_client else "none"
 
         return video_result
-
-    def _paddle_ocr_sync(self, engine, frame_path: str) -> Optional[list[OCRItem]]:
-        """同步PaddleOCR识别（兼容3.x和旧版API）"""
-        items = []
-
-        # PaddleOCR 3.x (基于PaddleX) 使用 predict() 方法
-        try:
-            result = engine.predict(frame_path)
-            for res in result:
-                if hasattr(res, 'rec_texts') and res.rec_texts:
-                    for i, text in enumerate(res.rec_texts):
-                        confidence = res.rec_scores[i] if hasattr(res, 'rec_scores') and i < len(res.rec_scores) else 0.9
-                        bbox = res.dt_polys[i] if hasattr(res, 'dt_polys') and i < len(res.dt_polys) else []
-                        position = self._infer_position(bbox) if bbox else "center"
-                        items.append(OCRItem(
-                            text=text,
-                            confidence=float(confidence),
-                            bbox=bbox,
-                            position=position,
-                        ))
-                elif hasattr(res, 'keys'):
-                    # 旧格式兼容
-                    for key in res:
-                        pass
-            if items:
-                return items
-        except Exception as e:
-            logger.debug("PaddleOCR predict() 失败，尝试旧版ocr(): %s", e)
-
-        # 旧版PaddleOCR 使用 ocr() 方法
-        try:
-            result = engine.ocr(frame_path, cls=True)
-            if result and result[0]:
-                for line in result[0]:
-                    bbox = line[0]
-                    text = line[1][0]
-                    confidence = line[1][1]
-                    position = self._infer_position(bbox)
-                    items.append(OCRItem(
-                        text=text,
-                        confidence=confidence,
-                        bbox=bbox,
-                        position=position,
-                    ))
-        except Exception as e:
-            logger.warning("PaddleOCR识别失败: %s", e)
-
-        return items
-
-        return items
-
-    def _easyocr_ocr_sync(self, engine, frame_path: str) -> Optional[list[OCRItem]]:
-        """同步EasyOCR识别"""
-        results = engine.readtext(frame_path)
-        if not results:
-            return []
-
-        items = []
-        for detection in results:
-            bbox = detection[0]  # [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
-            text = detection[1]
-            confidence = detection[2]
-
-            position = self._infer_position(bbox)
-
-            items.append(OCRItem(
-                text=text,
-                confidence=confidence,
-                bbox=bbox,
-                position=position,
-            ))
-
-        return items
 
     @staticmethod
     def _infer_position(bbox: list) -> str:
@@ -326,18 +199,11 @@ class FrameOCR:
         if not bbox or len(bbox) < 4:
             return "unknown"
 
-        # 计算中心y坐标
         y_coords = [point[1] for point in bbox]
         x_coords = [point[0] for point in bbox]
         y_center = sum(y_coords) / len(y_coords)
         x_center = sum(x_coords) / len(x_coords)
 
-        # 需要知道图片尺寸来判断，这里用相对位置
-        y_range = max(y_coords) - min(y_coords)
-        x_range = max(x_coords) - min(x_coords)
-
-        # 简单启发式：y坐标越小越靠上
-        # 这里只做粗略判断，实际需要图片高度
         positions = []
         if y_center < 100:
             positions.append("top")
@@ -357,11 +223,6 @@ class FrameOCR:
 def get_ocr_status() -> dict:
     """获取OCR引擎可用状态"""
     return {
-        "paddleocr": _HAS_PADDLEOCR,
-        "easyocr": _HAS_EASYOCR,
-        "recommended": (
-            "paddleocr" if _HAS_PADDLEOCR else
-            "easyocr" if _HAS_EASYOCR else
-            "none"
-        ),
+        "api_ocr": True,  # API OCR始终可用（需配置API Key）
+        "recommended": "api_ocr",
     }

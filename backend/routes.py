@@ -37,17 +37,17 @@ class AnalyzeResponse(BaseModel):
 
 
 class VideoExtractRequest(BaseModel):
-    url: str = Field(..., description="视频链接(B站/抖音等)")
+    video_path: str = Field(..., description="本地视频文件路径")
 
 
 class VideoAnalyzeRequest(BaseModel):
-    url: str = Field(..., description="视频链接(B站/抖音等)")
+    video_path: str = Field(..., description="本地视频文件路径")
 
 
 @router.post("/extract-video")
 async def extract_video(req: VideoExtractRequest):
-    """从视频链接提取文案文本"""
-    result = await extract_video_text(req.url)
+    """从本地视频文件提取文案文本"""
+    result = await extract_video_text(req.video_path)
     if result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])
     return result

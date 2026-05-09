@@ -2,24 +2,21 @@ fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 sqlalchemy>=2.0.0
 httpx>=0.27.0
-streamlit>=1.33.0
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
-yt-dlp>=2024.0.0
 pyyaml>=6.0
 apscheduler>=3.10.0
 feedparser>=6.0.0
 neo4j>=5.0.0
 pyvis>=0.3.2
 pymysql>=1.1.0
-# V2.R4 多模态风控依赖
+# 多模态风控依赖
 opencv-python>=4.8.0
 scenedetect>=0.6.1
 ffmpeg-python>=0.2.0
-paddleocr>=2.7.0
-paddlepaddle>=2.5.0
-easyocr>=1.7.0
-faster-whisper>=0.10.0
 Pillow>=10.0.0
 websockets>=12.0
+# OCR: 移除paddleocr/paddlepaddle/easyocr，改用API(Qwen3-VL/GLM-OCR)
+# 音频转写: faster-whisper需GPU+PyTorch，API降级可用(Paraformer)
+# faster-whisper>=0.10.0
