@@ -35,9 +35,6 @@ data/
 Thumbs.db
 desktop.ini
 
-# Streamlit
-.streamlit/secrets.toml
-
 # 参考项目 (太大不上传)
 reference/
 files/

@@ -92,12 +92,12 @@ VibeUtopia employs a five-layer architecture:
 | **Graph Database** | Neo4j 5 | Knowledge graph + social network |
 | **LLM Integration** | httpx + OpenAI-compatible protocol | Supports DeepSeek / Alibaba Cloud / any compatible API |
 | **Frontend Framework** | Vue 3 + TypeScript | Composition API |
-| **UI Components** | Element Plus | Enterprise component library |
+| **UI Components** | Naive UI | Dark theme component library |
 | **Visualization** | ECharts + D3.js | Charts + knowledge graph visualization |
 | **CSS** | Tailwind CSS 4 | Atomic styling |
 | **Build Tool** | Vite 8 | Fast dev & build |
 | **Video Processing** | OpenCV + PySceneDetect + FFmpeg | Keyframe extraction + scene detection |
-| **OCR** | PaddleOCR + EasyOCR | Text recognition in video frames |
+| **OCR** | Qwen3-VL-Plus / GLM-OCR API | Text recognition in video frames (API mode) |
 | **Audio Transcription** | faster-whisper | Efficient speech-to-text |
 | **Containerization** | Docker Compose | Neo4j and other infrastructure |
 
@@ -172,24 +172,20 @@ cd frontend-vue
 npm run dev
 ```
 
-**Option B: One-click startup (MVP with Streamlit frontend)**
+**Option B: One-click startup**
 
-Double-click `start.bat`, or start manually:
-
-```bash
-# Terminal 1 - Backend
-python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
-
-# Terminal 2 - Streamlit Frontend (MVP)
-streamlit run frontend/app.py --server.port 8501
-```
+Double-click `start.bat` to start both backend and frontend automatically.
 
 ### 7. Access the Application
 
 | Entry Point | URL |
+|------|------|
+| Vue3 Frontend | http://localhost:3000 |
+| Backend API Docs | http://localhost:8000/docs |
+| Neo4j Browser | http://localhost:7474 |
 |-------------|-----|
 | Vue3 Frontend | http://localhost:5173 |
-| Streamlit Frontend (MVP) | http://localhost:8501 |
+| Streamlit Frontend (MVP) | (deprecated, use Vue3) |
 | Backend API Docs | http://localhost:8000/docs |
 | Neo4j Browser | http://localhost:7474 |
 
@@ -349,7 +345,7 @@ VibeUtopia/
 │       ├── rewriter.py             # Safe rewriting
 │       ├── video_extractor.py      # Video transcript extraction
 │       └── ...                     # V2 additional services
-├── frontend/                       # Streamlit Frontend (MVP)
+├── frontend-vue/                   # Vue3 + Naive UI Frontend
 │   └── app.py
 ├── frontend-vue/                   # Vue3 Frontend (V2)
 │   ├── src/

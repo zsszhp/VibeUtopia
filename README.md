@@ -93,12 +93,12 @@ VibeUtopia 采用五层架构设计：
 | **图数据库** | Neo4j 5 | 知识图谱 + 社会关系网络 |
 | **LLM 接入** | httpx + OpenAI兼容协议 | 支持 DeepSeek / 阿里云百炼 / 任意兼容接口 |
 | **前端框架** | Vue 3 + TypeScript | 组合式 API |
-| **UI 组件** | Element Plus | 企业级组件库 |
+| **UI 组件** | Naive UI | 暗色主题组件库 |
 | **可视化** | ECharts + D3.js | 图表 + 知识图谱可视化 |
 | **CSS 方案** | Tailwind CSS 4 | 原子化样式 |
 | **构建工具** | Vite 8 | 极速开发与构建 |
 | **视频处理** | OpenCV + PySceneDetect + FFmpeg | 关键帧提取 + 场景检测 |
-| **OCR** | PaddleOCR + EasyOCR | 视频帧文字识别 |
+| **OCR** | Qwen3-VL-Plus / GLM-OCR API | 视频帧文字识别(API模式) |
 | **语音转录** | faster-whisper | 高效语音转文字 |
 | **容器化** | Docker Compose | Neo4j 等基础设施 |
 
@@ -173,24 +173,15 @@ cd frontend-vue
 npm run dev
 ```
 
-**方式二：一键启动（MVP 版本，使用 Streamlit 前端）**
+**方式二：一键启动**
 
-双击 `start.bat`，或手动启动：
-
-```bash
-# 终端1 - 后端
-python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
-
-# 终端2 - Streamlit 前端（MVP）
-streamlit run frontend/app.py --server.port 8501
-```
+双击 `start.bat`，自动启动后端和前端。
 
 ### 7. 访问应用
 
 | 入口 | 地址 |
 |------|------|
-| Vue3 前端 | http://localhost:5173 |
-| Streamlit 前端（MVP） | http://localhost:8501 |
+| Vue3 前端 | http://localhost:3000 |
 | 后端 API 文档 | http://localhost:8000/docs |
 | Neo4j 浏览器 | http://localhost:7474 |
 
@@ -333,7 +324,7 @@ VibeUtopia/
 │   ├── config.py                   # 配置管理（读取 .env）
 │   ├── database.py                 # 数据库连接
 │   ├── models.py                   # 数据模型（V1 + V2 全量模型）
-│   ├── routes.py                   # API 路由（41+ 端点）
+│   ├── routes.py                   # API 路由（5核心端点 + 71功能端点）
 │   ├── prompts/                    # LLM 提示词模板
 │   │   ├── risk_assessment.txt     # 七维风险评估
 │   │   ├── rewrite.txt             # 安全改写
@@ -350,9 +341,7 @@ VibeUtopia/
 │       ├── rewriter.py             # 安全改写
 │       ├── video_extractor.py      # 视频文案提取
 │       └── ...                     # V2 新增服务
-├── frontend/                       # Streamlit 前端（MVP）
-│   └── app.py
-├── frontend-vue/                   # Vue3 前端（V2）
+├── frontend-vue/                   # Vue3 + Naive UI 前端
 │   ├── src/
 │   │   ├── views/                  # 页面组件
 │   │   ├── components/             # 通用组件

@@ -93,10 +93,9 @@ VibeUtopia 还依赖了以下优秀的开源项目（通过 pip/npm 安装使用
 | SQLAlchemy | MIT |
 | Pydantic | MIT |
 | httpx | BSD-3-Clause |
-| Streamlit | Apache-2.0 |
-| yt-dlp | Unlicense |
-| PaddleOCR | Apache-2.0 |
-| PaddlePaddle | Apache-2.0 |
+| Naive UI | MIT |
+| Vue.js | MIT |
+| ECharts | Apache-2.0 |
 | faster-whisper | MIT |
 | Neo4j Python Driver | Apache-2.0 |
 | pyvis | BSD-3-Clause |
