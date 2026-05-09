@@ -2,90 +2,95 @@ import axios from 'axios'
 
 const API_BASE = '/api/v1'
 
+// ─── TypeScript 接口定义 ─────────────────────────────────────────
+
+export interface ReviewRequest {
+  mode: 'text' | 'video' | 'mixed'
+  video_files?: string[]
+  texts?: { type: string; content: string }[]
+  options?: {
+    depth?: 'quick' | 'standard' | 'deep' | 'large_scale'
+    platforms?: string[]
+    enable_simulation?: boolean
+  }
+}
+
+export interface ReviewResponse {
+  task_id: string
+  status: string
+  estimated_depth: string
+  estimated_duration_seconds: number
+}
+
+export interface ProgressResponse {
+  task_id: string
+  current_step: 'understanding' | 'assessment' | 'signal' | 'simulation' | 'report'
+  progress: number
+  detail: string
+  completed_dimensions: string[]
+  remaining_dimensions: string[]
+}
+
+export interface RiskDimension {
+  name: string
+  score: number
+  severity: 'green' | 'yellow' | 'orange' | 'red'
+  evidence: string
+  evidence_source: { type: string; content: string; location: string }
+  confidence: number
+  suggestion: string
+}
+
+export interface ReviewResult {
+  task_id: string
+  status: string
+  overall_risk?: number
+  risk_level?: 'green' | 'yellow' | 'orange' | 'red'
+  method?: string
+  dimensions?: RiskDimension[]
+  platform_reactions?: Record<string, { positive: number; neutral: number; negative: number }>
+  suggestions?: { original: string; suggestion: string; dimension: string }[]
+  error?: string
+}
+
+export interface HistoryItem {
+  task_id: string
+  status: string
+  created_at: string | null
+  overall_risk?: number
+  risk_level?: 'green' | 'yellow' | 'orange' | 'red'
+}
+
+export interface HistoryResponse {
+  total: number
+  items: HistoryItem[]
+}
+
+export interface ModelsResponse {
+  hardware_tier: 'lite' | 'standard' | 'pro' | 'ultra'
+  models: Record<string, { primary: string; fallback: string }>
+}
+
+// ─── 5个核心API ─────────────────────────────────────────────────
+
 export const api = {
-  // 文字风控
-  analyzeText: (text: string, mode: string = 'quick') =>
-    axios.post(`${API_BASE}/analyze/v2`, { text, mode }),
+  /** 提交内容预审（统一入口） */
+  submitReview: (req: ReviewRequest) =>
+    axios.post<ReviewResponse>(`${API_BASE}/api/review`, req),
 
-  getAnalysisResult: (taskId: string) =>
-    axios.get(`${API_BASE}/analyze/v2/${taskId}`),
+  /** 获取预审结果 */
+  getReviewResult: (taskId: string) =>
+    axios.get<ReviewResult>(`${API_BASE}/api/review/${taskId}`),
 
-  // 视频风控
-  extractVideo: (url: string) =>
-    axios.post(`${API_BASE}/extract-video`, { url }),
+  /** 获取分析进度 */
+  getReviewProgress: (taskId: string) =>
+    axios.get<ProgressResponse>(`${API_BASE}/api/review/${taskId}/progress`),
 
-  analyzeVideoV2: (url: string, videoPath: string, mode: string, maxFrames: number) =>
-    axios.post(`${API_BASE}/analyze-video/v2`, { url, video_path: videoPath, mode, max_frames: maxFrames }),
+  /** 历史记录 */
+  getHistory: (page: number = 1, perPage: number = 20, riskLevel?: string) =>
+    axios.get<HistoryResponse>(`${API_BASE}/api/history`, { params: { page, per_page: perPage, risk_level: riskLevel } }),
 
-  getFrameResults: (taskId: string) =>
-    axios.get(`${API_BASE}/frames/${taskId}`),
-
-  analyzeFrames: (videoPath: string, maxFrames: number, enableOcr: boolean, enableRisk: boolean) =>
-    axios.post(`${API_BASE}/analyze-frames`, { video_path: videoPath, max_frames: maxFrames, enable_ocr: enableOcr, enable_risk: enableRisk }),
-
-  transcribeAudio: (videoPath: string, enableSentiment: boolean) =>
-    axios.post(`${API_BASE}/audio/transcribe`, { video_path: videoPath, enable_sentiment: enableSentiment }),
-
-  getCrossModalRisk: (taskId: string) =>
-    axios.get(`${API_BASE}/cross-modal/${taskId}`),
-
-  // 信号采集
-  fetchSignals: (mode: string = 'standard') =>
-    axios.post(`${API_BASE}/signal/fetch`, { mode }),
-
-  getSignals: (limit: number = 50) =>
-    axios.get(`${API_BASE}/signal/list`, { params: { limit } }),
-
-  // 知识图谱
-  queryEntity: (name: string) =>
-    axios.get(`${API_BASE}/graph/entity/${encodeURIComponent(name)}`),
-
-  getEntityRiskChain: (name: string) =>
-    axios.get(`${API_BASE}/entities/${encodeURIComponent(name)}/risk-chain`),
-
-  // 仿真
-  createSimulation: (text: string, totalTicks: number = 24, mode: string = 'lightweight') =>
-    axios.post(`${API_BASE}/simulation/create`, { seed_content: text, total_ticks: totalTicks, mode }),
-
-  getSimStatus: (simId: string) =>
-    axios.get(`${API_BASE}/simulation/${simId}/status`),
-
-  getSimSnapshot: (simId: string) =>
-    axios.get(`${API_BASE}/simulation/${simId}/snapshot`),
-
-  // 报告
-  generateReport: (type: string, taskId: string) =>
-    axios.post(`${API_BASE}/report/${type}`, { task_id: taskId }),
-
-  getReports: (type?: string) =>
-    axios.get(`${API_BASE}/report/list`, { params: { type } }),
-
-  // 趋势预测
-  predictTrend: (taskId: string) =>
-    axios.post(`${API_BASE}/prediction/trend`, { task_id: taskId }),
-
-  // 回测
-  runBacktest: () =>
-    axios.post(`${API_BASE}/backtest/run`),
-
-  getBacktestResults: () =>
-    axios.get(`${API_BASE}/backtest/results`),
-
-  // 一致性
-  checkConsistency: (text: string, runCount: number = 3) =>
-    axios.post(`${API_BASE}/consistency/check`, { text, run_count: runCount }),
-
-  // 系统
-  getDbStatus: () =>
-    axios.get(`${API_BASE}/system/db-status`),
-
-  // 模型管理
+  /** 当前可用模型 */
   getModels: () =>
-    axios.get(`${API_BASE}/models`),
-
-  getModelSetting: () =>
-    axios.get(`${API_BASE}/settings/model`),
-
-  setModel: (provider: string, model: string) =>
-    axios.post(`${API_BASE}/settings/model`, { provider, model }),
+    axios.get<ModelsResponse>(`${API_BASE}/api/models`),
 }

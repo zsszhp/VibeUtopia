@@ -1,24 +1,26 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import axios from 'axios'
+import { ref, computed } from 'vue'
+import { api } from '../api'
+import type { ReviewRequest, ReviewResult, ProgressResponse, HistoryItem, ModelsResponse } from '../api'
 
-const API_BASE = '/api/v1'
-
-export const useAnalysisStore = defineStore('analysis', () => {
+export const useReviewStore = defineStore('review', () => {
+  // ─── 状态 ─────────────────────────────────────────────
   const currentTaskId = ref('')
-  const analysisResult = ref<any>(null)
-  const v2Result = ref<any>(null)
+  const result = ref<ReviewResult | null>(null)
+  const progress = ref<ProgressResponse | null>(null)
   const loading = ref(false)
-  const mode = ref<'quick' | 'deep'>('quick')
+  const currentStep = ref<'understanding' | 'assessment' | 'signal' | 'simulation' | 'report'>('understanding')
+  const progressPercent = ref(0)
 
-  async function submitText(text: string, analysisMode: 'quick' | 'deep') {
+  // ─── 操作 ─────────────────────────────────────────────
+  async function submitReview(req: ReviewRequest) {
     loading.value = true
-    mode.value = analysisMode
+    currentStep.value = 'understanding'
+    progressPercent.value = 0
+    result.value = null
     try {
-      const resp = await axios.post(`${API_BASE}/analyze/v2`, { text, mode: analysisMode })
+      const resp = await api.submitReview(req)
       currentTaskId.value = resp.data.task_id
-      analysisResult.value = null
-      v2Result.value = null
       return resp.data
     } finally {
       loading.value = false
@@ -27,97 +29,72 @@ export const useAnalysisStore = defineStore('analysis', () => {
 
   async function fetchResult(taskId: string) {
     try {
-      const resp = await axios.get(`${API_BASE}/analyze/v2/${taskId}`)
-      if (resp.data.status === 'completed') {
-        analysisResult.value = resp.data.mvp_result
-        v2Result.value = resp.data.v2_result
-      }
+      const resp = await api.getReviewResult(taskId)
+      result.value = resp.data
       return resp.data
     } catch (e) {
-      console.error('获取结果失败', e)
+      console.error('获取预审结果失败', e)
       return null
     }
   }
 
-  return { currentTaskId, analysisResult, v2Result, loading, mode, submitText, fetchResult }
+  async function fetchProgress(taskId: string) {
+    try {
+      const resp = await api.getReviewProgress(taskId)
+      progress.value = resp.data
+      currentStep.value = resp.data.current_step as any
+      progressPercent.value = resp.data.progress * 100
+      return resp.data
+    } catch (e) {
+      console.error('获取进度失败', e)
+      return null
+    }
+  }
+
+  const riskLevel = computed(() => result.value?.risk_level ?? 'green')
+
+  return {
+    currentTaskId, result, progress, loading, currentStep, progressPercent, riskLevel,
+    submitReview, fetchResult, fetchProgress,
+  }
 })
 
-export const useVideoStore = defineStore('video', () => {
-  const videoTaskId = ref('')
-  const videoResult = ref<any>(null)
+export const useHistoryStore = defineStore('history', () => {
+  const items = ref<HistoryItem[]>([])
+  const total = ref(0)
+  const page = ref(1)
   const loading = ref(false)
 
-  async function submitVideo(url: string, videoPath: string, mode: string, maxFrames: number) {
+  async function fetchHistory(p: number = 1, perPage: number = 20, riskLevel?: string) {
     loading.value = true
     try {
-      const resp = await axios.post(`${API_BASE}/analyze-video/v2`, {
-        url, video_path: videoPath, mode, max_frames: maxFrames,
-      })
-      videoTaskId.value = resp.data.task_id
-      videoResult.value = null
-      return resp.data
+      const resp = await api.getHistory(p, perPage, riskLevel)
+      items.value = resp.data.items
+      total.value = resp.data.total
+      page.value = p
     } finally {
       loading.value = false
     }
   }
 
-  async function fetchFrameResults(taskId: string) {
-    try {
-      const resp = await axios.get(`${API_BASE}/frames/${taskId}`)
-      if (resp.data.status === 'completed') {
-        videoResult.value = resp.data
-      }
-      return resp.data
-    } catch (e) {
-      console.error('获取帧结果失败', e)
-      return null
-    }
-  }
-
-  return { videoTaskId, videoResult, loading, submitVideo, fetchFrameResults }
+  return { items, total, page, loading, fetchHistory }
 })
 
-export const useSimulationStore = defineStore('simulation', () => {
-  const simulations = ref<any[]>([])
-  const activeSimId = ref('')
-  const simStatus = ref<any>(null)
-  const wsConnected = ref(false)
-  let ws: WebSocket | null = null
+export const useModelsStore = defineStore('models', () => {
+  const models = ref<ModelsResponse | null>(null)
+  const loading = ref(false)
 
-  async function createSimulation(text: string, totalTicks: number = 24) {
-    const resp = await axios.post(`${API_BASE}/simulation/create`, {
-      seed_content: text,
-      total_ticks: totalTicks,
-      mode: 'lightweight',
-    })
-    activeSimId.value = resp.data.sim_id
-    return resp.data
-  }
-
-  async function fetchSimStatus(simId: string) {
-    const resp = await axios.get(`${API_BASE}/simulation/${simId}/status`)
-    simStatus.value = resp.data
-    return resp.data
-  }
-
-  function connectWebSocket(simId: string) {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    ws = new WebSocket(`${protocol}//${window.location.host}/ws/simulation/${simId}`)
-
-    ws.onopen = () => { wsConnected.value = true }
-    ws.onclose = () => { wsConnected.value = false }
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      simStatus.value = data
+  async function fetchModels() {
+    loading.value = true
+    try {
+      const resp = await api.getModels()
+      models.value = resp.data
+    } finally {
+      loading.value = false
     }
   }
 
-  function disconnectWebSocket() {
-    if (ws) {
-      ws.close()
-      ws = null
-    }
-  }
+  const hardwareTier = computed(() => models.value?.hardware_tier ?? 'lite')
 
-  return { simulations, activeSimId, simStatus, wsConnected, createSimulation, fetchSimStatus, connectWebSocket, disconnectWebSocket }
+  return { models, loading, hardwareTier, fetchModels }
 })
