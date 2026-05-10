@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import logging
 import os
@@ -57,8 +59,8 @@ async def extract_video(req: VideoExtractRequest):
 
 @router.post("/analyze-video", response_model=AnalyzeResponse)
 async def analyze_video(req: VideoAnalyzeRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    """从视频链接提取文案并自动分析"""
-    extract_result = await extract_video_text(req.url)
+    """从本地视频文件提取文案并自动分析"""
+    extract_result = await extract_video_text(req.video_path)
     if extract_result.get("error"):
         raise HTTPException(status_code=400, detail=extract_result["error"])
 
@@ -109,6 +111,24 @@ async def get_result(task_id: str, db: Session = Depends(get_db)):
             result["status"] = "failed"
             result["error"] = "分析结果数据缺失"
             return result
+
+        result["overall_score"] = summary.overall_score
+        result["suggestion"] = summary.suggestion
+        result["dimensions"] = json.loads(summary.dimensions_json) if summary.dimensions_json else {}
+        result["risk_items"] = [
+            {"sentence": ri.sentence, "dimension": ri.dimension, "severity": ri.severity}
+            for ri in risk_items
+        ]
+        result["platform_reactions"] = {
+            r.platform: {"positive": r.positive, "neutral": r.neutral, "negative": r.negative}
+            for r in reactions
+        }
+        result["rewrites"] = json.loads(summary.rewrites_json) if summary.rewrites_json else []
+
+    elif task.status == "failed":
+        result["error"] = task.error if hasattr(task, 'error') else "分析失败"
+
+    return result
 # ── V2.R1 增强风控 API ──────────────────────────────────────
 
 
@@ -392,16 +412,6 @@ class ModelSettingRequest(BaseModel):
     provider: str = Field("", description="厂商ID，留空表示不覆盖")
     model: str = Field("", description="模型ID，留空表示不覆盖")
 
-
-@router.get("/models")
-async def list_models():
-    """获取所有可用的厂商和模型列表"""
-    from backend.services.llm_client import registry
-    if not registry.is_loaded:
-        return {"providers": []}
-    return {"providers": registry.get_available_providers()}
-
-
 @router.get("/settings/model")
 async def get_model_setting():
     """获取当前模型设置（运行时覆盖 + 环境变量默认值）"""
@@ -595,34 +605,6 @@ async def run_consensus(req: ConsensusRunRequest):
         "divergent_dimensions": result.divergent_dimensions,
         "summary": result.summary,
     }
-
-
-@router.get("/history")
-async def get_history(skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
-    from sqlalchemy.orm import joinedload
-
-    tasks = (
-        db.query(Task)
-        .options(joinedload(Task.summary))
-        .order_by(Task.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-    results = []
-    for t in tasks:
-        item = {
-            "task_id": t.id,
-            "created_at": t.created_at.isoformat() if t.created_at else None,
-            "status": t.status,
-            "text_preview": (t.text[:50] + "...") if t.text and len(t.text) > 50 else t.text,
-        }
-        if t.status == "completed" and t.summary:
-            item["overall_score"] = t.summary.overall_score
-            item["suggestion"] = t.summary.suggestion
-        results.append(item)
-    return result
-
 
 # ============ 信号采集 API ============
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """音频分析模块 - V2.R4
 
 从视频中提取音频，进行语音转写和情感分析。

@@ -9,12 +9,8 @@ providers:
     models:
       - id: "LongCat-Flash-Thinking-2601"
         tier: advanced
-      - id: "LongCat-Flash-Omni"
-        tier: advanced
-      - id: "LongCat-Flash-Standard"
-        tier: standard
       - id: "LongCat-Flash-Lite"
-        tier: lite
+        tier: standard
 
   deepseek:
     name: "DeepSeek"
@@ -37,6 +33,12 @@ providers:
         tier: standard
       - id: "qwen-turbo"
         tier: lite
+      - id: "qwen-vl-plus"
+        tier: advanced
+        vision: true
+      - id: "qwen-vl-max"
+        tier: advanced
+        vision: true
 
   siliconflow:
     name: "硅基流动"
@@ -47,6 +49,9 @@ providers:
         tier: advanced
       - id: "deepseek-ai/DeepSeek-V3"
         tier: standard
+      - id: "Qwen/Qwen2.5-VL-72B-Instruct"
+        tier: advanced
+        vision: true
 
 task_tier_mapping:
   risk_assessment: advanced
@@ -55,6 +60,7 @@ task_tier_mapping:
   persona_generation: standard
   agent_simulation: standard
   rewrite: lite
+  ocr: advanced
   default: standard
 
 fallback_strategy:

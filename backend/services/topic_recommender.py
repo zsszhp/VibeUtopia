@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """选题推荐引擎 - V2.R6
 
 基于热点×博主风格匹配，生成选题推荐。

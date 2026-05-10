@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """交叉风险检测模块 - V2.R4
 
 检测文字×画面×音频之间的交叉风险：

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """博主风格画像模块 - V2.R6
 
 分析博主历史内容，生成5维风格画像：

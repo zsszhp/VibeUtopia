@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """OCR文字识别模块
 
 从视频关键帧中识别字幕、水印、贴图文字。
@@ -58,7 +60,8 @@ class FrameOCR:
 
     def __init__(self, config: dict | None = None, llm_client=None):
         self.config = {**DEFAULT_CONFIG, **(config or {})}
-        self._llm_client = llm_client  # LLM客户端，用于API OCR
+        # llm_client 参数保留以兼容旧调用方式，但不再使用
+        # OCR 现在通过模块级 call_vlm() 函数调用视觉模型
 
     async def extract_text(self, frame_path: str, frame_index: int = 0,
                            timestamp: float = 0.0) -> FrameOCRResult:
@@ -83,8 +86,14 @@ class FrameOCR:
         items = []
         engine_used = ""
 
-        # 优先使用API OCR (Qwen3-VL-Plus / GLM-OCR)
-        if self._llm_client is not None:
+        # 优先使用API OCR (通过 call_vlm 调用视觉模型)
+        try:
+            from backend.services.llm_client import registry as _llm_registry
+            has_vision = len(_llm_registry.get_vision_endpoints()) > 0
+        except Exception:
+            has_vision = False
+
+        if has_vision:
             try:
                 result = await self._api_ocr(frame_path)
                 if result:
@@ -92,6 +101,8 @@ class FrameOCR:
                     engine_used = "api_ocr"
             except Exception as e:
                 logger.warning("API OCR识别失败: %s，将跳过OCR", e)
+        else:
+            logger.info("无可用视觉模型，跳过OCR")
 
         if not items and not engine_used:
             return FrameOCRResult(
@@ -118,6 +129,8 @@ class FrameOCR:
 
     async def _api_ocr(self, frame_path: str) -> Optional[list[OCRItem]]:
         """使用多模态API进行OCR识别"""
+        from backend.services.llm_client import call_vlm
+
         # 将图片编码为base64
         with open(frame_path, "rb") as f:
             img_data = base64.b64encode(f.read()).decode("utf-8")
@@ -130,9 +143,10 @@ class FrameOCR:
         )
 
         try:
-            response = await self._llm_client.vlm_chat(
+            response = await call_vlm(
                 prompt=prompt,
                 image_base64=img_data,
+                task_type="ocr",
             )
 
             import json
@@ -189,7 +203,7 @@ class FrameOCR:
                 all_texts.append(result.full_text)
 
         video_result.all_text = "\n".join(all_texts)
-        video_result.engine_used = "api_ocr" if self._llm_client else "none"
+        video_result.engine_used = "api_ocr"
 
         return video_result
 

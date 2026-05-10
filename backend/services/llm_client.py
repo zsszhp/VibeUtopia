@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
@@ -36,6 +38,7 @@ class ModelEndpoint:
     api_key: str
     tier: str
     provider_name: str = ""
+    vision: bool = False  # 是否支持视觉/多模态
 
 
 # ---------------------------------------------------------------------------
@@ -96,6 +99,7 @@ class ModelRegistry:
                     api_key=api_key,
                     tier=mcfg.get("tier", "standard"),
                     provider_name=provider_name,
+                    vision=mcfg.get("vision", False),
                 )
                 self.endpoints.append(ep)
 
@@ -146,6 +150,23 @@ class ModelRegistry:
                 "tier": ep.tier,
             })
         return list(provider_map.values())
+
+    def get_vision_endpoints(
+        self,
+        tier: str | None = None,
+        exclude: set[str] | None = None,
+    ) -> list[ModelEndpoint]:
+        """获取支持视觉/多模态的端点列表"""
+        result = []
+        for ep in self.endpoints:
+            if not ep.vision:
+                continue
+            if tier and ep.tier != tier:
+                continue
+            if exclude and f"{ep.provider}:{ep.model_id}" in exclude:
+                continue
+            result.append(ep)
+        return result
 
 
 # ---------------------------------------------------------------------------
@@ -336,6 +357,112 @@ async def call_llm(prompt: str, system: str = "你是一个专业的AI助手。"
         return await _call_legacy(prompt, system)
 
 
+async def call_vlm(prompt: str, image_base64: str, system: str = "你是一个专业的AI助手。", task_type: str = "default") -> str:
+    """调用视觉语言模型 (VLM) API，支持图片输入
+
+    Args:
+        prompt: 用户提示词
+        image_base64: 图片的 base64 编码字符串
+        system: 系统提示词
+        task_type: 任务类型，用于智能路由
+
+    Raises:
+        RuntimeError: 无可用视觉模型时抛出
+    """
+    if not registry.is_loaded:
+        raise RuntimeError("模型配置未加载，无法调用视觉模型")
+
+    tried: set[str] = set()
+    last_error: Exception | None = None
+
+    while True:
+        endpoint = _route_vlm(task_type, exclude=tried)
+        if endpoint is None:
+            break
+
+        key = f"{endpoint.provider}:{endpoint.model_id}"
+        tried.add(key)
+
+        try:
+            result = await _call_endpoint_vlm(endpoint, prompt, image_base64, system)
+            return result
+        except QuotaExhaustedError as e:
+            router.mark_unavailable(endpoint.provider, endpoint.model_id)
+            logger.warning("视觉模型 %s 配额耗尽 (%s)，触发 fallback", key, e)
+            last_error = e
+        except Exception as e:
+            retried = False
+            for attempt in range(settings.LLM_MAX_RETRIES):
+                try:
+                    result = await _call_endpoint_vlm(endpoint, prompt, image_base64, system)
+                    return result
+                except QuotaExhaustedError as eq:
+                    router.mark_unavailable(endpoint.provider, endpoint.model_id)
+                    logger.warning("视觉模型 %s 配额耗尽 (重试%d次): %s", key, attempt + 1, eq)
+                    last_error = eq
+                    retried = True
+                    break
+                except Exception as e2:
+                    last_error = e2
+                    logger.warning("VLM 调用失败 %s (重试%d次): %s", key, attempt + 1, e2)
+
+            if not retried:
+                logger.warning("视觉模型 %s 调用失败，尝试下一个模型", key)
+
+    if last_error:
+        raise RuntimeError(f"所有视觉模型不可用，已尝试: {tried}，最后错误: {last_error}")
+    raise RuntimeError(f"无可用视觉模型（需要配置支持 vision 的模型端点）")
+
+
+def _route_vlm(task_type: str = "default", exclude: set[str] | None = None) -> ModelEndpoint | None:
+    """路由到可用的视觉模型端点"""
+    exclude = exclude or set()
+    tier = registry.get_tier(task_type)
+
+    # 按优先级收集视觉端点
+    candidates = []
+    tier_idx = ModelRouter.TIER_ORDER.index(tier) if tier in ModelRouter.TIER_ORDER else 1
+
+    # 同 tier 视觉模型
+    for ep in registry.get_vision_endpoints(tier=tier, exclude=exclude):
+        if router.is_available(ep.provider, ep.model_id):
+            candidates.append(ep)
+
+    # 低 tier 视觉模型
+    for lower_tier in ModelRouter.TIER_ORDER[tier_idx + 1:]:
+        for ep in registry.get_vision_endpoints(tier=lower_tier, exclude=exclude):
+            if router.is_available(ep.provider, ep.model_id) and ep not in candidates:
+                candidates.append(ep)
+
+    return candidates[0] if candidates else None
+
+
+async def _call_endpoint_vlm(endpoint: ModelEndpoint, prompt: str, image_base64: str, system: str) -> str:
+    """调用指定端点的视觉模型，构造 OpenAI Vision 多模态消息格式"""
+    url = f"{endpoint.base_url}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {endpoint.api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": endpoint.model_id,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}},
+            ]},
+        ],
+        "temperature": 0.7,
+        "max_tokens": 4096,
+    }
+
+    if _HAS_HTTPX:
+        return await _httpx_call(url, headers, payload, endpoint)
+    else:
+        return await _urllib_call(url, headers, payload, endpoint)
+
+
 async def _call_with_routing(prompt: str, system: str, task_type: str) -> str:
     """使用模型路由的调用方式"""
     tried: set[str] = set()
@@ -412,6 +539,10 @@ async def _httpx_call(url: str, headers: dict, payload: dict, endpoint: ModelEnd
             raise QuotaExhaustedError(
                 f"{endpoint.provider_name} {endpoint.model_id} HTTP {resp.status_code}: {resp.text[:200]}"
             )
+
+        if resp.status_code == 400:
+            logger.error("LLM 400 错误详情: url=%s, model=%s, response=%s", url, endpoint.model_id, resp.text[:500])
+            raise RuntimeError(f"请求格式错误 (HTTP 400): {resp.text[:300]}")
 
         resp.raise_for_status()
         data = resp.json()

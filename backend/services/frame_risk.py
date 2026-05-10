@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """画面风险评估模块 - V2.R4
 
 使用LLM视觉模型分析视频关键帧画面内容，

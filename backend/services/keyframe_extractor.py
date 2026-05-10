@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """关键帧提取模块 - V2.R4
 
 从视频中提取关键帧，支持三种策略：
@@ -282,7 +284,7 @@ class KeyframeExtractor:
         for scene_idx, (start, end) in enumerate(scene_list):
             # 每个场景取中间帧
             mid_frame_num = (start.get_frames() + end.get_frames()) // 2
-            timestamp = mid_frame_num / (video.frame_rate if video.frame_rate > 0 else 25.0)
+            timestamp = mid_frame_num / (float(video.frame_rate) if video.frame_rate > 0 else 25.0)
 
             frame_path = os.path.join(
                 output_dir,

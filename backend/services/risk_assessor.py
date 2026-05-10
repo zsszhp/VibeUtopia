@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 from backend.services.llm_client import call_llm, load_prompt, parse_llm_json

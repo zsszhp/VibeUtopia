@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """本地视频文案提取模块
 
 仅支持本地视频文件的文案提取。
@@ -65,7 +67,7 @@ async def extract_video_text(video_path: str) -> dict:
         from backend.services.audio_analyzer import AudioAnalyzer
 
         analyzer = AudioAnalyzer()
-        transcription = await analyzer.transcribe(video_path)
+        transcription = await analyzer.analyze(video_path)
 
         if transcription and transcription.full_text:
             combined_texts.append(transcription.full_text)

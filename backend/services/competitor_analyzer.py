@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """竞品对标分析模块 - V2.R6
 
 对比博主与竞品的风格/主题/受众差异，
