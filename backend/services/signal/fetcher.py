@@ -27,6 +27,7 @@ class HotlistFetcher:
         "weibo", "baidu", "zhihu", "bilibili-hot-search",
         "douyin", "toutiao", "tieba", "thepaper",
         "wallstreetcn-hot", "cls-hot", "ifeng",
+        "kuaishou", "xiaohongshu",
     ]
 
     async def fetch_platform(self, platform_id: str) -> List[Signal]:
@@ -77,11 +78,23 @@ class HotlistFetcher:
         if platform_ids is None:
             platform_ids = self.PLATFORM_IDS
 
+        async def _fetch_with_interval(pid: str, delay: float = 0.0):
+            if delay > 0:
+                await asyncio.sleep(delay)
+            return pid, await self.fetch_platform(pid)
+
+        tasks = [
+            _fetch_with_interval(pid, i * self.REQUEST_INTERVAL)
+            for i, pid in enumerate(platform_ids)
+        ]
+        results_list = await asyncio.gather(*tasks, return_exceptions=True)
+
         results: Dict[str, List[Signal]] = {}
-        for i, pid in enumerate(platform_ids):
-            if i > 0:
-                await asyncio.sleep(self.REQUEST_INTERVAL)
-            signals = await self.fetch_platform(pid)
+        for item in results_list:
+            if isinstance(item, Exception):
+                logger.warning("HotlistFetcher: 平台抓取异常 %s", item)
+                continue
+            pid, signals = item
             results[pid] = signals
             logger.info("HotlistFetcher: %s 获取到 %d 条信号", pid, len(signals))
 

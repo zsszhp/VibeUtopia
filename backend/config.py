@@ -53,7 +53,13 @@ class Settings:
     # 仿真引擎配置
     AGENTS_PER_PLATFORM: int = int(os.getenv("AGENTS_PER_PLATFORM", "10"))
     MEMORY_RETRIEVAL_LIMIT: int = int(os.getenv("MEMORY_RETRIEVAL_LIMIT", "5"))
-    DREAM_CYCLE_INTERVAL: int = int(os.getenv("DREAM_CYCLE_INTERVAL", "3600")) # 记忆整合间隔(秒)
+    DREAM_CYCLE_INTERVAL: int = int(os.getenv("DREAM_CYCLE_INTERVAL", "3600"))
+
+    # 信号采集配置
+    SIGNAL_CONFIG_PATH: str = os.getenv(
+        "SIGNAL_CONFIG_PATH",
+        str(Path(__file__).parent / "services" / "signal" / "signal_config.yaml"),
+    ) # 记忆整合间隔(秒)
 
     # 多模态风控配置
     KEYFRAME_MAX_FRAMES: int = int(os.getenv("KEYFRAME_MAX_FRAMES", "50"))

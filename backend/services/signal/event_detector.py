@@ -322,18 +322,24 @@ class EventDetector:
 
     @staticmethod
     def _extract_keywords(title: str) -> Set[str]:
-        """从标题中提取关键词（简单分词：2-4字组合）"""
-        # 去除标点和特殊字符
+        """从标题中提取关键词（jieba优先，降级为字符n-gram）"""
         clean = re.sub(r"[^\u4e00-\u9fff\w]", "", title)
-        keywords: Set[str] = set()
+        if not clean:
+            return set()
 
-        # 2-4字滑动窗口
+        try:
+            import jieba
+            words = set(jieba.cut(clean))
+            return {w for w in words if len(w) >= 2}
+        except ImportError:
+            pass
+
+        keywords: Set[str] = set()
         for length in (2, 3, 4):
             for i in range(len(clean) - length + 1):
                 word = clean[i : i + length]
                 if word:
                     keywords.add(word)
-
         return keywords
 
     @staticmethod

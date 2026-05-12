@@ -1,0 +1,43 @@
+signal:
+  hotlist:
+    platforms:
+      - weibo
+      - baidu
+      - zhihu
+      - bilibili-hot-search
+      - douyin
+      - toutiao
+      - tieba
+      - thepaper
+      - wallstreetcn-hot
+      - cls-hot
+      - ifeng
+      - kuaishou
+      - xiaohongshu
+    interval_seconds: 300
+
+  rss:
+    feeds:
+      - name: "Hacker News"
+        url: "https://hnrss.org/frontpage"
+        category: "tech"
+      - name: "华尔街见闻"
+        url: "https://wallstreetcn.com/rss"
+        category: "finance"
+      - name: "澎湃新闻"
+        url: "https://thepaper.cn/rss"
+        category: "news"
+    interval_seconds: 600
+
+  event_detection:
+    cluster_threshold: 0.4
+    min_cluster_size: 2
+    deep_crawl_threshold: 1.0
+    event_detect_interval: 0
+
+  deep_crawl:
+    max_comments_per_platform: 50
+    platforms:
+      - weibo
+      - zhihu
+      - bilibili

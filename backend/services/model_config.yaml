@@ -53,14 +53,34 @@ providers:
         tier: advanced
         vision: true
 
+  zhipu:
+    name: "智谱AI"
+    base_url: "https://open.bigmodel.cn/api/paas/v4"
+    api_key_env: "GLM_API_KEY"
+    models:
+      - id: "glm-4-plus"
+        tier: advanced
+      - id: "glm-4-flash"
+        tier: standard
+      - id: "glm-4v-plus"
+        tier: advanced
+        vision: true
+      - id: "glm-4v-flash"
+        tier: standard
+        vision: true
+
 task_tier_mapping:
   risk_assessment: advanced
   persona_simulation: standard
   transcript_detection: lite
   persona_generation: standard
+  life_story_generation: advanced
+  memory_reflection: standard
   agent_simulation: standard
   rewrite: lite
   ocr: advanced
+  visual_risk: advanced
+  cross_modal: standard
   default: standard
 
 fallback_strategy:

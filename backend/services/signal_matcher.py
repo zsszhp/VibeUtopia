@@ -4,6 +4,8 @@
 识别文案是否与当前热点事件相关，评估热点关联带来的额外风险。
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from dataclasses import dataclass, field
