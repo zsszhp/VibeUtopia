@@ -5,12 +5,15 @@ from backend.services.llm_client import call_llm, load_prompt, parse_llm_json
 
 logger = logging.getLogger(__name__)
 
-PLATFORMS = ["bilibili", "xiaohongshu", "zhihu", "douyin"]
+PLATFORMS = ["bilibili", "xiaohongshu", "zhihu", "douyin", "weibo", "kuaishou", "wechat_channels"]
 PLATFORM_NAMES = {
     "bilibili": "B站",
     "xiaohongshu": "小红书",
     "zhihu": "知乎",
     "douyin": "抖音",
+    "weibo": "微博",
+    "kuaishou": "快手",
+    "wechat_channels": "微信视频号",
 }
 
 

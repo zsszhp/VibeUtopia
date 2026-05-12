@@ -5,7 +5,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
 
 const props = defineProps<{
@@ -16,9 +16,14 @@ const props = defineProps<{
 const gaugeRef = ref<HTMLElement>()
 let chart: echarts.ECharts | null = null
 
+function handleResize() { chart?.resize() }
+
 function render() {
   if (!gaugeRef.value) return
-  if (!chart) chart = echarts.init(gaugeRef.value, 'dark')
+  if (!chart) {
+    chart = echarts.init(gaugeRef.value, 'dark')
+    window.addEventListener('resize', handleResize)
+  }
   const colorMap: Record<string, string> = { green: '#22c55e', yellow: '#eab308', orange: '#f97316', red: '#ef4444' }
   chart.setOption({
     series: [{
@@ -41,6 +46,11 @@ function render() {
 
 onMounted(render)
 watch(() => props.score, render)
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+  chart?.dispose()
+  chart = null
+})
 </script>
 
 <style scoped>

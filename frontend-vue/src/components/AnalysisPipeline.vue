@@ -8,6 +8,7 @@
     >
       <div class="node-dot"></div>
       <span class="node-label">{{ step.label }}</span>
+      <span v-if="step.key === currentStep" class="progress-pct">{{ Math.round(progress * 100) }}%</span>
       <div v-if="idx < steps.length - 1" class="node-line"></div>
     </div>
   </div>
@@ -87,6 +88,13 @@ const stepIndex = computed(() => steps.findIndex(s => s.key === props.currentSte
 
 .pipeline-node.done .node-label {
   color: #22c55e;
+}
+
+.progress-pct {
+  font-size: 11px;
+  color: #6366f1;
+  font-weight: 600;
+  margin-left: 2px;
 }
 
 .node-line {

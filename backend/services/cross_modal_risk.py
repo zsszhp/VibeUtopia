@@ -202,18 +202,15 @@ class CrossModalRiskDetector:
         if ocr_text and text_analysis:
             original_text = text_analysis.get("text", "")
             if original_text and ocr_text:
-                # 简单关键词匹配
-                ocr_keywords = set(ocr_text.lower().split())
-                text_keywords = set(original_text.lower().split())
-                overlap = ocr_keywords & text_keywords
-                if len(overlap) < len(ocr_keywords) * 0.2 and len(ocr_keywords) > 3:
+                overlap = self._char_ngram_overlap(ocr_text, original_text)
+                if overlap < 0.2 and len(ocr_text) > 10:
                     risks.append(CrossModalRisk(
                         risk_type="contradiction",
                         modalities=["text", "image"],
                         description="画面中OCR文字与文案内容严重不一致",
                         severity="medium",
                         confidence=0.6,
-                        evidence=f"OCR关键词: {list(ocr_keywords)[:5]}, 文案关键词: {list(text_keywords)[:5]}",
+                        evidence=f"OCR与文案字符重叠度: {overlap:.0%}",
                         suggestion="检查画面文字是否与文案表述一致",
                     ))
 
@@ -221,17 +218,15 @@ class CrossModalRiskDetector:
         if audio_text and text_analysis:
             original_text = text_analysis.get("text", "")
             if original_text and audio_text:
-                audio_keywords = set(audio_text.lower().split())
-                text_keywords = set(original_text.lower().split())
-                overlap = audio_keywords & text_keywords
-                if len(overlap) < len(audio_keywords) * 0.2 and len(audio_keywords) > 3:
+                overlap = self._char_ngram_overlap(audio_text, original_text)
+                if overlap < 0.2 and len(audio_text) > 10:
                     risks.append(CrossModalRisk(
                         risk_type="contradiction",
                         modalities=["text", "audio"],
                         description="音频内容与文案表述不一致",
                         severity="medium",
                         confidence=0.6,
-                        evidence=f"音频关键词与文案重叠度低于20%",
+                        evidence=f"音频与文案字符重叠度: {overlap:.0%}",
                         suggestion="检查音频内容是否与文案一致",
                     ))
 
@@ -440,15 +435,28 @@ class CrossModalRiskDetector:
     @staticmethod
     def _score_to_level(score: float) -> str:
         """分数转风险等级"""
-        if score >= 80:
+        if score >= 75:
             return "critical"
-        elif score >= 60:
+        elif score >= 50:
             return "high"
-        elif score >= 40:
+        elif score >= 25:
             return "medium"
-        elif score >= 20:
+        elif score >= 10:
             return "low"
         return "safe"
+
+    @staticmethod
+    def _char_ngram_overlap(text_a: str, text_b: str, n: int = 2) -> float:
+        """基于字符n-gram的重叠度计算，适配中文"""
+        def _ngrams(s: str, size: int) -> set:
+            s = s.lower().strip()
+            return {s[i:i + size] for i in range(len(s) - size + 1)} if len(s) >= size else {s}
+
+        a_set = _ngrams(text_a, n)
+        b_set = _ngrams(text_b, n)
+        if not a_set:
+            return 0.0
+        return len(a_set & b_set) / len(a_set)
 
     @staticmethod
     def _generate_summary(result: CrossModalResult) -> str:
@@ -464,3 +472,18 @@ class CrossModalRiskDetector:
                 if score > 0:
                     parts.append(f"{modality}模态风险: {score}分")
         return "；".join(parts) if parts else "未检测到交叉风险"
+
+
+def get_cross_modal_status() -> dict:
+    """返回交叉模态检测器状态"""
+    try:
+        from backend.services.llm_client import call_llm
+        llm_available = True
+    except Exception:
+        llm_available = False
+    return {
+        "available": True,
+        "rule_based": True,
+        "llm_enhanced": llm_available,
+        "supported_modalities": ["text", "image", "audio"],
+    }

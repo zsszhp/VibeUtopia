@@ -39,6 +39,21 @@ export interface RiskDimension {
   evidence_source: { type: string; content: string; location: string }
   confidence: number
   suggestion: string
+  affected_groups?: string[]
+}
+
+export interface SignalCorrelation {
+  signal_id: string
+  title: string
+  platform: string
+  correlation_score: number
+  risk_boost: number
+}
+
+export interface CrossEffect {
+  dimensions: string[]
+  description: string
+  combined_severity: string
 }
 
 export interface ReviewResult {
@@ -50,6 +65,10 @@ export interface ReviewResult {
   dimensions?: RiskDimension[]
   platform_reactions?: Record<string, { positive: number; neutral: number; negative: number }>
   suggestions?: { original: string; suggestion: string; dimension: string }[]
+  signal_correlations?: SignalCorrelation[]
+  confidence?: number
+  uncertainty_sources?: string[]
+  cross_effects?: CrossEffect[]
   error?: string
 }
 
@@ -73,6 +92,12 @@ export interface ModelsResponse {
 
 // ─── 5个核心API ─────────────────────────────────────────────────
 
+export interface UploadResponse {
+  file_path: string
+  file_name: string
+  file_size: number
+}
+
 export const api = {
   /** 提交内容预审（统一入口） */
   submitReview: (req: ReviewRequest) =>
@@ -93,4 +118,19 @@ export const api = {
   /** 当前可用模型 */
   getModels: () =>
     axios.get<ModelsResponse>(`${API_BASE}/models`),
+
+  /** 上传文件 */
+  uploadFile: (file: File, onProgress?: (percent: number) => void) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return axios.post<UploadResponse>(`${API_BASE}/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          onProgress(percent)
+        }
+      }
+    })
+  },
 }

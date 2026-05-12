@@ -2178,17 +2178,19 @@ async def compare_competitors(req: CompetitorCompareRequest, db: Session = Depen
 
 
 
-# ─── 5个核心API端点（主链路架构） ─────────────────────────────────────────
-# 按设计文档(02_系统架构设计/09_分析决策层/10_仿真增强风控)收敛自38+端点
-# 旧端点标记deprecated，保留不删避免前端过渡期断裂
+# ═══════════════════════════════════════════════════════════════════════════════
+# 阶段1核心流程 - 5个核心API端点
+# ═══════════════════════════════════════════════════════════════════════════════
+
+from fastapi import UploadFile, File
 
 
 class ReviewRequest(BaseModel):
     """内容预审请求"""
-    mode: str = Field("text", description="输入模式: video/text/mixed")
-    video_files: list[str] = Field(default_factory=list, description="本地视频文件路径")
-    texts: list[dict] = Field(default_factory=list, description="文案列表 [{type, content}]")
-    options: dict = Field(default_factory=dict, description="分析选项 {depth, platforms, enable_simulation}")
+    mode: str = Field("text", description="输入模式: text/video/mixed")
+    video_files: list[str] | None = Field(None, description="上传后的视频文件路径列表")
+    texts: list[dict] | None = Field(None, description="文本内容列表 [{type, content}]")
+    options: dict | None = Field(None, description="分析选项 {depth, platforms, enable_simulation}")
 
 
 class ReviewResponse(BaseModel):
@@ -2209,198 +2211,449 @@ class ProgressResponse(BaseModel):
     remaining_dimensions: list[str] = Field(default_factory=list)
 
 
+class HistoryItemResponse(BaseModel):
+    """历史记录项"""
+    task_id: str
+    status: str
+    created_at: str | None = None
+    overall_risk: int | None = None
+    risk_level: str | None = None
+
+
+class HistoryResponse(BaseModel):
+    """历史记录响应"""
+    total: int
+    items: list[HistoryItemResponse]
+
+
+class ModelsResponse(BaseModel):
+    """可用模型响应"""
+    hardware_tier: str
+    models: dict[str, dict[str, str]]
+
+
+class UploadResponse(BaseModel):
+    """文件上传响应"""
+    file_path: str
+    file_name: str
+    file_size: int
+
+
+def _get_estimated_duration(depth: str | None) -> tuple[str, int]:
+    """根据分析深度返回预估深度和时长"""
+    depth_map = {
+        "quick": ("快速分析", 60),
+        "standard": ("标准分析", 180),
+        "deep": ("深度分析", 600),
+        "large_scale": ("大规模仿真", 1800),
+    }
+    return depth_map.get(depth or "standard", ("标准分析", 180))
+
+
+def _score_to_risk_level(score: int | None) -> str:
+    """将分数转换为风险等级"""
+    if score is None:
+        return "green"
+    if score <= 25:
+        return "green"
+    elif score <= 55:
+        return "yellow"
+    elif score <= 75:
+        return "orange"
+    return "red"
+
+
 @router.post("/review", response_model=ReviewResponse)
-async def submit_review(req: ReviewRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    """提交内容进行预审（统一入口）- 支持text/video/mixed三种模式"""
-    mode = req.mode
-    depth = req.options.get("depth", "standard")
-    texts = req.texts
-    video_files = req.video_files
+async def submit_review(
+    req: ReviewRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """提交内容预审（统一入口）
 
-    combined_text = ""
-    for t in texts:
-        content = t.get("content", "")
-        if content:
-            combined_text += content + "\n"
+    支持三种输入模式:
+    - text: 纯文本分析
+    - video: 视频文件分析（提取文案后分析）
+    - mixed: 文本+视频混合分析
+    """
+    # 收集所有文本内容
+    texts_to_analyze: list[str] = []
 
-    if mode in ("video", "mixed") and video_files:
-        for video_path in video_files:
-            try:
+    # 处理文本输入
+    if req.texts:
+        for item in req.texts:
+            if item.get("type") == "text" and item.get("content"):
+                texts_to_analyze.append(item["content"])
+
+    # 处理视频文件（提取文案）
+    if req.video_files:
+        for video_path in req.video_files:
+            if os.path.exists(video_path):
                 extract_result = await extract_video_text(video_path)
-                if extract_result.get("text"):
-                    combined_text += extract_result["text"] + "\n"
-            except Exception as e:
-                logger.warning("视频文案提取失败 %s: %s", video_path, e)
+                if not extract_result.get("error"):
+                    text = extract_result.get("text", "").strip()
+                    if len(text) >= 10:
+                        texts_to_analyze.append(text)
+
+    # 合并所有文本
+    combined_text = "\n\n".join(texts_to_analyze)
 
     if len(combined_text.strip()) < 10:
-        raise HTTPException(status_code=400, detail="有效文案内容不足10字符，无法分析")
+        raise HTTPException(status_code=400, detail="内容太短，无法进行分析（至少需要10个字符）")
 
+    # 创建任务
     task_id = str(uuid.uuid4())
-    task = Task(id=task_id, text=combined_text.strip(), status="processing", model=settings.DEEPSEEK_MODEL)
+    task = Task(
+        id=task_id,
+        text=combined_text,
+        status="processing",
+        model=settings.DEEPSEEK_MODEL,
+        mode=req.mode,
+        depth=req.options.get("depth", "standard") if req.options else "standard",
+    )
     db.add(task)
     db.commit()
 
-    depth_map = {
-        "quick": ("quick", 60),
-        "standard": ("standard", 180),
-        "deep": ("deep", 600),
-        "large_scale": ("large_scale", 1800),
-    }
-    est_depth, est_seconds = depth_map.get(depth, ("standard", 180))
+    # 启动后台分析
+    background_tasks.add_task(run_analysis, task_id, combined_text)
 
-    background_tasks.add_task(run_analysis, task_id, combined_text.strip())
+    # 计算预估时间
+    depth = req.options.get("depth", "standard") if req.options else "standard"
+    estimated_depth, estimated_seconds = _get_estimated_duration(depth)
 
     return ReviewResponse(
         task_id=task_id,
-        status="analyzing",
-        estimated_depth=est_depth,
-        estimated_duration_seconds=est_seconds,
+        status="processing",
+        estimated_depth=estimated_depth,
+        estimated_duration_seconds=estimated_seconds
     )
 
 
 @router.get("/review/{task_id}")
 async def get_review_result(task_id: str, db: Session = Depends(get_db)):
-    """获取预审结果：7维评估+证据链+置信度+平台反应+改写建议"""
+    """获取预审结果
+
+    返回完整分析结果，字段对齐前端ReviewResult接口
+    """
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
 
-    result = {"task_id": task.id, "status": task.status}
+    result: dict[str, Any] = {
+        "task_id": task.id,
+        "status": task.status,
+    }
 
     if task.status == "completed":
         summary = db.query(AnalysisSummary).filter(AnalysisSummary.task_id == task_id).first()
         risk_items = db.query(RiskItem).filter(RiskItem.task_id == task_id).all()
         reactions = db.query(PlatformReaction).filter(PlatformReaction.task_id == task_id).all()
 
-        if summary:
-            result["overall_risk"] = summary.overall_score
-            result["risk_level"] = _score_to_level(summary.overall_score)
-            result["method"] = "static"
+        if not summary:
+            result["status"] = "failed"
+            result["error"] = "分析结果数据缺失"
+            return result
 
-        if risk_items:
-            result["dimensions"] = [
-                {
-                    "name": item.dimension,
-                    "score": _severity_to_score(item.severity),
-                    "severity": item.severity or "green",
-                    "evidence": item.evidence,
-                    "evidence_source": {
-                        "type": "text",
-                        "content": item.sentence or "",
-                        "location": "",
-                    },
-                    "confidence": item.dimension_weight if item.dimension_weight else 0.7,
-                    "suggestion": "",
-                }
-                for item in risk_items
-            ]
+        # 解析维度数据 - 支持新格式(完整对象)和旧格式(仅分数)
+        dimensions = []
+        if summary.dimensions_json:
+            try:
+                dims_data = json.loads(summary.dimensions_json)
+                if isinstance(dims_data, dict):
+                    for name, data in dims_data.items():
+                        if isinstance(data, dict):
+                            dimensions.append({
+                                "name": name,
+                                "score": data.get("score", 0),
+                                "severity": data.get("severity", "low"),
+                                "evidence": data.get("evidence", ""),
+                                "evidence_source": data.get("evidence_source", {}),
+                                "confidence": data.get("confidence", 0.8),
+                                "suggestion": data.get("suggestion", ""),
+                                "affected_groups": data.get("affected_groups", []),
+                            })
+                        elif isinstance(data, (int, float)):
+                            score = int(data)
+                            severity = "high" if score >= 60 else ("medium" if score >= 30 else "low")
+                            dimensions.append({
+                                "name": name,
+                                "score": score,
+                                "severity": severity,
+                                "evidence": "",
+                                "confidence": 0.5,
+                                "suggestion": "",
+                            })
+            except json.JSONDecodeError:
+                pass
 
-        if reactions:
-            result["platform_reactions"] = {
-                r.platform: {
-                    "positive": r.positive,
-                    "neutral": r.neutral,
-                    "negative": r.negative,
-                }
-                for r in reactions
-            }
+        # 信号关联数据
+        signal_correlations = []
+        try:
+            from backend.models import HotspotCorrelationRecord
+            correlations = db.query(HotspotCorrelationRecord).filter(
+                HotspotCorrelationRecord.task_id == task_id
+            ).all()
+            for c in correlations:
+                signal_correlations.append({
+                    "signal_id": c.signal_id,
+                    "title": c.signal_title,
+                    "platform": c.signal_platform,
+                    "correlation_score": c.correlation_score,
+                    "risk_boost": c.risk_boost,
+                })
+        except Exception:
+            pass
 
-        result["suggestions"] = [
-            {"original": item.sentence or "", "suggestion": "", "dimension": item.dimension}
-            for item in risk_items
-            if item.sentence
-        ]
+        # 置信度计算
+        confidence = 0.8
+        uncertainty_sources = []
+        if summary.transcript_quality:
+            try:
+                tq = json.loads(summary.transcript_quality)
+                if tq.get("quality_level") not in ("clean", None):
+                    confidence -= 0.15
+                    uncertainty_sources.append("转写质量不佳")
+            except json.JSONDecodeError:
+                pass
+        if len(dimensions) < 3:
+            confidence -= 0.1
+            uncertainty_sources.append("评估维度不完整")
+
+        # 构建响应
+        result["overall_risk"] = summary.overall_score
+        result["risk_level"] = _score_to_risk_level(summary.overall_score)
+        result["method"] = "standard"
+        result["dimensions"] = dimensions
+        result["platform_reactions"] = {
+            r.platform: {"positive": r.positive, "neutral": r.neutral, "negative": r.negative}
+            for r in reactions
+        }
+        result["signal_correlations"] = signal_correlations
+        result["confidence"] = round(confidence, 2)
+        result["uncertainty_sources"] = uncertainty_sources
+
+        # 交叉效应
+        cross_effects = []
+        if summary.cross_effects:
+            try:
+                cross_effects = json.loads(summary.cross_effects)
+            except json.JSONDecodeError:
+                pass
+        result["cross_effects"] = cross_effects
+
+        # 改写建议
+        suggestions = []
+        if summary.rewrites_json:
+            try:
+                rewrites = json.loads(summary.rewrites_json)
+                for rw in rewrites:
+                    if isinstance(rw, dict):
+                        suggestions.append({
+                            "original": rw.get("original", ""),
+                            "suggestion": rw.get("suggestion", ""),
+                            "dimension": rw.get("dimension", ""),
+                        })
+            except json.JSONDecodeError:
+                pass
+        result["suggestions"] = suggestions
+
     elif task.status == "failed":
-        result["error"] = "分析失败"
+        result["error"] = task.error if hasattr(task, 'error') and task.error else "分析失败"
 
     return result
 
 
 @router.get("/review/{task_id}/progress", response_model=ProgressResponse)
 async def get_review_progress(task_id: str, db: Session = Depends(get_db)):
-    """获取分析进度"""
+    """获取分析进度
+
+    返回当前分析步骤和进度百分比
+    """
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
 
-    status_map = {
-        "processing": ("assessment", 0.3, "7维风险评估进行中"),
-        "completed": ("report", 1.0, "报告已生成"),
-        "failed": ("assessment", 0.0, "分析失败"),
+    # 从任务状态推断进度
+    step_progress_map = {
+        "pending": ("understanding", 0.0),
+        "processing": ("assessment", 0.3),
+        "signal": ("signal", 0.5),
+        "simulation": ("simulation", 0.7),
+        "reporting": ("report", 0.9),
+        "completed": ("report", 1.0),
+        "failed": ("report", 0.0),
     }
-    step, progress, detail = status_map.get(task.status, ("understanding", 0.1, "内容理解中"))
 
-    return ProgressResponse(task_id=task_id, current_step=step, progress=progress, detail=detail)
+    current_step, progress = step_progress_map.get(task.status, ("understanding", 0.0))
+
+    detail_map = {
+        "understanding": "正在理解内容...",
+        "assessment": "正在进行风险评估...",
+        "signal": "正在采集平台信号...",
+        "simulation": "正在推演平台反应...",
+        "report": "正在生成报告...",
+    }
+
+    return ProgressResponse(
+        task_id=task_id,
+        current_step=current_step,
+        progress=progress,
+        detail=detail_map.get(current_step, "处理中..."),
+        completed_dimensions=[],
+        remaining_dimensions=[]
+    )
 
 
-@router.get("/history")
-async def get_history(page: int = 1, per_page: int = 20, risk_level: str = None, db: Session = Depends(get_db)):
-    """历史记录"""
+@router.get("/history", response_model=HistoryResponse)
+async def get_history(
+    page: int = 1,
+    per_page: int = 20,
+    risk_level: str | None = None,
+    db: Session = Depends(get_db)
+):
+    """获取历史记录
+
+    支持分页和风险等级筛选
+    """
     query = db.query(Task).order_by(Task.created_at.desc())
-    total = query.count()
-    items = query.offset((page - 1) * per_page).limit(per_page).all()
 
-    result_items = []
-    for task in items:
-        summary = db.query(AnalysisSummary).filter(AnalysisSummary.task_id == task.id).first()
-        item = {
-            "task_id": task.id,
-            "status": task.status,
-            "created_at": str(task.created_at) if task.created_at else None,
+    # 风险等级筛选
+    if risk_level:
+        score_ranges = {
+            "green": (0, 25),
+            "yellow": (26, 55),
+            "orange": (56, 75),
+            "red": (76, 100),
         }
-        if summary:
-            item["overall_risk"] = summary.overall_score
-            item["risk_level"] = _score_to_level(summary.overall_score)
-        result_items.append(item)
+        if risk_level in score_ranges:
+            min_score, max_score = score_ranges[risk_level]
+            query = query.join(AnalysisSummary).filter(
+                AnalysisSummary.overall_score >= min_score,
+                AnalysisSummary.overall_score <= max_score
+            )
 
-    return {"total": total, "items": result_items}
+    # 分页
+    total = query.count()
+    tasks = query.offset((page - 1) * per_page).limit(per_page).all()
+
+    items: list[HistoryItemResponse] = []
+    for task in tasks:
+        risk_level_val = None
+        overall_risk = None
+        if task.status == "completed":
+            summary = db.query(AnalysisSummary).filter(AnalysisSummary.task_id == task.id).first()
+            if summary:
+                overall_risk = summary.overall_score
+                risk_level_val = _score_to_risk_level(summary.overall_score)
+
+        items.append(HistoryItemResponse(
+            task_id=task.id,
+            status=task.status,
+            created_at=task.created_at.isoformat() if task.created_at else None,
+            overall_risk=overall_risk,
+            risk_level=risk_level_val
+        ))
+
+    return HistoryResponse(total=total, items=items)
 
 
-@router.get("/models")
+@router.get("/models", response_model=ModelsResponse)
 async def get_models():
-    """当前可用模型列表（基于硬件自适应）"""
+    """获取当前可用模型和硬件等级"""
+    hardware_tier = "lite"
     try:
         import torch
-
-        has_gpu = torch.cuda.is_available()
-        if has_gpu:
-            vram_gb = torch.cuda.get_device_properties(0).total_mem // (1024**3)
-            tier = "pro" if vram_gb >= 24 else "standard" if vram_gb >= 12 else "lite"
-        else:
-            tier = "lite"
+        if torch.cuda.is_available():
+            gpu_mem = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+            if gpu_mem >= 24:
+                hardware_tier = "ultra"
+            elif gpu_mem >= 12:
+                hardware_tier = "pro"
+            elif gpu_mem >= 6:
+                hardware_tier = "standard"
     except ImportError:
-        tier = "lite"
+        pass
 
     models = {
-        "risk_assessment": {"primary": "deepseek-v4-pro", "fallback": "qwen3.6-plus"},
-        "persona_simulation": {"primary": "deepseek-v4-flash", "fallback": "qwen3.6-plus"},
-        "frame_understanding": {"primary": "qwen3-vl-plus", "fallback": "glm-5v-turbo"},
-        "ocr": {"primary": "glm-ocr" if tier != "lite" else "qwen3-vl-plus", "fallback": "paddleocr-vl-1.5"},
-        "audio_transcription": {
-            "primary": "faster-whisper-large-v3" if tier != "lite" else "aliyun-paraformer",
-            "fallback": "aliyun-paraformer",
+        "text_analysis": {
+            "primary": settings.DEEPSEEK_MODEL,
+            "fallback": "deepseek-chat"
         },
+        "vision": {
+            "primary": "qwen3-vl-plus",
+            "fallback": "glm-4v"
+        },
+        "audio": {
+            "primary": "paraformer",
+            "fallback": "faster-whisper-local"
+        }
     }
 
-    return {"hardware_tier": tier, "models": models}
+    return ModelsResponse(
+        hardware_tier=hardware_tier,
+        models=models
+    )
 
 
-def _score_to_level(score) -> str:
-    """将风险分数转换为等级"""
-    if score is None:
-        return "green"
-    score = int(score)
-    if score >= 75:
-        return "red"
-    elif score >= 55:
-        return "orange"
-    elif score >= 35:
-        return "yellow"
-    else:
-        return "green"
+# ═══════════════════════════════════════════════════════════════════════════════
+# 文件上传端点
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# 允许的视频文件类型
+ALLOWED_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/webm"}
+ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".webm"}
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 
 
-def _severity_to_score(severity: str) -> int:
-    """将severity字符串转换为数值分数(用于前端显示)"""
-    severity_map = {"critical": 95, "high": 80, "medium": 55, "low": 30, "safe": 10}
-    return severity_map.get(severity, 50)
+@router.post("/upload", response_model=UploadResponse)
+async def upload_file(file: UploadFile = File(...)):
+    """上传视频文件
+
+    支持格式: mp4, mov, avi, webm
+    最大大小: 100MB
+    """
+    # 验证文件类型
+    content_type = file.content_type or ""
+    file_ext = os.path.splitext(file.filename or "")[1].lower()
+
+    if content_type not in ALLOWED_VIDEO_TYPES and file_ext not in ALLOWED_VIDEO_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的文件类型: {content_type or file_ext}。仅支持: mp4, mov, avi, webm"
+        )
+
+    # 创建上传目录
+    upload_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+
+    # 生成唯一文件名
+    file_id = str(uuid.uuid4())[:8]
+    safe_filename = f"{file_id}_{file.filename or 'video.mp4'}"
+    file_path = os.path.join(upload_dir, safe_filename)
+
+    # 保存文件
+    try:
+        contents = await file.read()
+
+        # 验证文件大小
+        if len(contents) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"文件大小超过限制: {len(contents) / (1024*1024):.1f}MB > 100MB"
+            )
+
+        with open(file_path, "wb") as f:
+            f.write(contents)
+
+        return UploadResponse(
+            file_path=file_path,
+            file_name=file.filename or "video.mp4",
+            file_size=len(contents)
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("文件上传失败: %s", e)
+        raise HTTPException(status_code=500, detail=f"文件上传失败: {str(e)}")
+

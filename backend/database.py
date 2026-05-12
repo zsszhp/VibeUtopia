@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from sqlalchemy import create_engine
@@ -5,20 +6,23 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 from backend.config import settings
 
+logger = logging.getLogger(__name__)
+
 
 def _build_database_url() -> str:
     """构建数据库URL：MySQL优先，SQLite降级"""
     if settings.MYSQL_HOST:
-        # MySQL模式
-        url = (
-            f"mysql+pymysql://{settings.MYSQL_USER}:{settings.MYSQL_PASSWORD}"
-            f"@{settings.MYSQL_HOST}:{settings.MYSQL_PORT}/{settings.MYSQL_DATABASE}"
-            f"?charset=utf8mb4"
-        )
-        return url
-    else:
-        # SQLite模式（默认/降级）
-        return settings.DATABASE_URL
+        try:
+            import pymysql  # noqa: F401
+            url = (
+                f"mysql+pymysql://{settings.MYSQL_USER}:{settings.MYSQL_PASSWORD}"
+                f"@{settings.MYSQL_HOST}:{settings.MYSQL_PORT}/{settings.MYSQL_DATABASE}"
+                f"?charset=utf8mb4"
+            )
+            return url
+        except ImportError:
+            logger.warning("pymysql未安装，MySQL不可用，降级为SQLite")
+    return settings.DATABASE_URL
 
 
 def _create_engine(url: str):
@@ -26,14 +30,18 @@ def _create_engine(url: str):
     if url.startswith("sqlite"):
         return create_engine(url, connect_args={"check_same_thread": False})
     else:
-        # MySQL/其他数据库
-        return create_engine(
-            url,
-            pool_size=10,
-            max_overflow=20,
-            pool_recycle=3600,
-            pool_pre_ping=True,
-        )
+        try:
+            return create_engine(
+                url,
+                pool_size=10,
+                max_overflow=20,
+                pool_recycle=3600,
+                pool_pre_ping=True,
+            )
+        except Exception:
+            logger.warning("数据库引擎创建失败(%s)，降级为SQLite", url)
+            sqlite_url = "sqlite:///./data/vibeutopia.db"
+            return create_engine(sqlite_url, connect_args={"check_same_thread": False})
 
 
 DATABASE_URL = _build_database_url()

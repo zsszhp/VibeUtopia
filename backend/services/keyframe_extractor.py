@@ -211,7 +211,7 @@ class KeyframeExtractor:
                 if video_stream:
                     info["width"] = int(video_stream.get("width", 0))
                     info["height"] = int(video_stream.get("height", 0))
-                    info["fps"] = eval(video_stream.get("r_frame_rate", "25/1"))
+                    info["fps"] = self._parse_frame_rate(video_stream.get("r_frame_rate", "25/1"))
                     duration_str = probe.get("format", {}).get("duration", "0")
                     info["duration"] = float(duration_str)
                     info["total_frames"] = int(info["duration"] * info["fps"])
@@ -501,6 +501,17 @@ class KeyframeExtractor:
                 unique.append(frame)
 
         return unique
+
+    @staticmethod
+    def _parse_frame_rate(rate_str: str) -> float:
+        """安全解析帧率字符串（如 '25/1', '30000/1001'）"""
+        try:
+            if "/" in rate_str:
+                num, den = rate_str.split("/")
+                return float(num) / float(den) if float(den) != 0 else 25.0
+            return float(rate_str)
+        except (ValueError, ZeroDivisionError):
+            return 25.0
 
     @staticmethod
     def _hamming_distance(hash1: str, hash2: str) -> int:

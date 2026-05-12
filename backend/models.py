@@ -17,6 +17,9 @@ class Task(Base):
     text = Column(Text, nullable=False)
     status = Column(String, default="processing")
     model = Column(String)
+    error = Column(Text, nullable=True)
+    mode = Column(String, default="text")
+    depth = Column(String, default="standard")
     created_at = Column(DateTime, default=utcnow)
     completed_at = Column(DateTime, nullable=True)
 
@@ -367,4 +370,68 @@ class CompetitorCompareRecord(Base):
     content_gaps = Column(Text, default="[]")               # JSON: 内容缺口
     suggestions = Column(Text, default="[]")                # JSON: 差异化建议
     overall_assessment = Column(Text, default="")
+    created_at = Column(DateTime, default=utcnow)
+
+
+class HotspotCorrelationRecord(Base):
+    """热点关联记录"""
+    __tablename__ = "hotspot_correlations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_id = Column(String, index=True)
+    signal_id = Column(String, index=True)
+    signal_title = Column(String)
+    signal_platform = Column(String)
+    correlation_score = Column(Float, default=0.0)
+    correlation_type = Column(String, default="keyword")
+    risk_boost = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=utcnow)
+
+
+class EntityRiskChainRecord(Base):
+    """实体风险链记录"""
+    __tablename__ = "entity_risk_chains"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_id = Column(String, index=True)
+    entity_name = Column(String, index=True)
+    entity_type = Column(String)
+    risk_level = Column(String, default="safe")
+    chain_path = Column(Text, default="[]")
+    total_risk_score = Column(Float, default=0.0)
+    dimension_boosts = Column(Text, default="{}")
+    created_at = Column(DateTime, default=utcnow)
+
+
+class SimulationSummaryRecord(Base):
+    """仿真摘要记录"""
+    __tablename__ = "simulation_summaries"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_id = Column(String, index=True)
+    sim_id = Column(String, index=True)
+    total_agents = Column(Integer, default=0)
+    total_ticks = Column(Integer, default=0)
+    final_stage = Column(String, default="")
+    polarization_index = Column(Float, default=0.0)
+    reach_count = Column(Integer, default=0)
+    sentiment_summary = Column(Text, default="{}")
+    key_findings = Column(Text, default="[]")
+    risk_impact = Column(Text, default="{}")
+    created_at = Column(DateTime, default=utcnow)
+
+
+class BacktestComparisonRecord(Base):
+    """回测对比记录"""
+    __tablename__ = "backtest_comparisons"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_id = Column(String, index=True)
+    case_id = Column(String, index=True)
+    mvp_prediction = Column(Text, default="{}")
+    v2_prediction = Column(Text, default="{}")
+    actual_outcome = Column(Text, default="{}")
+    mvp_accuracy = Column(Float, default=0.0)
+    v2_accuracy = Column(Float, default=0.0)
+    improvement = Column(Float, default=0.0)
     created_at = Column(DateTime, default=utcnow)

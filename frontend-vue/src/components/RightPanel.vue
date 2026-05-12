@@ -1,5 +1,19 @@
 <template>
   <div class="right-panel">
+    <!-- 置信度与不确定性 -->
+    <section v-if="reviewStore.result?.confidence !== undefined" class="confidence-section">
+      <h3 class="section-title">评估置信度</h3>
+      <div class="confidence-row">
+        <div class="conf-bar-lg">
+          <div class="conf-fill-lg" :style="{ width: ((reviewStore.result.confidence ?? 0) * 100) + '%' }"></div>
+        </div>
+        <span class="conf-value">{{ ((reviewStore.result.confidence ?? 0) * 100).toFixed(0) }}%</span>
+      </div>
+      <div v-if="reviewStore.result.uncertainty_sources?.length" class="uncertainty-list">
+        <span v-for="src in reviewStore.result.uncertainty_sources" :key="src" class="uncertainty-tag">{{ src }}</span>
+      </div>
+    </section>
+
     <!-- 风险详情 -->
     <section class="risk-detail-section">
       <h3 class="section-title">风险详情</h3>
@@ -21,9 +35,9 @@
             <div class="confidence">
               <span>置信度:</span>
               <div class="conf-bar">
-                <div class="conf-fill" :style="{ width: (dim.confidence * 100) + '%' }"></div>
+                <div class="conf-fill" :style="{ width: ((dim.confidence ?? 0) * 100) + '%' }"></div>
               </div>
-              <span>{{ (dim.confidence * 100).toFixed(0) }}%</span>
+              <span>{{ ((dim.confidence ?? 0) * 100).toFixed(0) }}%</span>
             </div>
             <div v-if="dim.suggestion" class="suggestion">
               <span class="suggestion-label">建议:</span>
@@ -33,6 +47,30 @@
         </div>
       </div>
       <p v-else class="empty-hint">暂无风险数据</p>
+    </section>
+
+    <!-- 热点关联 -->
+    <section v-if="signalCorrelations?.length" class="signal-section">
+      <h3 class="section-title">热点关联</h3>
+      <div v-for="sc in signalCorrelations" :key="sc.signal_id" class="signal-item">
+        <div class="signal-header">
+          <span class="signal-platform">[{{ sc.platform }}]</span>
+          <span class="signal-title">{{ sc.title }}</span>
+        </div>
+        <div class="signal-meta">
+          <span class="signal-score">关联度: {{ (sc.correlation_score * 100).toFixed(0) }}%</span>
+          <span class="signal-boost">风险提升: +{{ (sc.risk_boost * 100).toFixed(0) }}%</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 交叉效应 -->
+    <section v-if="crossEffects?.length" class="cross-effects-section">
+      <h3 class="section-title">交叉风险</h3>
+      <div v-for="(ce, i) in crossEffects" :key="i" class="cross-effect-item">
+        <div class="ce-dims">{{ ce.dimensions?.join(' × ') }}</div>
+        <p class="ce-desc">{{ ce.description }}</p>
+      </div>
     </section>
 
     <!-- 修改建议 -->
@@ -49,15 +87,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useReviewStore } from '../stores'
-import { computed } from 'vue'
 
 const reviewStore = useReviewStore()
 const expanded = ref('')
 
 const dimensions = computed(() => reviewStore.result?.dimensions)
 const suggestions = computed(() => reviewStore.result?.suggestions)
+const signalCorrelations = computed(() => reviewStore.result?.signal_correlations)
+const crossEffects = computed(() => reviewStore.result?.cross_effects)
 </script>
 
 <style scoped>
@@ -73,6 +112,52 @@ const suggestions = computed(() => reviewStore.result?.suggestions)
   color: #888;
   margin-bottom: 8px;
   font-weight: 600;
+}
+
+.confidence-section { margin-bottom: 4px; }
+
+.confidence-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.conf-bar-lg {
+  flex: 1;
+  height: 8px;
+  background: #1e1e2e;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.conf-fill-lg {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.conf-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #8b5cf6;
+  min-width: 36px;
+  text-align: right;
+}
+
+.uncertainty-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.uncertainty-tag {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(234,179,8,0.15);
+  color: #eab308;
 }
 
 .risk-item {
@@ -140,6 +225,49 @@ const suggestions = computed(() => reviewStore.result?.suggestions)
 .suggestion { margin-top: 6px; }
 .suggestion-label { font-size: 11px; color: #6366f1; }
 .suggestion p { font-size: 12px; color: #aaa; margin-top: 2px; }
+
+.signal-section { margin-top: 4px; }
+
+.signal-item {
+  padding: 6px 8px;
+  background: #1a1a2e;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  border-left: 2px solid #f97316;
+}
+
+.signal-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.signal-platform { font-size: 10px; color: #f97316; font-weight: 600; }
+.signal-title { font-size: 12px; color: #ccc; }
+
+.signal-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: #888;
+}
+
+.signal-score { color: #6366f1; }
+.signal-boost { color: #ef4444; }
+
+.cross-effects-section { margin-top: 4px; }
+
+.cross-effect-item {
+  padding: 6px 8px;
+  background: #1a1a2e;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  border-left: 2px solid #ef4444;
+}
+
+.ce-dims { font-size: 11px; color: #ef4444; font-weight: 600; margin-bottom: 2px; }
+.ce-desc { font-size: 11px; color: #aaa; line-height: 1.4; }
 
 .suggestion-card {
   background: #1a1a2e;

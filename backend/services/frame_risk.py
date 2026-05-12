@@ -266,15 +266,27 @@ class FrameRiskAssessor:
         raise RuntimeError(f"所有视觉模型不可用，已尝试: {tried}")
 
     async def _call_direct_vision(self, image_base64: str) -> str:
-        """直接调用视觉API（降级模式）"""
+        """直接调用视觉API（降级模式）— 优先使用支持视觉的模型"""
         api_key = settings.DEEPSEEK_API_KEY
         base_url = settings.DEEPSEEK_BASE_URL
-        model = settings.DEEPSEEK_MODEL
 
         if not api_key:
             raise RuntimeError("API Key 未配置")
 
-        return await self._vision_api_call(base_url, api_key, model, image_base64)
+        vision_models = [
+            (settings.QWEN_API_KEY, settings.QWEN_BASE_URL, settings.QWEN_VL_MODEL),
+            (settings.GLM_API_KEY, settings.GLM_BASE_URL, getattr(settings, "GLM_VL_MODEL", "glm-4v-flash")),
+        ]
+
+        for v_api_key, v_base_url, v_model in vision_models:
+            if v_api_key and v_base_url and v_model:
+                try:
+                    return await self._vision_api_call(v_base_url, v_api_key, v_model, image_base64)
+                except Exception as e:
+                    logger.warning("视觉降级模型 %s 调用失败: %s", v_model, e)
+                    continue
+
+        raise RuntimeError("无可用的视觉模型API")
 
     async def _vision_api_call(self, base_url: str, api_key: str,
                                 model_id: str, image_base64: str) -> str:

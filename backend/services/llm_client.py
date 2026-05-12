@@ -80,21 +80,39 @@ class ModelRegistry:
 
         providers_config = config.get("providers", {})
         for provider_id, pcfg in providers_config.items():
-            api_key_env = pcfg.get("api_key_env", "")
+            prefix = provider_id.upper()
+            api_key_env = pcfg.get("api_key_env", f"{prefix}_API_KEY")
             api_key = os.getenv(api_key_env, "")
 
-            # 如果环境变量为空，尝试用 DEFAULT_PROVIDER/DEFAULT_MODEL 的兼容逻辑
+            # 如果环境变量为空，直接跳过该 provider
             if not api_key:
-                continue  # 无 key 的 provider 直接跳过
+                continue
 
-            base_url = pcfg.get("base_url", "")
+            # --- 动态覆盖逻辑 ---
+            # 1. 允许从 .env 覆盖 base_url
+            base_url = os.getenv(f"{prefix}_BASE_URL", pcfg.get("base_url", ""))
+            
+            # 2. 允许从 .env 指定该厂商的主力模型
+            env_model_id = os.getenv(f"{prefix}_MODEL", "")
+            
             provider_name = pcfg.get("name", provider_id)
             self.providers[provider_id] = pcfg
 
-            for mcfg in pcfg.get("models", []):
+            # 获取 YAML 中的模型定义
+            models_cfg = pcfg.get("models", [])
+            
+            # 如果 .env 指定了模型名，且该模型不在 YAML 列表中，将其作为 standard 级别加入
+            if env_model_id:
+                existing_model_ids = [m.get("id") for m in models_cfg]
+                if env_model_id not in existing_model_ids:
+                    # 插入到首位作为优先候选项
+                    models_cfg.insert(0, {"id": env_model_id, "tier": "standard"})
+
+            for mcfg in models_cfg:
+                m_id = mcfg.get("id", "")
                 ep = ModelEndpoint(
                     provider=provider_id,
-                    model_id=mcfg.get("id", ""),
+                    model_id=m_id,
                     base_url=base_url,
                     api_key=api_key,
                     tier=mcfg.get("tier", "standard"),
@@ -104,7 +122,7 @@ class ModelRegistry:
                 self.endpoints.append(ep)
 
         logger.info(
-            "模型配置加载完成: %d 个 provider, %d 个可用模型",
+            "模型配置加载完成: %d 个 provider, %d 个可用模型 (支持 .env 动态覆盖)",
             len(self.providers),
             len(self.endpoints),
         )

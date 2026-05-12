@@ -7,6 +7,7 @@ from backend.database import init_db
 from backend.routes import router
 from backend.services.signal.scheduler import SignalScheduler
 from backend.services.graph.graph_store import GraphStore
+from backend.services.analyzer import set_broadcast_func
 from backend.config import settings
 
 # 全局调度器实例
@@ -29,6 +30,8 @@ async def lifespan(app: FastAPI):
     init_db()
     # 尝试连接 Neo4j
     graph_store.connect()
+    # 注入WebSocket广播函数到analyzer
+    set_broadcast_func(broadcast_review_update)
     yield
     # 关闭时停止调度器
     if signal_scheduler.is_running:

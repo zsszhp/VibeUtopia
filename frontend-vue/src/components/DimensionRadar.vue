@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
 import type { RiskDimension } from '../api'
 
@@ -11,9 +11,14 @@ const props = defineProps<{ dimensions: RiskDimension[] }>()
 const radarRef = ref<HTMLElement>()
 let chart: echarts.ECharts | null = null
 
+function handleResize() { chart?.resize() }
+
 function render() {
   if (!radarRef.value || !props.dimensions?.length) return
-  if (!chart) chart = echarts.init(radarRef.value, 'dark')
+  if (!chart) {
+    chart = echarts.init(radarRef.value, 'dark')
+    window.addEventListener('resize', handleResize)
+  }
   chart.setOption({
     radar: {
       indicator: props.dimensions.map(d => ({ name: d.name, max: 100 })),
@@ -35,4 +40,9 @@ function render() {
 
 onMounted(render)
 watch(() => props.dimensions, render, { deep: true })
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+  chart?.dispose()
+  chart = null
+})
 </script>

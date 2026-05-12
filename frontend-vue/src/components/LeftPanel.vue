@@ -30,13 +30,20 @@
         <div class="drop-zone" @dragover.prevent @drop.prevent="handleDrop">
           <p>拖拽视频文件到此处</p>
           <p class="hint">支持 mp4/mov/avi 格式</p>
-          <input type="file" accept="video/*" multiple @change="handleFileSelect" class="file-input" />
-          <button class="select-btn" @click="($refs.fileInput as HTMLInputElement)?.click()">选择文件</button>
+          <input type="file" accept="video/*" multiple ref="fileInput" @change="handleFileSelect" class="file-input" />
+          <button class="select-btn" @click="fileInput?.click()">选择文件</button>
         </div>
         <div v-if="videoFiles.length" class="file-list">
           <div v-for="(f, i) in videoFiles" :key="i" class="file-item">
             <span>{{ f.name }}</span>
-            <button class="remove-btn" @click="videoFiles.splice(i, 1)">x</button>
+            <!-- 上传进度条 -->
+            <div v-if="uploadProgress[f.name] !== undefined" class="upload-progress">
+              <div class="progress-bar">
+                <div class="progress-fill" :style="{ width: uploadProgress[f.name] + '%' }"></div>
+              </div>
+              <span class="progress-text">{{ uploadProgress[f.name] }}%</span>
+            </div>
+            <button v-else class="remove-btn" @click="videoFiles.splice(i, 1)">x</button>
           </div>
         </div>
       </div>
@@ -49,8 +56,8 @@
           rows="4"
           class="text-input"
         ></textarea>
-        <input type="file" accept="video/*" multiple @change="handleFileSelect" class="file-input" />
-        <button class="select-btn" @click="($refs.fileInput as HTMLInputElement)?.click()">添加视频</button>
+        <input type="file" accept="video/*" multiple ref="fileInput" @change="handleFileSelect" class="file-input" />
+        <button class="select-btn" @click="fileInput?.click()">添加视频</button>
       </div>
 
       <!-- 分析选项 -->
@@ -66,10 +73,10 @@
 
       <button
         class="submit-btn"
-        :disabled="!canSubmit || reviewStore.loading"
+        :disabled="!canSubmit || reviewStore.loading || isUploading"
         @click="handleSubmit"
       >
-        {{ reviewStore.loading ? '分析中...' : '开始预审' }}
+        {{ isUploading ? '上传中...' : reviewStore.loading ? '分析中...' : '开始预审' }}
       </button>
     </section>
 
@@ -107,6 +114,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useReviewStore, useHistoryStore } from '../stores'
+import { api } from '../api'
 
 const reviewStore = useReviewStore()
 const historyStore = useHistoryStore()
@@ -115,6 +123,9 @@ const inputMode = ref<'text' | 'video' | 'mixed'>('text')
 const textContent = ref('')
 const videoFiles = ref<File[]>([])
 const depth = ref<'quick' | 'standard' | 'deep' | 'large_scale'>('standard')
+const uploadProgress = ref<Record<string, number>>({})
+const isUploading = ref(false)
+const fileInput = ref<HTMLInputElement>()
 
 const modes = [
   { key: 'text' as const, label: '文本' },
@@ -137,14 +148,41 @@ function handleDrop(e: DragEvent) {
   if (e.dataTransfer?.files) videoFiles.value.push(...Array.from(e.dataTransfer.files))
 }
 
+async function uploadVideoFiles(): Promise<string[]> {
+  if (videoFiles.value.length === 0) return []
+
+  isUploading.value = true
+  const uploadedPaths: string[] = []
+
+  try {
+    for (const file of videoFiles.value) {
+      const resp = await api.uploadFile(file, (percent) => {
+        uploadProgress.value[file.name] = percent
+      })
+      uploadedPaths.push(resp.data.file_path)
+    }
+  } finally {
+    isUploading.value = false
+    uploadProgress.value = {}
+  }
+
+  return uploadedPaths
+}
+
 async function handleSubmit() {
+  // 先上传视频文件
+  let videoPaths: string[] = []
+  if (videoFiles.value.length > 0) {
+    videoPaths = await uploadVideoFiles()
+  }
+
   const texts = textContent.value.trim()
     ? [{ type: 'text', content: textContent.value.trim() }]
     : []
 
   await reviewStore.submitReview({
     mode: inputMode.value,
-    video_files: videoFiles.value.map(f => f.name),
+    video_files: videoPaths,
     texts,
     options: { depth: depth.value },
   })
@@ -160,10 +198,9 @@ function formatTime(t: string | null) {
 }
 
 const platforms = [
-  '抖音', '微博', '小红书', 'B站', '快手', '微信', '知乎',
-  '今日头条', '豆瓣', '贴吧', '淘宝', '拼多多', '闲鱼', '得物',
-  '虎扑', '公众号', '视频号', 'QQ', 'Facebook', 'Twitter', 'TikTok',
-  'Instagram', 'YouTube', 'Reddit', 'LinkedIn',
+  '抖音', '微博', '小红书', 'B站', '快手', '知乎', '微信视频号',
+  '今日头条', '豆瓣', '贴吧', '虎扑', '公众号',
+  'Facebook', 'Twitter', 'TikTok', 'Instagram', 'YouTube', 'Reddit',
 ]
 
 historyStore.fetchHistory()
@@ -264,6 +301,35 @@ historyStore.fetchHistory()
   color: #ef4444;
   cursor: pointer;
   font-size: 12px;
+}
+
+.upload-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 4px;
+  background: #2a2a3e;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+.progress-text {
+  font-size: 10px;
+  color: #888;
+  min-width: 28px;
+  text-align: right;
 }
 
 .options {

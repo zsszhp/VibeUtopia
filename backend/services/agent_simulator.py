@@ -17,6 +17,9 @@ PLATFORM_NAMES = {
     "xiaohongshu": "小红书",
     "zhihu": "知乎",
     "douyin": "抖音",
+    "weibo": "微博",
+    "kuaishou": "快手",
+    "wechat_channels": "微信视频号",
 }
 
 logger = logging.getLogger(__name__)

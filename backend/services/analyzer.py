@@ -15,6 +15,54 @@ from backend.services.transcript_detector import detect_transcript_quality, is_n
 
 logger = logging.getLogger(__name__)
 
+# WebSocket广播函数（由main.py注入）
+_broadcast_func = None
+
+
+def set_broadcast_func(func):
+    """设置WebSocket广播函数"""
+    global _broadcast_func
+    _broadcast_func = func
+
+
+async def _broadcast_step(task_id: str, step: str, progress: float, detail: str, completed_dims: list = None, remaining_dims: list = None):
+    """广播步骤更新"""
+    if _broadcast_func:
+        await _broadcast_func(task_id, {
+            "type": "step_update",
+            "task_id": task_id,
+            "step": step,
+            "progress": progress,
+            "detail": detail,
+            "completed_dimensions": completed_dims or [],
+            "remaining_dimensions": remaining_dims or [],
+        })
+
+
+async def _broadcast_risk_alert(task_id: str, dimension: str, score: int, severity: str, evidence: str):
+    """广播风险预警"""
+    if _broadcast_func:
+        await _broadcast_func(task_id, {
+            "type": "risk_alert",
+            "task_id": task_id,
+            "dimension": dimension,
+            "score": score,
+            "severity": severity,
+            "evidence": evidence,
+        })
+
+
+async def _broadcast_complete(task_id: str, risk_level: str, overall_risk: int, dimensions_count: int):
+    """广播分析完成"""
+    if _broadcast_func:
+        await _broadcast_func(task_id, {
+            "type": "review_complete",
+            "task_id": task_id,
+            "risk_level": risk_level,
+            "overall_risk": overall_risk,
+            "dimensions_count": dimensions_count,
+        })
+
 MAX_TEXT_LENGTH = 5000
 
 # 维度默认权重（高风险维度权重更高）
@@ -126,29 +174,92 @@ def _compute_sentiment_ratios(pr: dict) -> tuple[float, float, float]:
 
 
 async def run_analysis(task_id: str, text: str):
-    """编排整个分析流程"""
+    """编排整个分析流程 - 集成WebSocket进度推送"""
     db: Session = SessionLocal()
     try:
-        # 1. 文本切分
+        # ═══════════════════════════════════════════════════════════════════════
+        # 步骤1: 内容理解 (0% - 15%)
+        # ═══════════════════════════════════════════════════════════════════════
+        await _broadcast_step(task_id, "understanding", 0.05, "正在理解内容结构...")
+
         sentences = split_text(text)
         logger.info("任务 %s: 文本切分为 %d 个句子", task_id, len(sentences))
+        await _broadcast_step(task_id, "understanding", 0.1, f"内容已切分为{len(sentences)}个句子")
 
-        # 2. 转写质量检测（新增步骤）
+        # 转写质量检测
+        await _broadcast_step(task_id, "understanding", 0.12, "正在检测内容质量...")
         transcript_quality = await detect_transcript_quality(text, sentences)
         tq_level = transcript_quality.get("quality_level", "clean")
         logger.info(
             "任务 %s: 转写质量检测完成，等级=%s，分数=%d",
             task_id, tq_level, transcript_quality.get("quality_score", 100),
         )
+        await _broadcast_step(task_id, "understanding", 0.15, f"内容质量检测完成: {tq_level}")
 
-        # 3. 并行执行Agent人格模拟 + 风险评估（传入转写质量信息）
-        platform_results, risk_results = await asyncio.gather(
-            simulate_all_platforms_with_agents(text),
-            assess_risks(text, transcript_quality=transcript_quality),
-        )
+        # ═══════════════════════════════════════════════════════════════════════
+        # 步骤2: 风险评估 (15% - 50%)
+        # ═══════════════════════════════════════════════════════════════════════
+        await _broadcast_step(task_id, "assessment", 0.2, "开始进行风险评估...")
 
-        # 4. 并行对高风险句子生成改写（区分转写噪声）
+        # 先启动风险评估获取维度列表
+        risk_results = await assess_risks(text, transcript_quality=transcript_quality)
+        dimensions = risk_results.get("dimensions", [])
         risk_sentences = risk_results.get("risk_sentences", [])
+
+        # 广播各维度评估进度
+        dimension_names = [d.get("name", "") for d in dimensions]
+        completed_dims = []
+        for i, dim in enumerate(dimensions):
+            dim_name = dim.get("name", f"维度{i+1}")
+            progress = 0.2 + (i + 1) / len(dimensions) * 0.25 if dimensions else 0.3
+            await _broadcast_step(
+                task_id, "assessment", progress,
+                f"正在评估: {dim_name}",
+                completed_dims.copy(),
+                dimension_names[i+1:]
+            )
+            completed_dims.append(dim_name)
+
+            # 高风险维度发送预警
+            if dim.get("severity") in ("high", "critical"):
+                await _broadcast_risk_alert(
+                    task_id,
+                    dim_name,
+                    dim.get("score", 0),
+                    dim.get("severity", "high"),
+                    dim.get("evidence", "")[:100]
+                )
+
+        await _broadcast_step(task_id, "assessment", 0.5, "风险评估完成", dimension_names, [])
+
+        # ═══════════════════════════════════════════════════════════════════════
+        # 步骤3: 信号采集 (50% - 60%)
+        # ═══════════════════════════════════════════════════════════════════════
+        await _broadcast_step(task_id, "signal", 0.55, "正在采集平台热点信号...")
+        signal_correlations = []
+        try:
+            from backend.services.signal_matcher import SignalMatcher
+            matcher = SignalMatcher()
+            signal_result = await matcher.match(text)
+            signal_correlations = signal_result.matches
+            if signal_correlations:
+                await _broadcast_step(
+                    task_id, "signal", 0.58,
+                    f"发现{len(signal_correlations)}个热点关联",
+                )
+        except Exception as e:
+            logger.warning("信号采集失败(降级继续): %s", e)
+        await _broadcast_step(task_id, "signal", 0.6, "信号采集完成")
+
+        # ═══════════════════════════════════════════════════════════════════════
+        # 步骤4: 仿真推演 (60% - 85%)
+        # ═══════════════════════════════════════════════════════════════════════
+        await _broadcast_step(task_id, "simulation", 0.65, "正在推演平台用户反应...")
+        platform_results = await simulate_all_platforms_with_agents(text)
+        await _broadcast_step(task_id, "simulation", 0.8, "平台反应推演完成")
+
+        # 并行对高风险句子生成改写
+        await _broadcast_step(task_id, "simulation", 0.82, "正在生成改写建议...")
         rewrite_tasks = [
             rewrite_sentence(
                 rs.get("sentence", ""),
@@ -161,10 +272,30 @@ async def run_analysis(task_id: str, text: str):
         ]
         rewrites = await asyncio.gather(*rewrite_tasks, return_exceptions=True)
         rewrites = [r for r in rewrites if not isinstance(r, Exception)]
+        await _broadcast_step(task_id, "simulation", 0.85, "改写建议生成完成")
 
-        # 5. 加权评分（替代简单算术平均）
-        dimensions = risk_results.get("dimensions", [])
+        # ═══════════════════════════════════════════════════════════════════════
+        # 步骤5: 报告生成 (85% - 100%)
+        # ═══════════════════════════════════════════════════════════════════════
+        await _broadcast_step(task_id, "report", 0.88, "正在计算综合评分...")
+
+        # 加权评分
         overall_score, dimension_weights, auto_cross_effects = calculate_overall_score(dimensions)
+
+        # 信号关联风险提升
+        signal_risk_boost = 0.0
+        signal_dimension_boosts = {}
+        if signal_correlations:
+            from backend.services.signal_matcher import SignalMatchResult
+            if hasattr(signal_result, 'overall_risk_boost'):
+                signal_risk_boost = signal_result.overall_risk_boost
+                signal_dimension_boosts = signal_result.risk_dimension_boosts
+            for dim in dimensions:
+                dim_name = dim.get("name", "")
+                if dim_name in signal_dimension_boosts:
+                    boost = signal_dimension_boosts[dim_name]
+                    dim["score"] = min(100, int(dim.get("score", 0) + boost * 20))
+            overall_score = min(100, int(overall_score + signal_risk_boost * 15))
 
         # 合并自动交叉效应和LLM识别的交叉效应
         llm_cross_effects = risk_results.get("cross_effects", [])
@@ -174,6 +305,17 @@ async def run_analysis(task_id: str, text: str):
         ]
 
         suggestion = get_suggestion(overall_score)
+
+        # 计算风险等级
+        risk_level = "green"
+        if overall_score > 75:
+            risk_level = "red"
+        elif overall_score > 55:
+            risk_level = "orange"
+        elif overall_score > 25:
+            risk_level = "yellow"
+
+        await _broadcast_step(task_id, "report", 0.92, "正在保存分析结果...")
 
         # 6. 存储结果
         for rs in risk_sentences:
@@ -186,6 +328,20 @@ async def run_analysis(task_id: str, text: str):
                 affected_groups=",".join(rs.get("affected_groups", [])) if rs.get("affected_groups") else None,
                 dimension_weight=rs.get("dimension_weight"),
             ))
+
+        # 保存信号关联结果
+        if signal_correlations:
+            from backend.models import HotspotCorrelationRecord
+            for sc in signal_correlations:
+                db.add(HotspotCorrelationRecord(
+                    task_id=task_id,
+                    signal_id=sc.signal_id,
+                    signal_title=sc.title,
+                    signal_platform=sc.source_platform,
+                    correlation_score=sc.relevance_score,
+                    correlation_type=sc.signal_type,
+                    risk_boost=sc.relevance_score * 0.2,
+                ))
 
         for pr in platform_results:
             positive, neutral, negative = _compute_sentiment_ratios(pr)
@@ -219,7 +375,19 @@ async def run_analysis(task_id: str, text: str):
             for ad in pr.get("agent_details", []):
                 all_agent_details.append(ad)
 
-        dimensions_dict = {d.get("name", ""): d.get("score", 0) for d in dimensions}
+        dimensions_dict = {}
+        for d in dimensions:
+            dim_name = d.get("name", "")
+            dimensions_dict[dim_name] = {
+                "score": d.get("score", 0),
+                "severity": d.get("severity", "low"),
+                "evidence": d.get("evidence", ""),
+                "evidence_source": d.get("evidence_source", {}),
+                "confidence": d.get("confidence", 0.8),
+                "suggestion": d.get("suggestion", ""),
+                "affected_groups": d.get("affected_groups", []),
+                "dimension_weight": d.get("dimension_weight", DIMENSION_WEIGHTS.get(dim_name, 1.0)),
+            }
         db.add(AnalysisSummary(
             task_id=task_id,
             overall_score=overall_score,
@@ -240,13 +408,25 @@ async def run_analysis(task_id: str, text: str):
         db.commit()
         logger.info("任务 %s: 分析完成，总分 %d，建议 %s，转写质量 %s", task_id, overall_score, suggestion, tq_level)
 
+        # 广播分析完成
+        await _broadcast_step(task_id, "report", 1.0, "分析完成")
+        await _broadcast_complete(task_id, risk_level, overall_score, len(dimensions))
+
     except Exception as e:
         logger.error("任务 %s: 分析失败 - %s", task_id, e)
         try:
             task = db.query(Task).filter(Task.id == task_id).first()
             if task:
                 task.status = "failed"
+                task.error = str(e)
                 db.commit()
+            # 广播失败
+            if _broadcast_func:
+                await _broadcast_func(task_id, {
+                    "type": "error",
+                    "task_id": task_id,
+                    "error": str(e),
+                })
         except Exception:
             db.rollback()
     finally:
