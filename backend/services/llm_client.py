@@ -39,6 +39,7 @@ class ModelEndpoint:
     tier: str
     provider_name: str = ""
     vision: bool = False  # 是否支持视觉/多模态
+    text: bool = True  # 是否支持纯文本任务（Omni类模型设为False）
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +119,7 @@ class ModelRegistry:
                     tier=mcfg.get("tier", "standard"),
                     provider_name=provider_name,
                     vision=mcfg.get("vision", False),
+                    text=mcfg.get("text", True),
                 )
                 self.endpoints.append(ep)
 
@@ -140,8 +142,13 @@ class ModelRegistry:
         tier: str | None = None,
         provider: str | None = None,
         exclude: set[str] | None = None,
+        text_only: bool = False,
     ) -> list[ModelEndpoint]:
-        """获取符合条件的端点列表"""
+        """获取符合条件的端点列表
+        
+        Args:
+            text_only: 如果为True，只返回支持纯文本任务的端点
+        """
         result = []
         for ep in self.endpoints:
             if tier and ep.tier != tier:
@@ -149,6 +156,8 @@ class ModelRegistry:
             if provider and ep.provider != provider:
                 continue
             if exclude and f"{ep.provider}:{ep.model_id}" in exclude:
+                continue
+            if text_only and not ep.text:
                 continue
             result.append(ep)
         return result
@@ -234,7 +243,7 @@ class ModelRouter:
 
     def _find_override(self, tier: str, exclude: set[str], provider: str, model: str) -> ModelEndpoint | None:
         """查找指定的覆盖模型"""
-        for ep in self.registry.get_endpoints():
+        for ep in self.registry.get_endpoints(text_only=True):
             key = f"{ep.provider}:{ep.model_id}"
             if key in exclude:
                 continue
@@ -254,14 +263,14 @@ class ModelRouter:
 
         # 同 provider 同 tier
         if strategy.get("same_provider_same_tier", True):
-            for ep in self.registry.get_endpoints(tier=tier, exclude=exclude):
+            for ep in self.registry.get_endpoints(tier=tier, exclude=exclude, text_only=True):
                 if self.is_available(ep.provider, ep.model_id):
                     candidates.append(ep)
 
         # 同 provider 低 tier
         if strategy.get("same_provider_lower_tier", True):
             for lower_tier in self.TIER_ORDER[tier_idx + 1:]:
-                for ep in self.registry.get_endpoints(tier=lower_tier, exclude=exclude):
+                for ep in self.registry.get_endpoints(tier=lower_tier, exclude=exclude, text_only=True):
                     if self.is_available(ep.provider, ep.model_id):
                         # 避免重复（前面的 tier 可能已包含）
                         if ep not in candidates:
@@ -275,7 +284,7 @@ class ModelRouter:
         # 跨 provider 低 tier（补充前面未覆盖的低 tier 跨 provider）
         if strategy.get("cross_provider_lower_tier", True):
             for lower_tier in self.TIER_ORDER[tier_idx + 1:]:
-                for ep in self.registry.get_endpoints(tier=lower_tier, exclude=exclude):
+                for ep in self.registry.get_endpoints(tier=lower_tier, exclude=exclude, text_only=True):
                     if self.is_available(ep.provider, ep.model_id) and ep not in candidates:
                         candidates.append(ep)
 

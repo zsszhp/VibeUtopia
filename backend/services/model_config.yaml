@@ -9,6 +9,12 @@ providers:
     models:
       - id: "LongCat-Flash-Thinking-2601"
         tier: advanced
+      - id: "LongCat-Flash-Omni-2603"
+        tier: advanced
+        vision: true
+        text: false
+      - id: "LongCat-Flash-Chat"
+        tier: standard
       - id: "LongCat-Flash-Lite"
         tier: standard
 
@@ -72,12 +78,12 @@ providers:
 task_tier_mapping:
   risk_assessment: advanced
   persona_simulation: standard
-  transcript_detection: lite
+  transcript_detection: standard
   persona_generation: standard
   life_story_generation: advanced
   memory_reflection: standard
   agent_simulation: standard
-  rewrite: lite
+  rewrite: standard
   ocr: advanced
   visual_risk: advanced
   cross_modal: standard
