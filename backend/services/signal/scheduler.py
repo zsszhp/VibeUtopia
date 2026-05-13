@@ -80,7 +80,10 @@ class SignalScheduler:
         """加载平台ID到名称的映射"""
         platforms = self.config.get("signal", {}).get("hotlist", {}).get("platforms", [])
         for p in platforms:
-            self._platform_map[p.get("id", "")] = p.get("name", p.get("id", ""))
+            if isinstance(p, dict):
+                self._platform_map[p.get("id", "")] = p.get("name", p.get("id", ""))
+            else:
+                self._platform_map[str(p)] = str(p)
 
     @property
     def is_running(self) -> bool:

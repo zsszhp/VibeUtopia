@@ -16,9 +16,10 @@ env/
 .env
 
 # 数据库
-data/
-*.db
-*.sqlite3
+data/*.db
+data/*.sqlite3
+data/chroma/
+data/uploads/
 
 # IDE
 .idea/
@@ -42,5 +43,5 @@ files/
 # 图标素材 (非代码)
 icon/
 
-#测试文件
-tests/
+# 测试源码 (保留测试脚本, 排除运行时数据)
+!tests/
