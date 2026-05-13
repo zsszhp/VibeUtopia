@@ -21,7 +21,7 @@ class RiskChainNode:
     entity_type: str = ""           # Person/Brand/Organization/Event/Topic
     risk_level: str = "low"         # low / medium / high
     controversy: str = ""           # 关联争议描述
-   传导概率: float = 0.0            # 从上一个节点传导到此节点的概率
+    transition_prob: float = 0.0    # 从上一个节点传导到此节点的概率
 
 
 @dataclass
@@ -91,7 +91,7 @@ RISK_CHAIN_PROMPT = """以下是文案中的命名实体和已知的相关信息
                     "entity_type": "Brand",
                     "risk_level": "high",
                     "controversy": "该品牌近期陷入XX争议",
-                    "传导概率": 0.7
+                    "transition_prob": 0.7
                 }}
             ],
             "total_risk_score": 0.8,
@@ -251,7 +251,7 @@ class EntityRiskChain:
                         entity_type=p.get("entity_type", ""),
                         risk_level=p.get("risk_level", "low"),
                         controversy=p.get("controversy", ""),
-                        传导概率=min(1.0, max(0.0, p.get("传导概率", 0.0))),
+                        transition_prob=min(1.0, max(0.0, p.get("transition_prob", 0.0))),
                     ))
 
                 chains.append(RiskChain(
@@ -304,7 +304,7 @@ class EntityRiskChain:
                             entity_type="Unknown",
                             risk_level="medium",
                             controversy=f"实体包含{dim}相关关键词",
-                            传导概率=0.5,
+                            transition_prob=0.5,
                         )],
                         total_risk_score=0.4,
                         risk_dimensions=[dim],
@@ -319,3 +319,21 @@ class EntityRiskChain:
             risk_dimension_boosts=dimension_boosts,
             analysis_summary=f"识别到 {len(chains)} 条潜在风险链（降级模式）" if chains else "未发现明显风险链",
         )
+
+
+# ---------------------------------------------------------------------------
+# 顶层便捷函数
+# ---------------------------------------------------------------------------
+
+async def analyze_entity_risk_chain(text: str, max_depth: int = 3) -> EntityRiskChainResult:
+    """顶层便捷函数：从文案分析实体风险链
+
+    Args:
+        text: 用户输入的文案
+        max_depth: 风险链最大深度
+
+    Returns:
+        EntityRiskChainResult: 实体风险链结果
+    """
+    analyzer = EntityRiskChain()
+    return await analyzer.trace(text, max_depth=max_depth)

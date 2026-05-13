@@ -274,9 +274,55 @@ async def run_analysis(task_id: str, text: str):
         await _broadcast_step(task_id, "signal", 0.6, "信号采集完成")
 
         # ═══════════════════════════════════════════════════════════════════════
-        # 步骤4: 仿真推演 (60% - 85%)
+        # 步骤3.5: 实体风险链分析 (60% - 65%)
         # ═══════════════════════════════════════════════════════════════════════
-        await _broadcast_step(task_id, "simulation", 0.65, "正在推演平台用户反应...")
+        await _broadcast_step(task_id, "entity_chain", 0.62, "正在分析实体风险传导链...")
+        entity_chain_result = None
+        entity_dimension_boosts = {}
+        try:
+            from backend.services.entity_risk_chain import analyze_entity_risk_chain
+            entity_chain_result = await analyze_entity_risk_chain(text)
+            if entity_chain_result and entity_chain_result.chains:
+                entity_dimension_boosts = entity_chain_result.risk_dimension_boosts
+                await _broadcast_step(
+                    task_id, "entity_chain", 0.65,
+                    f"发现{len(entity_chain_result.chains)}条风险传导链",
+                )
+            else:
+                await _broadcast_step(task_id, "entity_chain", 0.65, "未发现显著风险传导链")
+        except Exception as e:
+            logger.warning("实体风险链分析失败(降级继续): %s", e)
+
+        # ═══════════════════════════════════════════════════════════════════════
+        # 步骤3.6: 动态权重调整 (65% - 68%)
+        # ═══════════════════════════════════════════════════════════════════════
+        await _broadcast_step(task_id, "dynamic_weights", 0.66, "正在调整风险维度权重...")
+        signal_dimension_boosts = {}
+        if signal_correlations:
+            from backend.services.signal_matcher import SignalMatchResult
+            if hasattr(signal_result, 'risk_dimension_boosts'):
+                signal_dimension_boosts = signal_result.risk_dimension_boosts
+
+        try:
+            from backend.services.dynamic_weights import DynamicWeights
+            dw = DynamicWeights()
+            weights_result = dw.adjust(
+                signal_dimension_boosts=signal_dimension_boosts,
+                entity_dimension_boosts=entity_dimension_boosts,
+            )
+            # 应用动态权重到维度结果
+            for dim in dimensions:
+                dim_name = dim.get("name", "")
+                if dim_name in weights_result.adjusted_weights:
+                    dim["dimension_weight"] = weights_result.adjusted_weights[dim_name]
+            await _broadcast_step(task_id, "dynamic_weights", 0.68, "动态权重调整完成")
+        except Exception as e:
+            logger.warning("动态权重调整失败(降级继续): %s", e)
+
+        # ═══════════════════════════════════════════════════════════════════════
+        # 步骤4: 仿真推演 (68% - 85%)
+        # ═══════════════════════════════════════════════════════════════════════
+        await _broadcast_step(task_id, "simulation", 0.70, "正在推演平台用户反应...")
         platform_results = await simulate_all_platforms_with_agents(text)
         await _broadcast_step(task_id, "simulation", 0.8, "平台反应推演完成")
 
