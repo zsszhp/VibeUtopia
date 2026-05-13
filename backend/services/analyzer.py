@@ -84,6 +84,8 @@ def calculate_overall_score(dimensions: list[dict]) -> tuple[int, dict, list[dic
     1. 高风险维度（政治敏感、法律合规、民族宗教）权重更高
     2. 任一维度HIGH则整体评分不低于50
     3. 多维度同时HIGH则交叉叠加+15
+    4. 新增：最高分维度优先机制，避免平均分稀释高风险
+    5. 新增：红线维度（政治/法律/民族）分数放大1.5倍计入总体
 
     Returns:
         tuple: (overall_score, dimension_weights, cross_effects)
@@ -91,11 +93,16 @@ def calculate_overall_score(dimensions: list[dict]) -> tuple[int, dict, list[dic
     if not dimensions:
         return 0, {}, []
 
+    # 红线维度列表（触碰即高风险）
+    REDLINE_DIMS = {"政治敏感", "法律合规", "民族宗教"}
+
     # 收集各维度分数和权重
     weighted_sum = 0.0
     weight_total = 0.0
     dimension_weights = {}
     high_dims = []
+    max_score = 0
+    redline_max = 0
     cross_effects = []
 
     for d in dimensions:
@@ -106,8 +113,16 @@ def calculate_overall_score(dimensions: list[dict]) -> tuple[int, dict, list[dic
         weight = d.get("dimension_weight", DIMENSION_WEIGHTS.get(name, 1.0))
         dimension_weights[name] = weight
 
-        weighted_sum += score * weight
+        # 红线维度分数放大1.5倍
+        if name in REDLINE_DIMS:
+            adjusted_score = min(100, int(score * 1.5))
+            redline_max = max(redline_max, adjusted_score)
+        else:
+            adjusted_score = score
+
+        weighted_sum += adjusted_score * weight
         weight_total += weight
+        max_score = max(max_score, score)
 
         if severity == "high":
             high_dims.append(name)
@@ -118,7 +133,14 @@ def calculate_overall_score(dimensions: list[dict]) -> tuple[int, dict, list[dic
     else:
         avg = 0
 
-    overall = min(100, max(0, int(avg)))
+    # 总体分数 = max(加权平均, 最高分×0.8, 红线最高分×0.6)
+    # 这样确保高风险维度不被平均分稀释
+    overall = max(
+        int(avg),
+        int(max_score * 0.8),
+        int(redline_max * 0.6)
+    )
+    overall = min(100, max(0, overall))
 
     # 规则1：任一维度HIGH，整体不低于50
     if high_dims and overall < 50:
