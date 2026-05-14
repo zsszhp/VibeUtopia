@@ -28,6 +28,11 @@ from backend.services.hardware_detector import (
 from backend.services.llm_client import call_llm, call_vlm, parse_llm_json
 from backend.services.persona.life_story_generator import PersonaFactory
 from backend.services.persona.memory_stream import MemoryStreamStore, get_memory_stream_status
+from backend.services.report_optimizer import (
+    get_risk_dimensions,
+    get_risk_level_info,
+    optimize_report,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -456,3 +461,51 @@ async def test_llm(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM 测试失败：{str(e)}")
+
+
+# ==================== 报告质量优化 API ====================
+
+class ReportOptimizeRequest(BaseModel):
+    """报告优化请求"""
+    report: Dict[str, Any] = Field(..., description="原始风险报告")
+
+
+class ReportOptimizeResponse(BaseModel):
+    """报告优化响应"""
+    optimized_report: Dict[str, Any]
+    actionability_score: float
+
+
+@router.post("/api/v3/optimize-report")
+async def optimize_report_api(req: ReportOptimizeRequest) -> ReportOptimizeResponse:
+    """优化风险报告质量（细化风险等级 + 句子级建议 + 平台差异化建议）"""
+    optimized = await optimize_report(req.report)
+
+    return ReportOptimizeResponse(
+        optimized_report=optimized,
+        actionability_score=optimized.get("actionability_score", 0.0),
+    )
+
+
+@router.get("/api/v3/risk-levels")
+async def list_risk_levels():
+    """获取风险等级定义"""
+    return {
+        "levels": {
+            level: info
+            for level, info in [
+                ("critical", get_risk_level_info("critical")),
+                ("high", get_risk_level_info("high")),
+                ("medium", get_risk_level_info("medium")),
+                ("low", get_risk_level_info("low")),
+            ]
+        },
+    }
+
+
+@router.get("/api/v3/risk-dimensions")
+async def list_risk_dimensions():
+    """获取风险维度列表"""
+    return {
+        "dimensions": get_risk_dimensions(),
+    }
