@@ -82,3 +82,15 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
   - Recency 衰减公式：e^(-0.05 × hours_elapsed)
   - Reflection 后台异步执行，不阻塞主流程
   - 集成方式：在 Memory Store 中调用 check_and_trigger_reflection(agent_id) 方法
+
+### T5 信号关联 + 实体风险链 + 动态权重实现
+- Date: 2026-05-14
+- Context: T5 任务验证完成（现有实现已完整）
+- Category: 代码结构
+- Instructions:
+  - 信号关联：从文案提取关键词 → 查询最近 72 小时热搜/种子事件 → LLM 评估关联度 (0-1) → 输出风险维度提升
+  - 实体风险链：提取命名实体 → Neo4j 查询关联关系 → 追踪风险传导路径 (max_depth=3) → 评估链路风险分
+  - 动态权重：基础权重 + 信号提升 + 实体提升 → 综合计算 total_boost = max(s,e) + min(s,e)*0.3 → 调整后权重上限 3.0
+  - 集成入口：enhanced_analyzer.py 的 run_enhanced_analysis() 函数
+  - 使用模式：quick(Phase1+2) / deep(Phase1+2+3)
+  - 降级机制：LLM 失败→规则匹配，Neo4j 不可用→常识分析
