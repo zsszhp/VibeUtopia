@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import uuid
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -949,8 +949,10 @@ class NetworkGenerateRequest(BaseModel):
 @router.post("/agents/generate")
 async def generate_agents(req: AgentGenerateRequest):
     """批量生成Agent"""
-    from backend.services.persona_generator import generate_agents_cross_platform
-    from backend.services.persona.graph_injector import GraphInjector
+from backend.services.persona_generator import generate_agents_cross_platform
+from backend.services.persona.graph_injector import GraphInjector
+from backend.services.persona.life_story_generator import PersonaFactory
+from backend.services.persona.memory_stream import MemoryStreamStore
 
     graph_injector = None
     if req.inject_graph:
@@ -1181,6 +1183,161 @@ async def generate_social_network(req: NetworkGenerateRequest, db: Session = Dep
         "total_relations": len(relations),
         "agent_count": len(agents),
         "type_distribution": type_counts,
+    }
+
+
+# ============ T1: 人生故事驱动人格系统 API ============
+
+class LifeStoryGenerateRequest(BaseModel):
+    platform: str = Field(..., description="平台标识 (bilibili/xiaohongshu/zhihu/douyin)")
+    archetype: str = Field("主流用户", description="原型类型 (主流用户/争议用户/边缘用户/KOL/跨界用户)")
+    tier: str = Field("C", description="生成层级 A/B/C")
+    base_profile: Optional[Dict[str, Any]] = Field(None, description="基础人口统计信息 (仅A-tier需要)")
+
+
+@router.post("/persona/generate")
+async def generate_life_story_persona(req: LifeStoryGenerateRequest):
+    """T1: 生成人生故事驱动的人格 (A/B/C三级)
+    
+    A-tier: AI访谈生成器 — 6轮结构化访谈 → 数万字人生故事
+    B-tier: CGSS采样+LLM丰富 — 人口统计采样 → LLM推理L2-L7 → 千字故事
+    C-tier: 模板变体 — 原型模板+随机参数变体 → 百字梗概
+    """
+    factory = PersonaFactory()
+    
+    try:
+        persona = await factory.generate(
+            platform=req.platform,
+            archetype=req.archetype,
+            tier=req.tier,
+            base_profile=req.base_profile,
+        )
+        
+        return {
+            "status": "success",
+            "persona": {
+                "tier": persona.tier,
+                "life_story": persona.life_story,
+                "persona_7layers": persona.persona_7layers,
+                "initial_memories": persona.initial_memories,
+                "big_five": persona.big_five,
+                "quality_score": persona.quality_score,
+                "platform": persona.platform,
+                "archetype": persona.archetype,
+            },
+        }
+    except Exception as e:
+        logger.error("人生故事人格生成失败: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"生成失败: {str(e)}")
+
+
+class LifeStoryBatchGenerateRequest(BaseModel):
+    platform: str = Field(..., description="平台标识")
+    count: int = Field(10, ge=1, le=50, description="生成数量")
+    tier_distribution: Optional[Dict[str, int]] = Field(None, description="各层级数量 {'A': 1, 'B': 3, 'C': 6}")
+
+
+@router.post("/persona/generate-batch")
+async def generate_life_story_persona_batch(req: LifeStoryBatchGenerateRequest):
+    """T1: 批量生成人生故事驱动的人格"""
+    factory = PersonaFactory()
+    
+    try:
+        personas = await factory.generate_batch(
+            platform=req.platform,
+            count=req.count,
+            tier_distribution=req.tier_distribution,
+        )
+        
+        return {
+            "status": "success",
+            "total": len(personas),
+            "personas": [
+                {
+                    "tier": p.tier,
+                    "life_story_length": len(p.life_story),
+                    "persona_7layers": p.persona_7layers,
+                    "big_five": p.big_five,
+                    "quality_score": p.quality_score,
+                    "platform": p.platform,
+                    "archetype": p.archetype,
+                }
+                for p in personas
+            ],
+        }
+    except Exception as e:
+        logger.error("批量人生故事人格生成失败: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"批量生成失败: {str(e)}")
+
+
+class MemoryStreamStoreRequest(BaseModel):
+    agent_id: str = Field(..., description="Agent ID")
+    content: str = Field(..., description="记忆内容")
+    memory_type: str = Field("observation", description="记忆类型 (observation/reflection/plan)")
+    importance: float = Field(0.5, ge=0.0, le=1.0, description="重要性 0-1")
+    tags: Optional[List[str]] = Field(None, description="标签列表")
+
+
+@router.post("/memory/store")
+async def store_memory(req: MemoryStreamStoreRequest):
+    """T1: 存储一条记忆到Memory Stream"""
+    store = MemoryStreamStore()
+    
+    try:
+        memory_id = store.store(
+            agent_id=req.agent_id,
+            content=req.content,
+            memory_type=req.memory_type,
+            importance=req.importance,
+            tags=req.tags,
+        )
+        
+        return {
+            "status": "success",
+            "memory_id": memory_id,
+            "chroma_available": store.is_chroma_available,
+        }
+    except Exception as e:
+        logger.error("记忆存储失败: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"存储失败: {str(e)}")
+
+
+class MemoryStreamRetrieveRequest(BaseModel):
+    agent_id: str = Field(..., description="Agent ID")
+    query: str = Field(..., description="查询文本")
+    top_k: int = Field(10, ge=1, le=50, description="返回数量")
+
+
+@router.post("/memory/retrieve")
+async def retrieve_memory(req: MemoryStreamRetrieveRequest):
+    """T1: 三因子检索记忆 (Recency + Importance + Relevance)"""
+    store = MemoryStreamStore()
+    
+    try:
+        memories = store.retrieve(
+            agent_id=req.agent_id,
+            query=req.query,
+            top_k=req.top_k,
+        )
+        
+        return {
+            "status": "success",
+            "count": len(memories),
+            "chroma_available": store.is_chroma_available,
+            "memories": memories,
+        }
+    except Exception as e:
+        logger.error("记忆检索失败: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"检索失败: {str(e)}")
+
+
+@router.get("/memory/status")
+async def get_memory_status():
+    """T1: 获取Memory Stream状态"""
+    store = MemoryStreamStore()
+    return {
+        "chroma_available": store.is_chroma_available,
+        "persist_dir": store._persist_dir,
     }
 
 
