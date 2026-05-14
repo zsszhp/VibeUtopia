@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, Column, String, Text, Integer, Float, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.mysql import LONGTEXT
 
 from backend.database import Base
 
@@ -10,16 +11,21 @@ def utcnow():
     return datetime.now(timezone.utc)
 
 
+# MySQL兼容的Text类型别名
+# SQLite会自动处理,MySQL使用LONGTEXT
+MySQLText = Text().with_variant(LONGTEXT, 'mysql')
+
+
 class Task(Base):
     __tablename__ = "tasks"
 
-    id = Column(String, primary_key=True)
-    text = Column(Text, nullable=False)
-    status = Column(String, default="processing")
-    model = Column(String)
-    error = Column(Text, nullable=True)
-    mode = Column(String, default="text")
-    depth = Column(String, default="standard")
+    id = Column(String(36), primary_key=True)  # UUID
+    text = Column(MySQLText, nullable=False)
+    status = Column(String(20), default="processing")
+    model = Column(String(100))
+    error = Column(MySQLText, nullable=True)
+    mode = Column(String(20), default="text")
+    depth = Column(String(20), default="standard")
     created_at = Column(DateTime, default=utcnow)
     completed_at = Column(DateTime, nullable=True)
 
@@ -32,12 +38,12 @@ class RiskItem(Base):
     __tablename__ = "risk_items"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    task_id = Column(String, ForeignKey("tasks.id"))
-    sentence = Column(Text)
-    dimension = Column(String)
-    severity = Column(String)
-    evidence = Column(Text)
-    affected_groups = Column(Text, nullable=True)
+    task_id = Column(String(36), ForeignKey("tasks.id"))
+    sentence = Column(MySQLText)
+    dimension = Column(String(50))
+    severity = Column(String(20))
+    evidence = Column(MySQLText)
+    affected_groups = Column(MySQLText, nullable=True)
     dimension_weight = Column(Float, nullable=True)
 
 
@@ -45,31 +51,31 @@ class PlatformReaction(Base):
     __tablename__ = "platform_reactions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    task_id = Column(String, ForeignKey("tasks.id"))
-    platform = Column(String)
+    task_id = Column(String(36), ForeignKey("tasks.id"))
+    platform = Column(String(50))
     positive = Column(Float)
     neutral = Column(Float)
     negative = Column(Float)
-    reason = Column(Text)
+    reason = Column(MySQLText)
 
 
 class AnalysisSummary(Base):
     __tablename__ = "analysis_summaries"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    task_id = Column(String, ForeignKey("tasks.id"), unique=True)
+    task_id = Column(String(36), ForeignKey("tasks.id"), unique=True)
     overall_score = Column(Integer)
-    suggestion = Column(String)
-    dimensions_json = Column(Text)
-    rewrites_json = Column(Text)
-    transcript_quality = Column(Text, nullable=True)
-    dimension_weights = Column(Text, nullable=True)
-    cross_effects = Column(Text, nullable=True)
-    agents_json = Column(Text, nullable=True)
+    suggestion = Column(String(50))
+    dimensions_json = Column(MySQLText)
+    rewrites_json = Column(MySQLText)
+    transcript_quality = Column(MySQLText, nullable=True)
+    dimension_weights = Column(MySQLText, nullable=True)
+    cross_effects = Column(MySQLText, nullable=True)
+    agents_json = Column(MySQLText, nullable=True)
     # 阶段1.2新增: 证据链和置信度
-    evidence_chains_json = Column(Text, nullable=True)
-    confidence_json = Column(Text, nullable=True)
-    uncertainty_notes_json = Column(Text, nullable=True)
+    evidence_chains_json = Column(MySQLText, nullable=True)
+    confidence_json = Column(MySQLText, nullable=True)
+    uncertainty_notes_json = Column(MySQLText, nullable=True)
 
 
 class SignalRecord(Base):
