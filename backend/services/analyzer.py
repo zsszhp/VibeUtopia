@@ -13,6 +13,8 @@ from backend.services.risk_assessor import assess_risks
 from backend.services.rewriter import rewrite_sentence
 from backend.services.transcript_detector import detect_transcript_quality, is_noise_sentence
 from backend.services.cross_modal_detector import CrossModalConflictDetector, integrate_cross_modal_score
+from backend.services.evidence_chain import EvidenceChainBuilder
+from backend.services.confidence_calculator import ConfidenceCalculator
 
 logger = logging.getLogger(__name__)
 
@@ -371,9 +373,44 @@ async def run_analysis(task_id: str, text: str):
         # ═══════════════════════════════════════════════════════════════════════
         # 步骤5: 报告生成 (90% - 100%)
         # ═══════════════════════════════════════════════════════════════════════
-        await _broadcast_step(task_id, "report", 0.92, "正在计算综合评分...")
+        await _broadcast_step(task_id, "report", 0.92, "正在构建证据链...")
 
-        # 加权评分
+        # 5.1 构建证据链
+        evidence_builder = EvidenceChainBuilder()
+        evidence_chains = evidence_builder.build_chains_for_task(
+            risk_sentences=risk_sentences,
+            dimensions=dimensions,
+        )
+        evidence_summary = evidence_builder.get_summary()
+        logger.info("证据链构建完成: 总数=%d, 平均置信度=%.2f, 交叉验证=%d",
+                   evidence_summary["total_chains"],
+                   evidence_summary["avg_confidence"],
+                   evidence_summary["cross_validated_count"])
+
+        await _broadcast_step(task_id, "report", 0.94, "正在计算置信度...")
+
+        # 5.2 计算置信度
+        confidence_calc = ConfidenceCalculator()
+        confidence_result = confidence_calc.calculate(
+            dimensions=dimensions,
+            risk_sentences=risk_sentences,
+            transcript_quality=transcript_quality,
+            evidence_chains=evidence_chains,
+            platform_reactions=platform_results,
+        )
+        uncertainty_notes = confidence_calc.get_uncertainty_notes(
+            confidence_result, dimensions
+        )
+        logger.info("置信度计算完成: 总体=%.2f, 数据质量=%.2f, 一致性=%.2f, 证据=%.2f, 平台验证=%.2f",
+                   confidence_result["overall_confidence"],
+                   confidence_result["breakdown"]["data_quality_score"],
+                   confidence_result["breakdown"]["consistency_score"],
+                   confidence_result["breakdown"]["evidence_score"],
+                   confidence_result["breakdown"]["platform_validation_score"])
+
+        await _broadcast_step(task_id, "report", 0.96, "正在计算综合评分...")
+
+        # 5.3 加权评分
         overall_score, dimension_weights, auto_cross_effects = calculate_overall_score(dimensions)
 
         # 跨模态冲突分数集成
@@ -500,6 +537,10 @@ async def run_analysis(task_id: str, text: str):
             dimension_weights=json.dumps(dimension_weights, ensure_ascii=False),
             cross_effects=json.dumps(all_cross_effects, ensure_ascii=False),
             agents_json=json.dumps(all_agent_details, ensure_ascii=False) if all_agent_details else None,
+            # 阶段1.2新增: 保存证据链和置信度
+            evidence_chains_json=json.dumps(evidence_chains, ensure_ascii=False),
+            confidence_json=json.dumps(confidence_result, ensure_ascii=False),
+            uncertainty_notes_json=json.dumps(uncertainty_notes, ensure_ascii=False),
         ))
 
         task = db.query(Task).filter(Task.id == task_id).first()

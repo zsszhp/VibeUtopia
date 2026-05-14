@@ -2404,20 +2404,33 @@ async def get_review_result(task_id: str, db: Session = Depends(get_db)):
         except Exception:
             pass
 
-        # 置信度计算
+        # 置信度计算 - 使用新的置信度模块结果(如存在)
         confidence = 0.8
         uncertainty_sources = []
-        if summary.transcript_quality:
+        
+        # 优先使用新的置信度计算结果
+        if summary.confidence_json:
             try:
-                tq = json.loads(summary.transcript_quality)
-                if tq.get("quality_level") not in ("clean", None):
-                    confidence -= 0.15
-                    uncertainty_sources.append("转写质量不佳")
+                confidence_data = json.loads(summary.confidence_json)
+                confidence = confidence_data.get("overall_confidence", 0.8)
+                # 从不确定性说明中提取来源
+                if summary.uncertainty_notes_json:
+                    uncertainty_sources = json.loads(summary.uncertainty_notes_json)
             except json.JSONDecodeError:
                 pass
-        if len(dimensions) < 3:
-            confidence -= 0.1
-            uncertainty_sources.append("评估维度不完整")
+        else:
+            # 降级到旧逻辑
+            if summary.transcript_quality:
+                try:
+                    tq = json.loads(summary.transcript_quality)
+                    if tq.get("quality_level") not in ("clean", None):
+                        confidence -= 0.15
+                        uncertainty_sources.append("转写质量不佳")
+                except json.JSONDecodeError:
+                    pass
+            if len(dimensions) < 3:
+                confidence -= 0.1
+                uncertainty_sources.append("评估维度不完整")
 
         # 构建响应
         result["overall_risk"] = summary.overall_score
@@ -2456,6 +2469,20 @@ async def get_review_result(task_id: str, db: Session = Depends(get_db)):
             except json.JSONDecodeError:
                 pass
         result["suggestions"] = suggestions
+
+        # 阶段1.2新增: 证据链数据
+        if summary.evidence_chains_json:
+            try:
+                result["evidence_chains"] = json.loads(summary.evidence_chains_json)
+            except json.JSONDecodeError:
+                result["evidence_chains"] = []
+        
+        # 阶段1.2新增: 置信度详细分解
+        if summary.confidence_json:
+            try:
+                result["confidence_breakdown"] = json.loads(summary.confidence_json)
+            except json.JSONDecodeError:
+                pass
 
     elif task.status == "failed":
         result["error"] = task.error if hasattr(task, 'error') and task.error else "分析失败"

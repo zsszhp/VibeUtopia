@@ -66,6 +66,10 @@ class AnalysisSummary(Base):
     dimension_weights = Column(Text, nullable=True)
     cross_effects = Column(Text, nullable=True)
     agents_json = Column(Text, nullable=True)
+    # 阶段1.2新增: 证据链和置信度
+    evidence_chains_json = Column(Text, nullable=True)
+    confidence_json = Column(Text, nullable=True)
+    uncertainty_notes_json = Column(Text, nullable=True)
 
 
 class SignalRecord(Base):
