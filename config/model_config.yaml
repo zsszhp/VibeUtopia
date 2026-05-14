@@ -1,0 +1,142 @@
+# 多模型路由配置文件
+# 支持多厂商、多模型、多 Key 智能调度
+# 任务类型映射：根据任务复杂度自动选择不同级别的模型
+
+# ==================== 任务类型与模型级别映射 ====================
+task_tier_mapping:
+  # 高级任务：复杂推理、多模态理解、人生故事生成
+  life_story_generation: advanced
+  persona_simulation: advanced
+  multimodal_analysis: advanced
+  risk_assessment: advanced
+  
+  # 标准任务：常规风险评估、文案理解、平台模拟
+  default: standard
+  text_understanding: standard
+  platform_simulation: standard
+  
+  # 轻量任务：简单分类、格式化输出
+  rewrite: lite
+  json_extraction: lite
+
+# ==================== Fallback 策略 ====================
+fallback_strategy:
+  same_provider_same_tier: true       # 优先：同厂商同级别
+  same_provider_lower_tier: true      # 次优：同厂商低级别
+  cross_provider_same_tier: true      # 再次：跨厂商同级别
+  cross_provider_lower_tier: true     # 最后：跨厂商低级别
+
+# ==================== Provider 配置 ====================
+providers:
+  # --- 阿里通义千问 (支持多模态) ---
+  aliyun:
+    name: "阿里通义千问"
+    api_key_env: "ALIYUN_API_KEY"
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    models:
+      # Qwen-VL 多模态模型
+      - id: "qwen-vl-max"
+        tier: advanced
+        vision: true
+        text: true
+      - id: "qwen-vl-plus"
+        tier: standard
+        vision: true
+        text: true
+      # Qwen 文本模型
+      - id: "qwen-max"
+        tier: advanced
+        vision: false
+        text: true
+      - id: "qwen-plus"
+        tier: standard
+        vision: false
+        text: true
+      - id: "qwen-turbo"
+        tier: lite
+        vision: false
+        text: true
+
+  # --- DeepSeek (支持多模态) ---
+  deepseek:
+    name: "DeepSeek"
+    api_key_env: "DEEPSEEK_API_KEY"
+    base_url: "https://api.deepseek.com/v1"
+    models:
+      # DeepSeek-VL 多模态
+      - id: "deepseek-vl2"
+        tier: advanced
+        vision: true
+        text: true
+      # DeepSeek 文本模型
+      - id: "deepseek-chat"
+        tier: standard
+        vision: false
+        text: true
+      - id: "deepseek-coder"
+        tier: standard
+        vision: false
+        text: true
+
+  # --- 硅基流动 (聚合模型) ---
+  siliconflow:
+    name: "硅基流动"
+    api_key_env: "SILICONFLOW_API_KEY"
+    base_url: "https://api.siliconflow.cn/v1"
+    models:
+      # 支持视觉的模型
+      - id: "Qwen/Qwen2-VL-72B-Instruct"
+        tier: advanced
+        vision: true
+        text: true
+      - id: "deepseek-ai/DeepSeek-V3"
+        tier: standard
+        vision: false
+        text: true
+      - id: "deepseek-ai/DeepSeek-R1"
+        tier: advanced
+        vision: false
+        text: true
+
+  # --- LongCat (快捷接入) ---
+  longcat:
+    name: "LongCat"
+    api_key_env: "LONGCAT_API_KEY"
+    base_url: "https://api.longcat.chat/openai/v1"
+    models:
+      - id: "LongCat-Flash-Thinking-2601"
+        tier: standard
+        vision: false
+        text: true
+      - id: "LongCat-VL"
+        tier: standard
+        vision: true
+        text: true
+
+  # --- 阿里 Paraformer (音频转写专用) ---
+  paraformer:
+    name: "阿里 Paraformer"
+    api_key_env: "ALIYUN_API_KEY"
+    base_url: "https://dashscope.aliyuncs.com/api/v1/services/asr/transcription"
+    models:
+      - id: "paraformer-v2"
+        tier: standard
+        vision: false
+        text: false
+        audio: true
+
+# ==================== 模型路由默认设置 ====================
+default:
+  provider: "aliyun"  # 默认厂商
+  tier: "standard"    # 默认级别
+  
+# ==================== 硬件检测配置 ====================
+hardware_detection:
+  enabled: true
+  vram_thresholds:
+    # VRAM < 8GB: 使用轻量模型
+    lite: 8
+    # VRAM >= 8GB and < 16GB: 使用标准模型
+    standard: 16
+    # VRAM >= 16GB: 可使用高级模型
+    advanced: 999

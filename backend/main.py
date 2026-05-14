@@ -51,6 +51,10 @@ app.add_middleware(
 
 app.include_router(router, prefix="/api/v1")
 
+# 注册阶段 3 新增路由
+from backend.routes_v3 import router as router_v3
+app.include_router(router_v3, prefix="/api/v3")
+
 
 # ─── WebSocket端点 ────────────────────────────────────────────────
 

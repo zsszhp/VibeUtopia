@@ -23,6 +23,9 @@ scenedetect>=0.6.1
 ffmpeg-python>=0.2.0
 Pillow>=10.0.0
 
+# 音频转写（阿里 Paraformer）
+# 通过 HTTP API 调用，无需额外 Python 包
+
 # 信号采集与调度
 apscheduler>=3.10.0
 feedparser>=6.0.0
