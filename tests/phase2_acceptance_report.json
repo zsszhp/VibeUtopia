@@ -1,0 +1,80 @@
+{
+  "report_title": "阶段 2 验收测试报告",
+  "report_date": "2026-05-14 13:21:48",
+  "phase": "阶段 2: 深度打磨",
+  "theme": "5 大核心平台深度覆盖 + 平台权重体系",
+  "acceptance_criteria": [
+    {
+      "test_name": "人格原型覆盖率",
+      "requirement": "每平台≥20 个差异化人格原型",
+      "actual_result": "每平台20个，共100个",
+      "platforms": {
+        "weibo": 20,
+        "bilibili": 20,
+        "xiaohongshu": 20,
+        "douyin": 20,
+        "zhihu": 20
+      },
+      "passed": true,
+      "status": "PASS"
+    },
+    {
+      "test_name": "回测命中率",
+      "requirement": "≥60%",
+      "actual_result": "85.0%",
+      "total_cases": 33,
+      "passed": true,
+      "status": "PASS"
+    },
+    {
+      "test_name": "平台情绪差异",
+      "requirement": "标准差>0.01",
+      "test_cases": [
+        {
+          "case_name": "娱乐八卦文案",
+          "std_dev": 0.1949,
+          "threshold": 0.01,
+          "passed": true
+        },
+        {
+          "case_name": "科技产品争议",
+          "std_dev": 0.1204,
+          "threshold": 0.01,
+          "passed": true
+        }
+      ],
+      "passed": true,
+      "status": "PASS"
+    },
+    {
+      "test_name": "P0 平台影响占比",
+      "requirement": "≥70%",
+      "scenarios": [
+        {
+          "scenario_name": "纯 P0 平台场景",
+          "p0_ratio": 1.0,
+          "passed": true
+        },
+        {
+          "scenario_name": "P0+P1 混合场景",
+          "p0_ratio": 0.8276,
+          "passed": true
+        },
+        {
+          "scenario_name": "P0+P1+P2混合场景",
+          "p0_ratio": 0.8951,
+          "passed": true
+        }
+      ],
+      "passed": true,
+      "status": "PASS"
+    }
+  ],
+  "summary": {
+    "total_tests": 4,
+    "passed_tests": 4,
+    "failed_tests": 0,
+    "pass_rate": 100.0,
+    "overall_passed": true
+  }
+}
