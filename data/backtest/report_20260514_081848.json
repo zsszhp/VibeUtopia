@@ -1,0 +1,756 @@
+{
+  "report_id": "backtest_20260514_081848",
+  "generated_at": "2026-05-14T08:18:48.040277",
+  "total_cases": 25,
+  "completed": 25,
+  "failed": 0,
+  "elapsed_seconds": 578.2,
+  "overall_metrics": {
+    "level_accuracy": 0.72,
+    "score_accuracy": 0.68,
+    "dim_precision": 0.71,
+    "dim_recall": 0.67,
+    "dim_f1": 0.68,
+    "overall_accuracy": 0.69
+  },
+  "by_risk_level": {
+    "red": {
+      "count": 7,
+      "accuracy": 0.29
+    },
+    "green": {
+      "count": 12,
+      "accuracy": 1.0
+    },
+    "orange": {
+      "count": 5,
+      "accuracy": 0.6
+    },
+    "yellow": {
+      "count": 1,
+      "accuracy": 1.0
+    }
+  },
+  "by_category": {
+    "政治": {
+      "count": 1,
+      "accuracy": 0.2
+    },
+    "数码": {
+      "count": 2,
+      "accuracy": 1.0
+    },
+    "社会": {
+      "count": 5,
+      "accuracy": 0.38
+    },
+    "美食": {
+      "count": 1,
+      "accuracy": 1.0
+    },
+    "文化": {
+      "count": 1,
+      "accuracy": 0.27
+    },
+    "旅游": {
+      "count": 1,
+      "accuracy": 1.0
+    },
+    "健康": {
+      "count": 1,
+      "accuracy": 0.4
+    },
+    "时尚": {
+      "count": 1,
+      "accuracy": 1.0
+    },
+    "金融": {
+      "count": 1,
+      "accuracy": 0.2
+    },
+    "宠物": {
+      "count": 1,
+      "accuracy": 1.0
+    },
+    "历史": {
+      "count": 1,
+      "accuracy": 0.7
+    },
+    "影视": {
+      "count": 1,
+      "accuracy": 1.0
+    },
+    "运动": {
+      "count": 1,
+      "accuracy": 1.0
+    },
+    "读书": {
+      "count": 1,
+      "accuracy": 1.0
+    },
+    "生活": {
+      "count": 1,
+      "accuracy": 1.0
+    },
+    "技术": {
+      "count": 1,
+      "accuracy": 0.5
+    },
+    "教育": {
+      "count": 1,
+      "accuracy": 1.0
+    },
+    "情感": {
+      "count": 1,
+      "accuracy": 0.5
+    },
+    "职场": {
+      "count": 1,
+      "accuracy": 0.6
+    },
+    "公益": {
+      "count": 1,
+      "accuracy": 1.0
+    }
+  },
+  "results": [
+    {
+      "case_id": "BT001",
+      "title": "政治敏感话题讨论",
+      "category": "政治",
+      "expected_level": "red",
+      "actual_level": "orange",
+      "expected_score_range": [
+        75,
+        100
+      ],
+      "actual_score": 60,
+      "expected_high_dims": [
+        "政治敏感",
+        "时事踩雷",
+        "法律合规"
+      ],
+      "actual_high_dims": [
+        "政治敏感"
+      ],
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 1.0,
+        "dim_recall": 0.33,
+        "dim_f1": 0.5,
+        "overall": 0.2
+      }
+    },
+    {
+      "case_id": "BT002",
+      "title": "品牌产品测评文案",
+      "category": "数码",
+      "expected_level": "green",
+      "actual_level": "green",
+      "expected_score_range": [
+        0,
+        25
+      ],
+      "actual_score": 0,
+      "expected_high_dims": [],
+      "actual_high_dims": [],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": true,
+        "dim_precision": 1.0,
+        "dim_recall": 1.0,
+        "dim_f1": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "case_id": "BT003",
+      "title": "性别争议话题",
+      "category": "社会",
+      "expected_level": "red",
+      "actual_level": "orange",
+      "expected_score_range": [
+        75,
+        100
+      ],
+      "actual_score": 75,
+      "expected_high_dims": [
+        "价值观倾向",
+        "性别议题",
+        "群体冒犯"
+      ],
+      "actual_high_dims": [
+        "性别议题",
+        "群体冒犯",
+        "道德伦理"
+      ],
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": true,
+        "dim_precision": 0.67,
+        "dim_recall": 0.67,
+        "dim_f1": 0.67,
+        "overall": 0.57
+      }
+    },
+    {
+      "case_id": "BT004",
+      "title": "美食探店分享",
+      "category": "美食",
+      "expected_level": "green",
+      "actual_level": "green",
+      "expected_score_range": [
+        0,
+        20
+      ],
+      "actual_score": 0,
+      "expected_high_dims": [],
+      "actual_high_dims": [],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": true,
+        "dim_precision": 1.0,
+        "dim_recall": 1.0,
+        "dim_f1": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "case_id": "BT005",
+      "title": "民族宗教敏感内容",
+      "category": "文化",
+      "expected_level": "red",
+      "actual_level": "orange",
+      "expected_score_range": [
+        80,
+        100
+      ],
+      "actual_score": 75,
+      "expected_high_dims": [
+        "价值观倾向",
+        "民族宗教",
+        "群体冒犯"
+      ],
+      "actual_high_dims": [
+        "民族宗教",
+        "群体冒犯",
+        "道德伦理"
+      ],
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0.67,
+        "dim_recall": 0.67,
+        "dim_f1": 0.67,
+        "overall": 0.27
+      }
+    },
+    {
+      "case_id": "BT006",
+      "title": "旅游攻略分享",
+      "category": "旅游",
+      "expected_level": "green",
+      "actual_level": "green",
+      "expected_score_range": [
+        0,
+        15
+      ],
+      "actual_score": 0,
+      "expected_high_dims": [],
+      "actual_high_dims": [],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": true,
+        "dim_precision": 1.0,
+        "dim_recall": 1.0,
+        "dim_f1": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "case_id": "BT007",
+      "title": "医疗健康谣言",
+      "category": "健康",
+      "expected_level": "red",
+      "actual_level": "red",
+      "expected_score_range": [
+        80,
+        100
+      ],
+      "actual_score": 79,
+      "expected_high_dims": [
+        "事实错误",
+        "价值观倾向",
+        "法律合规"
+      ],
+      "actual_high_dims": [
+        "政治敏感",
+        "时事踩雷",
+        "法律合规",
+        "群体冒犯",
+        "道德伦理"
+      ],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": false,
+        "dim_precision": 0.2,
+        "dim_recall": 0.33,
+        "dim_f1": 0.25,
+        "overall": 0.4
+      }
+    },
+    {
+      "case_id": "BT008",
+      "title": "日常穿搭分享",
+      "category": "时尚",
+      "expected_level": "green",
+      "actual_level": "green",
+      "expected_score_range": [
+        0,
+        10
+      ],
+      "actual_score": 0,
+      "expected_high_dims": [],
+      "actual_high_dims": [],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": true,
+        "dim_precision": 1.0,
+        "dim_recall": 1.0,
+        "dim_f1": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "case_id": "BT009",
+      "title": "金融投资建议",
+      "category": "金融",
+      "expected_level": "orange",
+      "actual_level": "red",
+      "expected_score_range": [
+        55,
+        75
+      ],
+      "actual_score": 83,
+      "expected_high_dims": [
+        "事实错误",
+        "法律合规"
+      ],
+      "actual_high_dims": [
+        "法律合规",
+        "道德伦理"
+      ],
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0.5,
+        "dim_recall": 0.5,
+        "dim_f1": 0.5,
+        "overall": 0.2
+      }
+    },
+    {
+      "case_id": "BT010",
+      "title": "宠物日常记录",
+      "category": "宠物",
+      "expected_level": "green",
+      "actual_level": "green",
+      "expected_score_range": [
+        0,
+        10
+      ],
+      "actual_score": 0,
+      "expected_high_dims": [],
+      "actual_high_dims": [],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": true,
+        "dim_precision": 1.0,
+        "dim_recall": 1.0,
+        "dim_f1": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "case_id": "BT011",
+      "title": "历史虚无主义言论",
+      "category": "历史",
+      "expected_level": "red",
+      "actual_level": "red",
+      "expected_score_range": [
+        80,
+        100
+      ],
+      "actual_score": 83,
+      "expected_high_dims": [
+        "事实错误",
+        "价值观倾向",
+        "政治敏感"
+      ],
+      "actual_high_dims": [
+        "政治敏感",
+        "时事踩雷",
+        "法律合规",
+        "群体冒犯",
+        "道德伦理"
+      ],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": true,
+        "dim_precision": 0.2,
+        "dim_recall": 0.33,
+        "dim_f1": 0.25,
+        "overall": 0.7
+      }
+    },
+    {
+      "case_id": "BT012",
+      "title": "电影影评",
+      "category": "影视",
+      "expected_level": "green",
+      "actual_level": "green",
+      "expected_score_range": [
+        0,
+        15
+      ],
+      "actual_score": 0,
+      "expected_high_dims": [],
+      "actual_high_dims": [],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": true,
+        "dim_precision": 1.0,
+        "dim_recall": 1.0,
+        "dim_f1": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "case_id": "BT013",
+      "title": "煽动对立情绪内容",
+      "category": "社会",
+      "expected_level": "red",
+      "actual_level": "yellow",
+      "expected_score_range": [
+        70,
+        90
+      ],
+      "actual_score": 50,
+      "expected_high_dims": [
+        "价值观倾向",
+        "情绪极化",
+        "政治敏感"
+      ],
+      "actual_high_dims": [
+        "政治敏感",
+        "群体冒犯"
+      ],
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0.5,
+        "dim_recall": 0.33,
+        "dim_f1": 0.4,
+        "overall": 0.16
+      }
+    },
+    {
+      "case_id": "BT014",
+      "title": "健身经验分享",
+      "category": "运动",
+      "expected_level": "green",
+      "actual_level": "green",
+      "expected_score_range": [
+        0,
+        10
+      ],
+      "actual_score": 0,
+      "expected_high_dims": [],
+      "actual_high_dims": [],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": true,
+        "dim_precision": 1.0,
+        "dim_recall": 1.0,
+        "dim_f1": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "case_id": "BT015",
+      "title": "暗讽时事的隐喻内容",
+      "category": "社会",
+      "expected_level": "orange",
+      "actual_level": "yellow",
+      "expected_score_range": [
+        50,
+        70
+      ],
+      "actual_score": 28,
+      "expected_high_dims": [
+        "政治敏感",
+        "隐喻反讽"
+      ],
+      "actual_high_dims": [],
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0.0,
+        "dim_f1": 0,
+        "overall": 0.0
+      }
+    },
+    {
+      "case_id": "BT016",
+      "title": "科技产品评测",
+      "category": "数码",
+      "expected_level": "green",
+      "actual_level": "green",
+      "expected_score_range": [
+        0,
+        15
+      ],
+      "actual_score": 0,
+      "expected_high_dims": [],
+      "actual_high_dims": [],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": true,
+        "dim_precision": 1.0,
+        "dim_recall": 1.0,
+        "dim_f1": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "case_id": "BT017",
+      "title": "地域歧视言论",
+      "category": "社会",
+      "expected_level": "orange",
+      "actual_level": "orange",
+      "expected_score_range": [
+        55,
+        75
+      ],
+      "actual_score": 52,
+      "expected_high_dims": [
+        "价值观倾向",
+        "群体冒犯"
+      ],
+      "actual_high_dims": [
+        "群体冒犯"
+      ],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": false,
+        "dim_precision": 1.0,
+        "dim_recall": 0.5,
+        "dim_f1": 0.67,
+        "overall": 0.57
+      }
+    },
+    {
+      "case_id": "BT018",
+      "title": "读书笔记分享",
+      "category": "读书",
+      "expected_level": "green",
+      "actual_level": "green",
+      "expected_score_range": [
+        0,
+        15
+      ],
+      "actual_score": 0,
+      "expected_high_dims": [],
+      "actual_high_dims": [],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": true,
+        "dim_precision": 1.0,
+        "dim_recall": 1.0,
+        "dim_f1": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "case_id": "BT019",
+      "title": "敏感事件蹭热度",
+      "category": "社会",
+      "expected_level": "orange",
+      "actual_level": "orange",
+      "expected_score_range": [
+        55,
+        75
+      ],
+      "actual_score": 73,
+      "expected_high_dims": [
+        "事实错误",
+        "情绪极化",
+        "时事踩雷"
+      ],
+      "actual_high_dims": [
+        "政治敏感",
+        "群体冒犯",
+        "道德伦理"
+      ],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": true,
+        "dim_precision": 0.0,
+        "dim_recall": 0.0,
+        "dim_f1": 0,
+        "overall": 0.6
+      }
+    },
+    {
+      "case_id": "BT020",
+      "title": "日常心情记录",
+      "category": "生活",
+      "expected_level": "green",
+      "actual_level": "green",
+      "expected_score_range": [
+        0,
+        10
+      ],
+      "actual_score": 0,
+      "expected_high_dims": [],
+      "actual_high_dims": [],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": true,
+        "dim_precision": 1.0,
+        "dim_recall": 1.0,
+        "dim_f1": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "case_id": "BT021",
+      "title": "法律擦边内容",
+      "category": "技术",
+      "expected_level": "red",
+      "actual_level": "orange",
+      "expected_score_range": [
+        75,
+        95
+      ],
+      "actual_score": 75,
+      "expected_high_dims": [
+        "平台禁区",
+        "法律合规"
+      ],
+      "actual_high_dims": [
+        "法律合规",
+        "道德伦理"
+      ],
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": true,
+        "dim_precision": 0.5,
+        "dim_recall": 0.5,
+        "dim_f1": 0.5,
+        "overall": 0.5
+      }
+    },
+    {
+      "case_id": "BT022",
+      "title": "教育经验分享",
+      "category": "教育",
+      "expected_level": "green",
+      "actual_level": "green",
+      "expected_score_range": [
+        0,
+        15
+      ],
+      "actual_score": 0,
+      "expected_high_dims": [],
+      "actual_high_dims": [],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": true,
+        "dim_precision": 1.0,
+        "dim_recall": 1.0,
+        "dim_f1": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "case_id": "BT023",
+      "title": "道德绑架式传播",
+      "category": "情感",
+      "expected_level": "orange",
+      "actual_level": "orange",
+      "expected_score_range": [
+        50,
+        70
+      ],
+      "actual_score": 75,
+      "expected_high_dims": [
+        "情绪极化",
+        "道德伦理"
+      ],
+      "actual_high_dims": [
+        "法律合规",
+        "道德伦理"
+      ],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": false,
+        "dim_precision": 0.5,
+        "dim_recall": 0.5,
+        "dim_f1": 0.5,
+        "overall": 0.5
+      }
+    },
+    {
+      "case_id": "BT024",
+      "title": "职场吐槽内容",
+      "category": "职场",
+      "expected_level": "yellow",
+      "actual_level": "yellow",
+      "expected_score_range": [
+        30,
+        50
+      ],
+      "actual_score": 36,
+      "expected_high_dims": [
+        "价值观倾向",
+        "情绪极化"
+      ],
+      "actual_high_dims": [
+        "群体冒犯"
+      ],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": true,
+        "dim_precision": 0.0,
+        "dim_recall": 0.0,
+        "dim_f1": 0,
+        "overall": 0.6
+      }
+    },
+    {
+      "case_id": "BT025",
+      "title": "环保公益倡议",
+      "category": "公益",
+      "expected_level": "green",
+      "actual_level": "green",
+      "expected_score_range": [
+        0,
+        10
+      ],
+      "actual_score": 0,
+      "expected_high_dims": [],
+      "actual_high_dims": [],
+      "accuracy": {
+        "level_correct": true,
+        "score_in_range": true,
+        "dim_precision": 1.0,
+        "dim_recall": 1.0,
+        "dim_f1": 1.0,
+        "overall": 1.0
+      }
+    }
+  ]
+}

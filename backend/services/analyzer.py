@@ -73,6 +73,10 @@ DIMENSION_WEIGHTS = {
     "政治敏感": 1.5,
     "法律合规": 1.5,
     "民族宗教": 1.3,
+    "事实错误": 1.3,
+    "平台禁区": 1.3,
+    "情绪极化": 1.2,
+    "价值观倾向": 1.2,
     "性别议题": 1.0,
     "道德伦理": 1.0,
     "群体冒犯": 1.0,
@@ -97,7 +101,7 @@ def calculate_overall_score(dimensions: list[dict]) -> tuple[int, dict, list[dic
         return 0, {}, []
 
     # 红线维度列表（触碰即高风险）
-    REDLINE_DIMS = {"政治敏感", "法律合规", "民族宗教"}
+    REDLINE_DIMS = {"政治敏感", "法律合规", "民族宗教", "事实错误", "平台禁区"}
 
     # 收集各维度分数和权重
     weighted_sum = 0.0
