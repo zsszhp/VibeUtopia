@@ -327,9 +327,45 @@ async def run_analysis(task_id: str, text: str):
             logger.warning("动态权重调整失败(降级继续): %s", e)
 
         # ═══════════════════════════════════════════════════════════════════════
-        # 步骤4: 仿真推演 (68% - 85%)
+        # 步骤3.7: 平台权重仿真 (68% - 70%) — 阶段2新增
         # ═══════════════════════════════════════════════════════════════════════
-        await _broadcast_step(task_id, "simulation", 0.70, "正在推演平台用户反应...")
+        await _broadcast_step(task_id, "platform_sim", 0.69, "正在模拟平台用户反应...")
+        platform_sim_reactions = {}
+        try:
+            from backend.services.platform_simulator import PlatformSimulator, get_platform_risk_summary
+            simulator = PlatformSimulator()
+
+            # 计算基础风险分数映射
+            base_risk_scores = {d.get("name", ""): d.get("score", 0) for d in dimensions}
+
+            # 并行仿真P0核心平台
+            platform_reactions = await simulator.simulate_all_platforms(
+                text=text,
+                platforms=None,  # 默认P0平台
+                base_risk_scores=base_risk_scores,
+                max_concurrent=3,
+            )
+
+            if platform_reactions:
+                platform_sim_reactions = {pid: r.to_dict() for pid, r in platform_reactions.items()}
+                sim_summary = get_platform_risk_summary(platform_reactions)
+                logger.info("平台权重仿真完成: %d个平台, 综合风险%.1f, 最高风险平台=%s",
+                           sim_summary["platform_count"],
+                           sim_summary["overall_risk"],
+                           sim_summary.get("highest_risk_platform"))
+                await _broadcast_step(
+                    task_id, "platform_sim", 0.70,
+                    f"平台仿真完成: {sim_summary['platform_count']}个平台，最高风险={sim_summary.get('highest_risk_platform', '')}",
+                )
+            else:
+                await _broadcast_step(task_id, "platform_sim", 0.70, "平台仿真完成(无结果)")
+        except Exception as e:
+            logger.warning("平台权重仿真失败(降级继续): %s", e)
+
+        # ═══════════════════════════════════════════════════════════════════════
+        # 步骤4: 仿真推演 (70% - 85%)
+        # ═══════════════════════════════════════════════════════════════════════
+        await _broadcast_step(task_id, "simulation", 0.72, "正在推演平台用户反应...")
         platform_results = await simulate_all_platforms_with_agents(text)
         await _broadcast_step(task_id, "simulation", 0.8, "平台反应推演完成")
 
@@ -545,6 +581,8 @@ async def run_analysis(task_id: str, text: str):
             evidence_chains_json=json.dumps(evidence_chains, ensure_ascii=False),
             confidence_json=json.dumps(confidence_result, ensure_ascii=False),
             uncertainty_notes_json=json.dumps(uncertainty_notes, ensure_ascii=False),
+            # 阶段2新增: 保存平台权重仿真结果
+            platform_simulation_json=json.dumps(platform_sim_reactions, ensure_ascii=False) if platform_sim_reactions else None,
         ))
 
         task = db.query(Task).filter(Task.id == task_id).first()

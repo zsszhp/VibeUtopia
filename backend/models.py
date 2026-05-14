@@ -76,6 +76,8 @@ class AnalysisSummary(Base):
     evidence_chains_json = Column(MySQLText, nullable=True)
     confidence_json = Column(MySQLText, nullable=True)
     uncertainty_notes_json = Column(MySQLText, nullable=True)
+    # 阶段2新增: 平台权重仿真结果
+    platform_simulation_json = Column(MySQLText, nullable=True)  # JSON: 平台仿真汇总
 
 
 class SignalRecord(Base):
