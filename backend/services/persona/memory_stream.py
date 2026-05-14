@@ -331,13 +331,38 @@ class MemoryStreamStore:
             finally:
                 db.close()
         except Exception as e:
-            logger.warning("数据库获取最近记忆失败: %s", e)
+            logger.warning("数据库获取最近记忆失败：%s", e)
             return []
+
+    def check_and_trigger_reflection(self, agent_id: str) -> bool:
+        """检查并触发 Reflection
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            True 如果触发了 Reflection
+        """
+        try:
+            from backend.services.persona.reflection_engine import ReflectionEngine
+            reflection_engine = ReflectionEngine(self)
+            trigger = reflection_engine.trigger
+
+            if trigger.should_reflect(agent_id):
+                import asyncio
+                # 在后台执行 Reflection（不阻塞主流程）
+                asyncio.create_task(reflection_engine.execute_reflection(agent_id))
+                logger.info("触发 Agent %s 的 Reflection 机制", agent_id)
+                return True
+        except Exception as e:
+            logger.warning("Reflection 触发检查失败：%s", e)
+        return False
 
 
 def get_memory_stream_status() -> dict:
-    """返回Memory Stream状态"""
+    """返回 Memory Stream 状态"""
     return {
         "chromadb_available": _HAS_CHROMADB,
         "fallback": "database" if not _HAS_CHROMADB else None,
+        "reflection_enabled": True,
     }
