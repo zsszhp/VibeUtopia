@@ -161,6 +161,83 @@ class ApiCrawler:
             logger.warning("ApiCrawler: B站爬取失败 %s", e)
         return comments
 
+    async def crawl_douyin(self, keyword: str, max_comments: int = 50) -> List[dict]:
+        """抖音搜索API - 通过抖音开放平台"""
+        comments: List[dict] = []
+        try:
+            async with httpx.AsyncClient(timeout=self.TIMEOUT) as client:
+                # 抖音搜索API（模拟移动端）
+                resp = await client.get(
+                    "https://www.douyin.com/aweme/v1/web/general/search/single/",
+                    params={
+                        "keyword": keyword,
+                        "search_channel": "aweme_general",
+                        "count": min(max_comments // 5, 10),
+                        "offset": 0,
+                    },
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)",
+                        "Accept": "application/json",
+                    },
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    for item in data.get("data", []):
+                        desc = item.get("desc", "")
+                        if desc:
+                            comments.append({
+                                "content": desc[:300],
+                                "platform": "douyin",
+                                "like_count": item.get("statistics", {}).get("digg_count", 0),
+                                "reply_count": item.get("statistics", {}).get("comment_count", 0),
+                                "user_type": "kol" if item.get("author", {}).get("unique_id") else "ordinary",
+                            })
+                            if len(comments) >= max_comments:
+                                return comments
+        except Exception as e:
+            logger.warning("ApiCrawler: 抖音爬取失败 %s", e)
+        return comments
+
+    async def crawl_xiaohongshu(self, keyword: str, max_comments: int = 50) -> List[dict]:
+        """小红书搜索API - 通过小红书Web端"""
+        comments: List[dict] = []
+        try:
+            async with httpx.AsyncClient(timeout=self.TIMEOUT) as client:
+                # 小红书搜索API
+                resp = await client.get(
+                    "https://edith.xiaohongshu.com/api/sns/web/v1/search/notes",
+                    params={
+                        "keyword": keyword,
+                        "page": 1,
+                        "page_size": min(max_comments // 5, 10),
+                        "sort": "general",
+                    },
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)",
+                        "Accept": "application/json",
+                    },
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    for item in data.get("data", {}).get("items", []):
+                        note = item.get("note_card", {})
+                        title = note.get("title", "")
+                        desc = note.get("desc", "")
+                        content = (title + " " + desc).strip()
+                        if content:
+                            comments.append({
+                                "content": content[:300],
+                                "platform": "xiaohongshu",
+                                "like_count": note.get("interact_info", {}).get("liked_count", 0),
+                                "reply_count": note.get("interact_info", {}).get("comment_count", 0),
+                                "user_type": "kol" if note.get("user", {}).get("nickname") else "ordinary",
+                            })
+                            if len(comments) >= max_comments:
+                                return comments
+        except Exception as e:
+            logger.warning("ApiCrawler: 小红书爬取失败 %s", e)
+        return comments
+
 
 class DeepCrawler:
     """深度评论爬取器 - API优先策略"""
@@ -179,6 +256,8 @@ class DeepCrawler:
             "微博": self.api_crawler.crawl_weibo,
             "知乎": self.api_crawler.crawl_zhihu,
             "B站": self.api_crawler.crawl_bilibili,
+            "抖音": self.api_crawler.crawl_douyin,
+            "小红书": self.api_crawler.crawl_xiaohongshu,
         }
 
         per_platform_limit = max(max_comments // len(keyword.platforms), 10)
