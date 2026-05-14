@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/workspace/tests/t4_prompt_ab_test.py", line 16, in <module>
+    from backend.services.analyzer import calculate_overall_score
+  File "/workspace/backend/services/analyzer.py", line 6, in <module>
+    from sqlalchemy.orm import Session
+ModuleNotFoundError: No module named 'sqlalchemy'
