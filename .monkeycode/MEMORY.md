@@ -70,3 +70,15 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
   - 新增4个维度：事实错误、平台禁区、情绪极化、价值观倾向
   - 红线维度评分标准：触碰即HIGH 76+（政治敏感、法律合规、民族宗教、事实错误、平台禁区）
   - 多维度叠加机制：3个及以上维度触发时总分必须≥76
+
+### T3 Memory Stream + Reflection 机制实现
+- Date: 2026-05-14
+- Context: Agent 在执行 T3 任务（Memory Stream + Reflection 机制）时发现
+- Category: 代码结构
+- Instructions:
+  - Reflection 触发机制：当 24 小时内未反射的 observation 记忆累积重要性≥10.0 时自动触发
+  - Reflection 执行流程：生成 2-3 个反思问题 → 检索相关记忆 (Top-5) → LLM 生成反思文本 (200-400 字) → 评估重要性 (0.7-1.0) → 存储为 reflection 记忆
+  - Memory Stream 三因子检索权重：Recency(0.5) + Importance(0.3) + Relevance(0.2)
+  - Recency 衰减公式：e^(-0.05 × hours_elapsed)
+  - Reflection 后台异步执行，不阻塞主流程
+  - 集成方式：在 Memory Store 中调用 check_and_trigger_reflection(agent_id) 方法
