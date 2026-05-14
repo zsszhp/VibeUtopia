@@ -949,10 +949,8 @@ class NetworkGenerateRequest(BaseModel):
 @router.post("/agents/generate")
 async def generate_agents(req: AgentGenerateRequest):
     """批量生成Agent"""
-from backend.services.persona_generator import generate_agents_cross_platform
-from backend.services.persona.graph_injector import GraphInjector
-from backend.services.persona.life_story_generator import PersonaFactory
-from backend.services.persona.memory_stream import MemoryStreamStore
+    from backend.services.persona_generator import generate_agents_cross_platform
+    from backend.services.persona.graph_injector import GraphInjector
 
     graph_injector = None
     if req.inject_graph:
@@ -1203,6 +1201,8 @@ async def generate_life_story_persona(req: LifeStoryGenerateRequest):
     B-tier: CGSS采样+LLM丰富 — 人口统计采样 → LLM推理L2-L7 → 千字故事
     C-tier: 模板变体 — 原型模板+随机参数变体 → 百字梗概
     """
+    from backend.services.persona.life_story_generator import PersonaFactory
+    
     factory = PersonaFactory()
     
     try:
@@ -1240,6 +1240,8 @@ class LifeStoryBatchGenerateRequest(BaseModel):
 @router.post("/persona/generate-batch")
 async def generate_life_story_persona_batch(req: LifeStoryBatchGenerateRequest):
     """T1: 批量生成人生故事驱动的人格"""
+    from backend.services.persona.life_story_generator import PersonaFactory
+    
     factory = PersonaFactory()
     
     try:
@@ -1281,6 +1283,8 @@ class MemoryStreamStoreRequest(BaseModel):
 @router.post("/memory/store")
 async def store_memory(req: MemoryStreamStoreRequest):
     """T1: 存储一条记忆到Memory Stream"""
+    from backend.services.persona.memory_stream import MemoryStreamStore
+    
     store = MemoryStreamStore()
     
     try:
@@ -1311,6 +1315,8 @@ class MemoryStreamRetrieveRequest(BaseModel):
 @router.post("/memory/retrieve")
 async def retrieve_memory(req: MemoryStreamRetrieveRequest):
     """T1: 三因子检索记忆 (Recency + Importance + Relevance)"""
+    from backend.services.persona.memory_stream import MemoryStreamStore
+    
     store = MemoryStreamStore()
     
     try:
@@ -1334,6 +1340,8 @@ async def retrieve_memory(req: MemoryStreamRetrieveRequest):
 @router.get("/memory/status")
 async def get_memory_status():
     """T1: 获取Memory Stream状态"""
+    from backend.services.persona.memory_stream import MemoryStreamStore
+    
     store = MemoryStreamStore()
     return {
         "chroma_available": store.is_chroma_available,
