@@ -1,0 +1,81 @@
+{
+  "test_time": "2026-05-14T07:23:05.350520",
+  "analysis_results": [
+    {
+      "name": "暴力画面检测",
+      "visual_score": 90,
+      "audio_score": 0,
+      "ocr_score": 0
+    },
+    {
+      "name": "敏感音频检测",
+      "visual_score": 0,
+      "audio_score": 68,
+      "ocr_score": 0
+    },
+    {
+      "name": "OCR风险检测",
+      "visual_score": 0,
+      "audio_score": 0,
+      "ocr_score": 85
+    },
+    {
+      "name": "安全内容",
+      "visual_score": 0,
+      "audio_score": 0,
+      "ocr_score": 10
+    }
+  ],
+  "score_integration": [
+    {
+      "text": 30,
+      "visual": 0,
+      "audio": 0,
+      "ocr": 0,
+      "expected": 30,
+      "actual": 30,
+      "passed": true
+    },
+    {
+      "text": 30,
+      "visual": 80,
+      "audio": 0,
+      "ocr": 0,
+      "expected": 64,
+      "actual": 64,
+      "passed": true
+    },
+    {
+      "text": 30,
+      "visual": 0,
+      "audio": 70,
+      "ocr": 0,
+      "expected": 49,
+      "actual": 49,
+      "passed": true
+    },
+    {
+      "text": 30,
+      "visual": 80,
+      "audio": 70,
+      "ocr": 60,
+      "expected": 74,
+      "actual": 64,
+      "passed": false
+    },
+    {
+      "text": 80,
+      "visual": 90,
+      "audio": 85,
+      "ocr": 80,
+      "expected": 90,
+      "actual": 90,
+      "passed": true
+    }
+  ],
+  "summary": {
+    "score_passed": 4,
+    "score_total": 5
+  },
+  "status": "PARTIAL"
+}
