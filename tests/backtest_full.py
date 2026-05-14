@@ -111,12 +111,17 @@ def evaluate_case(case: dict, actual_score: int, actual_dimensions: dict) -> dic
         "accuracy": accuracy,
     }
 
-async def run_single_case(case: dict) -> dict:
-    """运行单个案例的分析"""
+async def run_single_case(case: dict, prompt_version: str = "v2") -> dict:
+    """运行单个案例的分析
+    
+    Args:
+        case: 案例数据
+        prompt_version: Prompt 版本，"v2"为 T4 优化版，"v1"为原始版
+    """
     task_id = f"backtest_{case['case_id']}_{int(time.time())}"
     content = case["content"]
     
-    # 直接调用风险评估（跳过平台仿真等耗时步骤，但包含T5模块）
+    # 直接调用风险评估（跳过平台仿真等耗时步骤，但包含 T5 模块）
     try:
         from backend.services.risk_assessor import assess_risks
         from backend.services.text_splitter import split_text
@@ -125,7 +130,8 @@ async def run_single_case(case: dict) -> dict:
         
         sentences = split_text(content)
         transcript_quality = await detect_transcript_quality(content, sentences)
-        risk_results = await assess_risks(content, transcript_quality=transcript_quality)
+        # T4: 使用优化后的 Prompt 版本
+        risk_results = await assess_risks(content, transcript_quality=transcript_quality, prompt_version=prompt_version)
         
         dimensions = risk_results.get("dimensions", [])
         
@@ -184,17 +190,21 @@ async def run_single_case(case: dict) -> dict:
     
     return evaluate_case(case, actual_score, actual_dimensions)
 
-async def run_backtest():
-    """运行完整回测"""
+async def run_backtest(prompt_version: str = "v2"):
+    """运行完整回测
+    
+    Args:
+        prompt_version: Prompt 版本，"v2"为 T4 优化版，"v1"为原始版
+    """
     cases = load_cases()
-    logger.info("加载 %d 个回测案例", len(cases))
+    logger.info("加载 %d 个回测案例，使用 Prompt 版本：%s", len(cases), prompt_version)
     
     results = []
     start_time = time.time()
     
     for i, case in enumerate(cases, 1):
-        logger.info("[%d/%d] 运行案例: %s (%s)", i, len(cases), case["title"], case["category"])
-        result = await run_single_case(case)
+        logger.info("[%d/%d] 运行案例：%s (%s) [Prompt: %s]", i, len(cases), case["title"], case["category"], prompt_version)
+        result = await run_single_case(case, prompt_version=prompt_version)
         results.append(result)
         
         # 打印进度
@@ -324,4 +334,9 @@ def print_summary(report: dict):
 
 if __name__ == "__main__":
     os.chdir(Path(__file__).parent.parent)
-    asyncio.run(run_backtest())
+    
+    # 支持命令行参数指定版本
+    import sys
+    prompt_version = sys.argv[1] if len(sys.argv) > 1 else "v2"
+    
+    asyncio.run(run_backtest(prompt_version=prompt_version))

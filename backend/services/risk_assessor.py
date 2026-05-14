@@ -7,14 +7,15 @@ from backend.services.llm_client import call_llm, load_prompt, parse_llm_json
 logger = logging.getLogger(__name__)
 
 
-async def assess_risks(text: str, transcript_quality: dict | None = None) -> dict:
+async def assess_risks(text: str, transcript_quality: dict | None = None, prompt_version: str = "v2") -> dict:
     """对文本进行七维风险评估
 
     Args:
         text: 待评估文本
-        transcript_quality: 转写质量检测结果（如有），会在prompt中注入提示
+        transcript_quality: 转写质量检测结果（如有），会在 prompt 中注入提示
+        prompt_version: Prompt 版本，默认"v2"（T4 优化版），可选"v1"（原始版）
     """
-    prompt_template = load_prompt("risk_assessment.txt")
+    prompt_template = load_prompt(f"risk_assessment{prompt_version if prompt_version != 'v1' else ''}.txt")
     prompt = prompt_template + text
 
     # 如果检测到转写质量问题，在prompt前注入提醒
