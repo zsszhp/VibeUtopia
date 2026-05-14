@@ -12,6 +12,7 @@ from backend.services.agent_simulator import simulate_all_platforms_with_agents
 from backend.services.risk_assessor import assess_risks
 from backend.services.rewriter import rewrite_sentence
 from backend.services.transcript_detector import detect_transcript_quality, is_noise_sentence
+from backend.services.cross_modal_detector import CrossModalConflictDetector, integrate_cross_modal_score
 
 logger = logging.getLogger(__name__)
 
@@ -348,21 +349,19 @@ async def run_analysis(task_id: str, text: str):
         await _broadcast_step(task_id, "cross_modal", 0.87, "正在进行跨模态冲突检测...")
         cross_modal_result = None
         try:
-            from backend.services.cross_modal_risk import CrossModalRiskDetector
-            detector = CrossModalRiskDetector()
-            cross_modal_result = await detector.detect(
-                text_analysis={"text": text, "dimensions": dimensions, "risk_sentences": risk_sentences},
-                image_risks=[],  # MVP阶段暂无画面分析
-                audio_analysis={},  # MVP阶段暂无音频分析
-                ocr_text="",
-                audio_text="",
-                task_id=task_id,
+            detector = CrossModalConflictDetector()
+            cross_modal_result = await detector.detect_conflicts(
+                text=text,
+                visual_description=None,  # MVP阶段暂无画面分析
+                audio_transcript=None,    # MVP阶段暂无音频分析
             )
-            logger.info("跨模态检测完成: %d个风险, 等级=%s", len(cross_modal_result.cross_risks), cross_modal_result.overall_risk_level)
-            if cross_modal_result.cross_risks:
+            logger.info("跨模态检测完成: 冲突分数=%d, 隐藏风险=%s",
+                       cross_modal_result.get("overall_conflict_score", 0),
+                       cross_modal_result.get("has_hidden_risk", False))
+            if cross_modal_result.get("conflicts"):
                 await _broadcast_step(
                     task_id, "cross_modal", 0.90,
-                    f"发现{len(cross_modal_result.cross_risks)}个跨模态风险",
+                    f"发现{len(cross_modal_result['conflicts'])}个跨模态冲突",
                 )
             else:
                 await _broadcast_step(task_id, "cross_modal", 0.90, "跨模态检测完成，无冲突")
@@ -376,6 +375,14 @@ async def run_analysis(task_id: str, text: str):
 
         # 加权评分
         overall_score, dimension_weights, auto_cross_effects = calculate_overall_score(dimensions)
+
+        # 跨模态冲突分数集成
+        if cross_modal_result:
+            conflict_score = cross_modal_result.get("overall_conflict_score", 0)
+            has_hidden_risk = cross_modal_result.get("has_hidden_risk", False)
+            overall_score = integrate_cross_modal_score(overall_score, conflict_score, has_hidden_risk)
+            logger.info("跨模态冲突集成: 原始分=%d, 冲突分=%d, 隐藏风险=%s, 调整后=%d",
+                       overall_score, conflict_score, has_hidden_risk, overall_score)
 
         # 信号关联风险提升
         signal_risk_boost = 0.0

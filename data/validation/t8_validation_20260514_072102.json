@@ -1,0 +1,137 @@
+{
+  "test_time": "2026-05-14T07:21:02.089308",
+  "conflict_detection": [
+    {
+      "name": "文案安全但画面有风险",
+      "passed": true,
+      "result": {
+        "conflicts": [
+          {
+            "type": "文案vs画面",
+            "description": "文案表达积极正向的户外活动建议，而画面呈现暴力、血腥等高风险内容，存在明显的语义与视觉冲突。",
+            "risk_score": 95,
+            "severity": "high",
+            "evidence": "文案：'今天天气真好，适合出去走走'（积极、安全）；画面：检测到暴力打斗、血腥场景（高风险内容）"
+          }
+        ],
+        "overall_conflict_score": 95,
+        "has_hidden_risk": true,
+        "summary": "文案与画面存在严重冲突：文案看似安全且积极，但画面包含高风险的暴力与血腥内容。音频无信息，不构成额外风险。此场景存在典型的‘误导性包装’风险，即利用安全文案掩盖高风险视觉内容，属于隐蔽违规，需高度警惕。"
+      }
+    },
+    {
+      "name": "文案积极但音频消极",
+      "passed": true,
+      "result": {
+        "conflicts": [
+          {
+            "type": "文案vs音频",
+            "description": "文案声称产品优秀且用户好评，但音频转写内容指出产品问题多、投诉率高、质量堪忧，形成直接语义对立",
+            "risk_score": 95,
+            "severity": "high",
+            "evidence": "文案：'非常优秀'、'一致好评'；音频：'问题很多'、'投诉率很高'、'质量堪忧'"
+          }
+        ],
+        "overall_conflict_score": 95,
+        "has_hidden_risk": true,
+        "summary": "文案与音频内容存在严重冲突，文案呈现虚假正面宣传，而音频暴露真实负面信息，构成高风险误导性内容。画面缺失导致无法进一步验证，但单模态风险已显著。"
+      }
+    },
+    {
+      "name": "三模态一致安全",
+      "passed": true,
+      "result": {
+        "conflicts": [],
+        "overall_conflict_score": 0,
+        "has_hidden_risk": false,
+        "summary": "文案、画面与音频内容高度一致，均呈现积极、自然的春日景象，无风险信号冲突。"
+      }
+    },
+    {
+      "name": "单模态内容（无冲突）",
+      "passed": true,
+      "result": {
+        "conflicts": [],
+        "overall_conflict_score": 0,
+        "has_hidden_risk": false,
+        "summary": "单模态内容，无需跨模态检测"
+      }
+    },
+    {
+      "name": "画面和音频冲突",
+      "passed": true,
+      "result": {
+        "conflicts": [
+          {
+            "type": "文案vs音频",
+            "description": "文案声明为恐怖电影，但音频内容为轻松愉快的喜剧风格，存在明显的模态冲突。",
+            "risk_score": 75,
+            "severity": "medium",
+            "evidence": "文案：'这是一部恐怖电影'；音频转写：'轻松愉快，喜剧风格'"
+          },
+          {
+            "type": "画面vs音频",
+            "description": "画面展示血腥暴力的恐怖场景，但音频为轻松愉快的喜剧风格，存在强烈的不协调和潜在误导风险。",
+            "risk_score": 85,
+            "severity": "high",
+            "evidence": "画面描述：'恐怖场景，血腥暴力'；音频转写：'轻松愉快，喜剧风格'"
+          }
+        ],
+        "overall_conflict_score": 80,
+        "has_hidden_risk": true,
+        "summary": "画面和文案均指向恐怖暴力内容，但音频呈现完全相反的轻松风格，存在高风险模态冲突，可能用于规避内容审核或造成用户心理不适。"
+      }
+    }
+  ],
+  "score_integration": [
+    {
+      "overall": 30,
+      "conflict": 0,
+      "hidden": false,
+      "expected": 30,
+      "actual": 30,
+      "passed": true
+    },
+    {
+      "overall": 30,
+      "conflict": 60,
+      "hidden": false,
+      "expected": 40,
+      "actual": 40,
+      "passed": true
+    },
+    {
+      "overall": 30,
+      "conflict": 0,
+      "hidden": true,
+      "expected": 45,
+      "actual": 45,
+      "passed": true
+    },
+    {
+      "overall": 30,
+      "conflict": 60,
+      "hidden": true,
+      "expected": 45,
+      "actual": 45,
+      "passed": true
+    },
+    {
+      "overall": 80,
+      "conflict": 70,
+      "hidden": true,
+      "expected": 95,
+      "actual": 95,
+      "passed": true
+    }
+  ],
+  "summary": {
+    "conflict_passed": 5,
+    "conflict_total": 5,
+    "score_passed": 5,
+    "score_total": 5,
+    "total_passed": 10,
+    "total_tests": 10
+  },
+  "status": "PASSED"
+}
