@@ -2586,35 +2586,73 @@ async def get_history(
 
 @router.get("/models", response_model=ModelsResponse)
 async def get_models():
-    """获取当前可用模型和硬件等级"""
-    hardware_tier = "lite"
+    """获取当前可用模型和硬件等级
+    
+    阶段1.3增强: 使用硬件自适应检测模块返回详细配置
+    """
+    # 使用新的硬件检测模块
     try:
-        import torch
-        if torch.cuda.is_available():
-            gpu_mem = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-            if gpu_mem >= 24:
-                hardware_tier = "ultra"
-            elif gpu_mem >= 12:
-                hardware_tier = "pro"
-            elif gpu_mem >= 6:
-                hardware_tier = "standard"
-    except ImportError:
-        pass
-
-    models = {
-        "text_analysis": {
-            "primary": settings.DEEPSEEK_MODEL,
-            "fallback": "deepseek-chat"
-        },
-        "vision": {
-            "primary": "qwen3-vl-plus",
-            "fallback": "glm-4v"
-        },
-        "audio": {
-            "primary": "paraformer",
-            "fallback": "faster-whisper-local"
+        from backend.services.hardware_detector import get_hardware_summary
+        hardware_info = get_hardware_summary()
+        hardware_tier = hardware_info["hardware"]["tier"]
+        
+        models = {
+            "text_analysis": {
+                "primary": hardware_info["recommendation"]["risk_assessment_model"],
+                "fallback": "deepseek-chat"
+            },
+            "vision": {
+                "primary": hardware_info["recommendation"]["vision_model"],
+                "fallback": "glm-4v"
+            },
+            "audio": {
+                "primary": hardware_info["recommendation"]["audio_model"],
+                "fallback": "faster-whisper-local"
+            },
+            "ocr": {
+                "primary": hardware_info["recommendation"]["ocr_model"],
+                "fallback": "glm-ocr-api"
+            },
+            "agent_simulation": {
+                "primary": hardware_info["recommendation"]["agent_simulation_model"],
+                "fallback": "qwen3-8b"
+            }
         }
-    }
+        
+        # 附加硬件详情
+        models["_hardware_details"] = hardware_info
+        
+    except Exception as e:
+        logger.warning("硬件检测失败,使用默认配置: %s", e)
+        # 降级到旧逻辑
+        hardware_tier = "lite"
+        try:
+            import torch
+            if torch.cuda.is_available():
+                gpu_mem = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                if gpu_mem >= 24:
+                    hardware_tier = "ultra"
+                elif gpu_mem >= 12:
+                    hardware_tier = "pro"
+                elif gpu_mem >= 6:
+                    hardware_tier = "standard"
+        except ImportError:
+            pass
+        
+        models = {
+            "text_analysis": {
+                "primary": settings.DEEPSEEK_MODEL,
+                "fallback": "deepseek-chat"
+            },
+            "vision": {
+                "primary": "qwen3-vl-plus",
+                "fallback": "glm-4v"
+            },
+            "audio": {
+                "primary": "paraformer",
+                "fallback": "faster-whisper-local"
+            }
+        }
 
     return ModelsResponse(
         hardware_tier=hardware_tier,
