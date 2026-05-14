@@ -343,9 +343,36 @@ async def run_analysis(task_id: str, text: str):
         await _broadcast_step(task_id, "simulation", 0.85, "改写建议生成完成")
 
         # ═══════════════════════════════════════════════════════════════════════
-        # 步骤5: 报告生成 (85% - 100%)
+        # 步骤4.5: 跨模态冲突检测 (85% - 90%)
         # ═══════════════════════════════════════════════════════════════════════
-        await _broadcast_step(task_id, "report", 0.88, "正在计算综合评分...")
+        await _broadcast_step(task_id, "cross_modal", 0.87, "正在进行跨模态冲突检测...")
+        cross_modal_result = None
+        try:
+            from backend.services.cross_modal_risk import CrossModalRiskDetector
+            detector = CrossModalRiskDetector()
+            cross_modal_result = await detector.detect(
+                text_analysis={"text": text, "dimensions": dimensions, "risk_sentences": risk_sentences},
+                image_risks=[],  # MVP阶段暂无画面分析
+                audio_analysis={},  # MVP阶段暂无音频分析
+                ocr_text="",
+                audio_text="",
+                task_id=task_id,
+            )
+            logger.info("跨模态检测完成: %d个风险, 等级=%s", len(cross_modal_result.cross_risks), cross_modal_result.overall_risk_level)
+            if cross_modal_result.cross_risks:
+                await _broadcast_step(
+                    task_id, "cross_modal", 0.90,
+                    f"发现{len(cross_modal_result.cross_risks)}个跨模态风险",
+                )
+            else:
+                await _broadcast_step(task_id, "cross_modal", 0.90, "跨模态检测完成，无冲突")
+        except Exception as e:
+            logger.warning("跨模态检测失败(降级继续): %s", e, exc_info=True)
+
+        # ═══════════════════════════════════════════════════════════════════════
+        # 步骤5: 报告生成 (90% - 100%)
+        # ═══════════════════════════════════════════════════════════════════════
+        await _broadcast_step(task_id, "report", 0.92, "正在计算综合评分...")
 
         # 加权评分
         overall_score, dimension_weights, auto_cross_effects = calculate_overall_score(dimensions)

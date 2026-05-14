@@ -198,6 +198,11 @@ class CrossModalRiskDetector:
         """基于规则的快速交叉检测"""
         risks = []
 
+        # 纯文本模式：检测文本内部一致性
+        if text_analysis and not image_risks and not audio_analysis and not ocr_text and not audio_text:
+            risks.extend(self._detect_text_internal_inconsistency(text_analysis))
+            return risks
+
         # 检测：OCR文字与文案不一致
         if ocr_text and text_analysis:
             original_text = text_analysis.get("text", "")
@@ -250,6 +255,62 @@ class CrossModalRiskDetector:
                 suggestion="重点关注画面与音频的组合效果",
             ))
 
+        return risks
+
+    def _detect_text_internal_inconsistency(self, text_analysis: dict) -> list[CrossModalRisk]:
+        """检测纯文本内部的一致性（MVP阶段单模态检测）
+        
+        检测文本内部的矛盾、语气突变、逻辑冲突等。
+        """
+        risks = []
+        text = text_analysis.get("text", "")
+        dimensions = text_analysis.get("dimensions", [])
+        risk_sentences = text_analysis.get("risk_sentences", [])
+        
+        if not text:
+            return risks
+        
+        # 检测1：多维度中等风险共存（可能暗示隐含冲突）
+        medium_dims = [d for d in dimensions if d.get("severity") == "medium"]
+        if len(medium_dims) >= 2:
+            dim_names = [d.get("name", "") for d in medium_dims]
+            risks.append(CrossModalRisk(
+                risk_type="implicit_conflict",
+                modalities=["text"],
+                description=f"文本同时触发多个中等风险维度：{', '.join(dim_names)}，可能存在隐含逻辑冲突",
+                severity="medium",
+                confidence=0.5,
+                evidence=f"多维度同时触发: {', '.join(dim_names)}",
+                suggestion="检查文本是否在不同维度间存在隐含冲突",
+            ))
+        
+        # 检测2：高风险维度但证据薄弱
+        high_dims = [d for d in dimensions if d.get("severity") == "high"]
+        for dim in high_dims:
+            evidence = dim.get("evidence", "")
+            if not evidence or evidence == "未检测到相关风险" or len(evidence) < 10:
+                risks.append(CrossModalRisk(
+                    risk_type="misleading",
+                    modalities=["text"],
+                    description=f"{dim.get('name', '')}维度判定为高风险，但证据不足，可能存在误判",
+                    severity="low",
+                    confidence=0.4,
+                    evidence=f"高风险维度'{dim.get('name', '')}'缺乏具体证据",
+                    suggestion="人工复核该维度判定是否准确",
+                ))
+        
+        # 检测3：文本长度与风险句子数量不匹配
+        if len(text) > 500 and len(risk_sentences) <= 1:
+            risks.append(CrossModalRisk(
+                risk_type="other",
+                modalities=["text"],
+                description="长文本中仅检测到极少数风险句子，可能存在漏检",
+                severity="low",
+                confidence=0.3,
+                evidence=f"文本长度{len(text)}字，仅{len(risk_sentences)}个风险句子",
+                suggestion="建议分段仔细检查",
+            ))
+        
         return risks
 
     async def _llm_cross_analysis(
