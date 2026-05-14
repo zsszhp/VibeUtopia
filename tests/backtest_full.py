@@ -116,21 +116,61 @@ async def run_single_case(case: dict) -> dict:
     task_id = f"backtest_{case['case_id']}_{int(time.time())}"
     content = case["content"]
     
-    # 直接调用风险评估（跳过平台仿真等耗时步骤）
+    # 直接调用风险评估（跳过平台仿真等耗时步骤，但包含T5模块）
     try:
         from backend.services.risk_assessor import assess_risks
         from backend.services.text_splitter import split_text
         from backend.services.transcript_detector import detect_transcript_quality
+        from backend.services.analyzer import calculate_overall_score
         
         sentences = split_text(content)
         transcript_quality = await detect_transcript_quality(content, sentences)
         risk_results = await assess_risks(content, transcript_quality=transcript_quality)
         
         dimensions = risk_results.get("dimensions", [])
+        
+        # T5: 信号关联 + 实体风险链 + 动态权重
+        signal_dimension_boosts = {}
+        entity_dimension_boosts = {}
+        
+        try:
+            # 信号关联
+            from backend.services.signal_matcher import SignalMatcher
+            matcher = SignalMatcher()
+            signal_result = await matcher.match(content)
+            if hasattr(signal_result, 'risk_dimension_boosts'):
+                signal_dimension_boosts = signal_result.risk_dimension_boosts
+        except Exception as e:
+            logger.debug("信号关联失败(降级继续): %s", e)
+        
+        try:
+            # 实体风险链
+            from backend.services.entity_risk_chain import analyze_entity_risk_chain
+            entity_chain_result = await analyze_entity_risk_chain(content)
+            if entity_chain_result and hasattr(entity_chain_result, 'risk_dimension_boosts'):
+                entity_dimension_boosts = entity_chain_result.risk_dimension_boosts
+        except Exception as e:
+            logger.debug("实体风险链失败(降级继续): %s", e)
+        
+        try:
+            # 动态权重调整
+            from backend.services.dynamic_weights import DynamicWeights
+            dw = DynamicWeights()
+            weights_result = dw.adjust(
+                signal_dimension_boosts=signal_dimension_boosts,
+                entity_dimension_boosts=entity_dimension_boosts,
+            )
+            # 应用动态权重到维度结果
+            for dim in dimensions:
+                dim_name = dim.get("name", "")
+                if dim_name in weights_result.adjusted_weights:
+                    dim["dimension_weight"] = weights_result.adjusted_weights[dim_name]
+        except Exception as e:
+            logger.debug("动态权重调整失败(降级继续): %s", e)
+        
         actual_dimensions = {d.get("name", ""): d.get("score", 0) for d in dimensions}
         
-        # 计算总分
-        from backend.services.analyzer import calculate_overall_score
+        # 计算总分（应用动态权重后）
         actual_score, _, _ = calculate_overall_score(dimensions)
         
     except Exception as e:

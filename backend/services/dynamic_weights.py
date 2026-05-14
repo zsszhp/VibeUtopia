@@ -12,11 +12,15 @@ from backend.services.llm_client import call_llm, parse_llm_json
 
 logger = logging.getLogger(__name__)
 
-# 7维风险维度默认权重（高风险维度权重更高）
+# 11维风险维度默认权重（高风险维度权重更高）
 DEFAULT_DIMENSION_WEIGHTS = {
     "政治敏感": 1.5,
     "法律合规": 1.5,
     "民族宗教": 1.3,
+    "事实错误": 1.3,
+    "平台禁区": 1.3,
+    "情绪极化": 1.2,
+    "价值观倾向": 1.2,
     "性别议题": 1.0,
     "道德伦理": 1.0,
     "群体冒犯": 1.0,
