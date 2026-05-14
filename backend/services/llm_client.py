@@ -40,6 +40,8 @@ class ModelEndpoint:
     provider_name: str = ""
     vision: bool = False  # 是否支持视觉/多模态
     text: bool = True  # 是否支持纯文本任务（Omni类模型设为False）
+    key_index: int = 0  # 同一厂商多 Key 时的序号（从 0 开始）
+    key_label: str = ""  # Key 显示标签，如 "Key2"
 
 
 # ---------------------------------------------------------------------------
@@ -83,25 +85,25 @@ class ModelRegistry:
         for provider_id, pcfg in providers_config.items():
             prefix = provider_id.upper()
             api_key_env = pcfg.get("api_key_env", f"{prefix}_API_KEY")
-            api_key = os.getenv(api_key_env, "")
+            raw_api_key = os.getenv(api_key_env, "")
 
             # 如果环境变量为空，直接跳过该 provider
-            if not api_key:
+            if not raw_api_key:
                 continue
 
             # --- 动态覆盖逻辑 ---
             # 1. 允许从 .env 覆盖 base_url
             base_url = os.getenv(f"{prefix}_BASE_URL", pcfg.get("base_url", ""))
-            
+
             # 2. 允许从 .env 指定该厂商的主力模型
             env_model_id = os.getenv(f"{prefix}_MODEL", "")
-            
+
             provider_name = pcfg.get("name", provider_id)
             self.providers[provider_id] = pcfg
 
             # 获取 YAML 中的模型定义
             models_cfg = pcfg.get("models", [])
-            
+
             # 如果 .env 指定了模型名，且该模型不在 YAML 列表中，将其作为 standard 级别加入
             if env_model_id:
                 existing_model_ids = [m.get("id") for m in models_cfg]
@@ -109,19 +111,28 @@ class ModelRegistry:
                     # 插入到首位作为优先候选项
                     models_cfg.insert(0, {"id": env_model_id, "tier": "standard"})
 
+            # 支持多 Key：逗号分隔，如 "key1,key2,key3"
+            api_keys = [k.strip() for k in raw_api_key.split(",") if k.strip()]
+            if not api_keys:
+                continue
+
             for mcfg in models_cfg:
                 m_id = mcfg.get("id", "")
-                ep = ModelEndpoint(
-                    provider=provider_id,
-                    model_id=m_id,
-                    base_url=base_url,
-                    api_key=api_key,
-                    tier=mcfg.get("tier", "standard"),
-                    provider_name=provider_name,
-                    vision=mcfg.get("vision", False),
-                    text=mcfg.get("text", True),
-                )
-                self.endpoints.append(ep)
+                for key_idx, ak in enumerate(api_keys):
+                    key_label = f"Key{key_idx + 1}" if len(api_keys) > 1 else ""
+                    ep = ModelEndpoint(
+                        provider=provider_id,
+                        model_id=m_id,
+                        base_url=base_url,
+                        api_key=ak,
+                        tier=mcfg.get("tier", "standard"),
+                        provider_name=provider_name,
+                        vision=mcfg.get("vision", False),
+                        text=mcfg.get("text", True),
+                        key_index=key_idx,
+                        key_label=key_label,
+                    )
+                    self.endpoints.append(ep)
 
         logger.info(
             "模型配置加载完成: %d 个 provider, %d 个可用模型 (支持 .env 动态覆盖)",
@@ -145,7 +156,7 @@ class ModelRegistry:
         text_only: bool = False,
     ) -> list[ModelEndpoint]:
         """获取符合条件的端点列表
-        
+
         Args:
             text_only: 如果为True，只返回支持纯文本任务的端点
         """
@@ -155,7 +166,7 @@ class ModelRegistry:
                 continue
             if provider and ep.provider != provider:
                 continue
-            if exclude and f"{ep.provider}:{ep.model_id}" in exclude:
+            if exclude and f"{ep.provider}:{ep.model_id}:{ep.key_index}" in exclude:
                 continue
             if text_only and not ep.text:
                 continue
@@ -171,11 +182,18 @@ class ModelRegistry:
                     "id": ep.provider,
                     "name": ep.provider_name,
                     "models": [],
+                    "key_count": 0,
                 }
-            provider_map[ep.provider]["models"].append({
-                "id": ep.model_id,
-                "tier": ep.tier,
-            })
+            model_key = f"{ep.model_id}:{ep.tier}"
+            if not any(m["id"] == ep.model_id for m in provider_map[ep.provider]["models"]):
+                provider_map[ep.provider]["models"].append({
+                    "id": ep.model_id,
+                    "tier": ep.tier,
+                })
+            provider_map[ep.provider]["key_count"] = max(
+                provider_map[ep.provider].get("key_count", 0),
+                ep.key_index + 1,
+            )
         return list(provider_map.values())
 
     def get_vision_endpoints(
@@ -190,7 +208,7 @@ class ModelRegistry:
                 continue
             if tier and ep.tier != tier:
                 continue
-            if exclude and f"{ep.provider}:{ep.model_id}" in exclude:
+            if exclude and f"{ep.provider}:{ep.model_id}:{ep.key_index}" in exclude:
                 continue
             result.append(ep)
         return result
@@ -244,10 +262,10 @@ class ModelRouter:
     def _find_override(self, tier: str, exclude: set[str], provider: str, model: str) -> ModelEndpoint | None:
         """查找指定的覆盖模型"""
         for ep in self.registry.get_endpoints(text_only=True):
-            key = f"{ep.provider}:{ep.model_id}"
+            key = f"{ep.provider}:{ep.model_id}:{ep.key_index}"
             if key in exclude:
                 continue
-            if not self.is_available(ep.provider, ep.model_id):
+            if not self.is_available(ep.provider, ep.model_id, ep.key_index):
                 continue
             if model and ep.model_id == model:
                 return ep
@@ -264,14 +282,14 @@ class ModelRouter:
         # 同 provider 同 tier
         if strategy.get("same_provider_same_tier", True):
             for ep in self.registry.get_endpoints(tier=tier, exclude=exclude, text_only=True):
-                if self.is_available(ep.provider, ep.model_id):
+                if self.is_available(ep.provider, ep.model_id, ep.key_index):
                     candidates.append(ep)
 
         # 同 provider 低 tier
         if strategy.get("same_provider_lower_tier", True):
             for lower_tier in self.TIER_ORDER[tier_idx + 1:]:
                 for ep in self.registry.get_endpoints(tier=lower_tier, exclude=exclude, text_only=True):
-                    if self.is_available(ep.provider, ep.model_id):
+                    if self.is_available(ep.provider, ep.model_id, ep.key_index):
                         # 避免重复（前面的 tier 可能已包含）
                         if ep not in candidates:
                             candidates.append(ep)
@@ -285,26 +303,60 @@ class ModelRouter:
         if strategy.get("cross_provider_lower_tier", True):
             for lower_tier in self.TIER_ORDER[tier_idx + 1:]:
                 for ep in self.registry.get_endpoints(tier=lower_tier, exclude=exclude, text_only=True):
-                    if self.is_available(ep.provider, ep.model_id) and ep not in candidates:
+                    if self.is_available(ep.provider, ep.model_id, ep.key_index) and ep not in candidates:
                         candidates.append(ep)
 
         return candidates
 
-    def mark_unavailable(self, provider: str, model_id: str):
-        """标记模型临时不可用"""
-        key = f"{provider}:{model_id}"
+    def mark_unavailable(self, provider: str, model_id: str, key_index: int = 0):
+        """标记模型 Key 临时不可用"""
+        key = f"{provider}:{model_id}:{key_index}"
         self._cooling[key] = time.time() + self._cooldown_seconds
-        logger.warning("模型 %s 标记为临时不可用，冷却 %d 秒", key, self._cooldown_seconds)
+        label = f"Key{key_index + 1}" if key_index else "Key1"
+        logger.warning("模型 %s %s 标记为临时不可用，冷却 %d 秒", provider, label, self._cooldown_seconds)
 
-    def is_available(self, provider: str, model_id: str) -> bool:
-        """检查模型是否可用（未冷却）"""
-        key = f"{provider}:{model_id}"
+    def is_available(self, provider: str, model_id: str, key_index: int = 0) -> bool:
+        """检查模型 Key 是否可用（未冷却）"""
+        key = f"{provider}:{model_id}:{key_index}"
         resume_at = self._cooling.get(key, 0)
         if time.time() < resume_at:
             return False
         # 已过冷却期，清除
         self._cooling.pop(key, None)
         return True
+
+    def get_key_pool_status(self) -> dict:
+        """返回所有 Key 的实时状态，用于监控面板"""
+        status: dict[str, dict] = {}
+        for ep in self.registry.endpoints:
+            pkey = ep.provider
+            if pkey not in status:
+                status[pkey] = {
+                    "name": ep.provider_name,
+                    "key_count": 0,
+                    "models": {},
+                }
+            status[pkey]["key_count"] = max(
+                status[pkey]["key_count"],
+                ep.key_index + 1,
+            )
+            mk = ep.model_id
+            if mk not in status[pkey]["models"]:
+                status[pkey]["models"][mk] = {}
+            avail = self.is_available(ep.provider, ep.model_id, ep.key_index)
+            status[pkey]["models"][mk][f"Key{ep.key_index + 1}"] = {
+                "available": avail,
+                "tier": ep.tier,
+            }
+        return status
+
+    def get_active_endpoint(self, provider: str, model_id: str) -> ModelEndpoint | None:
+        """返回指定模型当前可用的第一个 Key 端点"""
+        for ep in self.registry.endpoints:
+            if ep.provider == provider and ep.model_id == model_id:
+                if self.is_available(ep.provider, ep.model_id, ep.key_index):
+                    return ep
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -407,14 +459,14 @@ async def call_vlm(prompt: str, image_base64: str, system: str = "你是一个�
         if endpoint is None:
             break
 
-        key = f"{endpoint.provider}:{endpoint.model_id}"
+        key = f"{endpoint.provider}:{endpoint.model_id}:{endpoint.key_index}"
         tried.add(key)
 
         try:
             result = await _call_endpoint_vlm(endpoint, prompt, image_base64, system)
             return result
         except QuotaExhaustedError as e:
-            router.mark_unavailable(endpoint.provider, endpoint.model_id)
+            router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
             logger.warning("视觉模型 %s 配额耗尽 (%s)，触发 fallback", key, e)
             last_error = e
         except Exception as e:
@@ -424,7 +476,7 @@ async def call_vlm(prompt: str, image_base64: str, system: str = "你是一个�
                     result = await _call_endpoint_vlm(endpoint, prompt, image_base64, system)
                     return result
                 except QuotaExhaustedError as eq:
-                    router.mark_unavailable(endpoint.provider, endpoint.model_id)
+                    router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
                     logger.warning("视觉模型 %s 配额耗尽 (重试%d次): %s", key, attempt + 1, eq)
                     last_error = eq
                     retried = True
@@ -452,13 +504,13 @@ def _route_vlm(task_type: str = "default", exclude: set[str] | None = None) -> M
 
     # 同 tier 视觉模型
     for ep in registry.get_vision_endpoints(tier=tier, exclude=exclude):
-        if router.is_available(ep.provider, ep.model_id):
+        if router.is_available(ep.provider, ep.model_id, ep.key_index):
             candidates.append(ep)
 
     # 低 tier 视觉模型
     for lower_tier in ModelRouter.TIER_ORDER[tier_idx + 1:]:
         for ep in registry.get_vision_endpoints(tier=lower_tier, exclude=exclude):
-            if router.is_available(ep.provider, ep.model_id) and ep not in candidates:
+            if router.is_available(ep.provider, ep.model_id, ep.key_index) and ep not in candidates:
                 candidates.append(ep)
 
     return candidates[0] if candidates else None
@@ -500,14 +552,14 @@ async def _call_with_routing(prompt: str, system: str, task_type: str) -> str:
         if endpoint is None:
             break
 
-        key = f"{endpoint.provider}:{endpoint.model_id}"
+        key = f"{endpoint.provider}:{endpoint.model_id}:{endpoint.key_index}"
         tried.add(key)
 
         try:
             result = await _call_endpoint(endpoint, prompt, system)
             return result
         except QuotaExhaustedError as e:
-            router.mark_unavailable(endpoint.provider, endpoint.model_id)
+            router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
             logger.warning("模型 %s 配额耗尽 (%s)，触发 fallback", key, e)
             last_error = e
         except Exception as e:
@@ -517,8 +569,8 @@ async def _call_with_routing(prompt: str, system: str, task_type: str) -> str:
                 try:
                     result = await _call_endpoint(endpoint, prompt, system)
                     return result
-                except QuotaExhausted as eq:
-                    router.mark_unavailable(endpoint.provider, endpoint.model_id)
+                except QuotaExhaustedError as eq:
+                    router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
                     logger.warning("模型 %s 配额耗尽 (重试%d次): %s", key, attempt + 1, eq)
                     last_error = eq
                     retried = True
