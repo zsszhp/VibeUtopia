@@ -1,0 +1,757 @@
+{
+  "test_name": "T0.1 回测案例库基线测试",
+  "test_time": "2026-05-14T11:52:12.965301+00:00",
+  "total_time_seconds": 0.0,
+  "summary": {
+    "total_cases": 27,
+    "completed": 27,
+    "errors": 0,
+    "overall_accuracy": 0.9259,
+    "level_hits": 25,
+    "avg_score_error": 2.57
+  },
+  "by_risk_level": {
+    "high": {
+      "total": 11,
+      "hits": 9,
+      "accuracy": 0.8182
+    },
+    "medium": {
+      "total": 11,
+      "hits": 11,
+      "accuracy": 1.0
+    },
+    "low": {
+      "total": 5,
+      "hits": 5,
+      "accuracy": 1.0
+    }
+  },
+  "by_category": {
+    "celebrity": {
+      "total": 2,
+      "hits": 2,
+      "accuracy": 1.0
+    },
+    "legal": {
+      "total": 4,
+      "hits": 4,
+      "accuracy": 1.0
+    },
+    "privacy": {
+      "total": 1,
+      "hits": 1,
+      "accuracy": 1.0
+    },
+    "gender": {
+      "total": 2,
+      "hits": 2,
+      "accuracy": 1.0
+    },
+    "consumer": {
+      "total": 12,
+      "hits": 11,
+      "accuracy": 0.9167
+    },
+    "ethics": {
+      "total": 3,
+      "hits": 2,
+      "accuracy": 0.6667
+    },
+    "politics": {
+      "total": 1,
+      "hits": 1,
+      "accuracy": 1.0
+    },
+    "academic": {
+      "total": 1,
+      "hits": 1,
+      "accuracy": 1.0
+    },
+    "minor": {
+      "total": 1,
+      "hits": 1,
+      "accuracy": 1.0
+    }
+  },
+  "results": [
+    {
+      "case_id": "CASE_001",
+      "case_name": "网红小英卖惨塌房",
+      "status": "mock",
+      "overall_score": 85.12641284155158,
+      "predicted_level": "high",
+      "expected_level": "high",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 75.0,
+          "expected_severity": "high"
+        },
+        {
+          "name": "道德伦理",
+          "score": 82.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "群体冒犯",
+          "score": 55.0,
+          "expected_severity": "medium"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_002",
+      "case_name": "张雨绮代孕风波",
+      "status": "mock",
+      "overall_score": 85.47136497397219,
+      "predicted_level": "high",
+      "expected_level": "high",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 90.0,
+          "expected_severity": "high"
+        },
+        {
+          "name": "道德伦理",
+          "score": 72.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "群体冒犯",
+          "score": 52.5,
+          "expected_severity": "medium"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_003",
+      "case_name": "全红婵饭圈侵入式监控",
+      "status": "mock",
+      "overall_score": 84.4373187308939,
+      "predicted_level": "high",
+      "expected_level": "high",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 80.0,
+          "expected_severity": "high"
+        },
+        {
+          "name": "隐私侵犯",
+          "score": 87.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "群体冒犯",
+          "score": 62.5,
+          "expected_severity": "medium"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_004",
+      "case_name": "AI 一键脱衣黑产",
+      "status": "mock",
+      "overall_score": 92.1334106876223,
+      "predicted_level": "high",
+      "expected_level": "high",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 90.0,
+          "expected_severity": "high"
+        },
+        {
+          "name": "性别议题",
+          "score": 91.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "道德伦理",
+          "score": 85.0,
+          "expected_severity": "high"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_005",
+      "case_name": "优思益假洋牌事件",
+      "status": "mock",
+      "overall_score": 60.00237423400983,
+      "predicted_level": "medium",
+      "expected_level": "medium",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 52.5,
+          "expected_severity": "medium"
+        },
+        {
+          "name": "消费欺诈",
+          "score": 72.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "道德伦理",
+          "score": 47.5,
+          "expected_severity": "medium"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_006",
+      "case_name": "王妈背刺打工人",
+      "status": "mock",
+      "overall_score": 66.49109191713917,
+      "predicted_level": "medium",
+      "expected_level": "medium",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 52.5,
+          "expected_severity": "medium"
+        },
+        {
+          "name": "道德伦理",
+          "score": 72.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "群体冒犯",
+          "score": 57.5,
+          "expected_severity": "medium"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_007",
+      "case_name": "哈佛蒋雨融演讲争议",
+      "status": "mock",
+      "overall_score": 54.44111384044217,
+      "predicted_level": "medium",
+      "expected_level": "medium",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "政治敏感",
+          "score": 72.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "群体冒犯",
+          "score": 47.5,
+          "expected_severity": "medium"
+        },
+        {
+          "name": "时事踩雷",
+          "score": 42.5,
+          "expected_severity": "medium"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_008",
+      "case_name": "同济大学教师论文造假",
+      "status": "mock",
+      "overall_score": 54.38130715740577,
+      "predicted_level": "medium",
+      "expected_level": "medium",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "道德伦理",
+          "score": 72.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "法律合规",
+          "score": 32.5,
+          "expected_severity": "low"
+        },
+        {
+          "name": "群体冒犯",
+          "score": 27.5,
+          "expected_severity": "low"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_009",
+      "case_name": "日常咖啡馆推荐",
+      "status": "mock",
+      "overall_score": 8.962298991286632,
+      "predicted_level": "low",
+      "expected_level": "low",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 5.0,
+          "expected_severity": "low"
+        },
+        {
+          "name": "道德伦理",
+          "score": 5.0,
+          "expected_severity": "low"
+        },
+        {
+          "name": "群体冒犯",
+          "score": 5.0,
+          "expected_severity": "low"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_010",
+      "case_name": "科技产品评测",
+      "status": "mock",
+      "overall_score": 11.777775082620881,
+      "predicted_level": "low",
+      "expected_level": "low",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 5.0,
+          "expected_severity": "low"
+        },
+        {
+          "name": "消费欺诈",
+          "score": 7.5,
+          "expected_severity": "low"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_011",
+      "case_name": "闫学晶直播翻车",
+      "status": "mock",
+      "overall_score": 58.55820235606783,
+      "predicted_level": "medium",
+      "expected_level": "medium",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 52.5,
+          "expected_severity": "medium"
+        },
+        {
+          "name": "消费欺诈",
+          "score": 67.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "道德伦理",
+          "score": 47.5,
+          "expected_severity": "medium"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_012",
+      "case_name": "某品牌性别歧视广告",
+      "status": "mock",
+      "overall_score": 82.45255335951315,
+      "predicted_level": "high",
+      "expected_level": "high",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "性别议题",
+          "score": 85.0,
+          "expected_severity": "high"
+        },
+        {
+          "name": "群体冒犯",
+          "score": 77.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "道德伦理",
+          "score": 57.5,
+          "expected_severity": "medium"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_013",
+      "case_name": "网红餐厅食品安全问题",
+      "status": "mock",
+      "overall_score": 74.72409602217672,
+      "predicted_level": "medium",
+      "expected_level": "high",
+      "level_match": false,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 72.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "消费欺诈",
+          "score": 77.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "道德伦理",
+          "score": 52.5,
+          "expected_severity": "medium"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_014",
+      "case_name": "健身教练性侵学员",
+      "status": "mock",
+      "overall_score": 82.63624333871932,
+      "predicted_level": "high",
+      "expected_level": "high",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 85.0,
+          "expected_severity": "high"
+        },
+        {
+          "name": "道德伦理",
+          "score": 89.0,
+          "expected_severity": "high"
+        },
+        {
+          "name": "群体冒犯",
+          "score": 57.5,
+          "expected_severity": "medium"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_015",
+      "case_name": "博主虚假慈善摆拍",
+      "status": "mock",
+      "overall_score": 73.35315405299121,
+      "predicted_level": "medium",
+      "expected_level": "high",
+      "level_match": false,
+      "dimensions": [
+        {
+          "name": "道德伦理",
+          "score": 85.0,
+          "expected_severity": "high"
+        },
+        {
+          "name": "群体冒犯",
+          "score": 72.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "法律合规",
+          "score": 52.5,
+          "expected_severity": "medium"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_016",
+      "case_name": "游戏公司诱导充值",
+      "status": "mock",
+      "overall_score": 58.074359896797496,
+      "predicted_level": "medium",
+      "expected_level": "medium",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 57.5,
+          "expected_severity": "medium"
+        },
+        {
+          "name": "消费欺诈",
+          "score": 52.5,
+          "expected_severity": "medium"
+        },
+        {
+          "name": "道德伦理",
+          "score": 47.5,
+          "expected_severity": "medium"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_017",
+      "case_name": "主播辱骂粉丝事件",
+      "status": "mock",
+      "overall_score": 59.539971881905245,
+      "predicted_level": "medium",
+      "expected_level": "medium",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "道德伦理",
+          "score": 67.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "群体冒犯",
+          "score": 52.5,
+          "expected_severity": "medium"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_018",
+      "case_name": "景区宰客事件",
+      "status": "mock",
+      "overall_score": 55.49277808596692,
+      "predicted_level": "medium",
+      "expected_level": "medium",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 52.5,
+          "expected_severity": "medium"
+        },
+        {
+          "name": "消费欺诈",
+          "score": 67.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "群体冒犯",
+          "score": 32.5,
+          "expected_severity": "low"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_019",
+      "case_name": "宠物医院过度医疗",
+      "status": "mock",
+      "overall_score": 64.73872159807551,
+      "predicted_level": "medium",
+      "expected_level": "medium",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 52.5,
+          "expected_severity": "medium"
+        },
+        {
+          "name": "消费欺诈",
+          "score": 67.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "道德伦理",
+          "score": 47.5,
+          "expected_severity": "medium"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_020",
+      "case_name": "共享单车押金难退",
+      "status": "mock",
+      "overall_score": 66.06376835771827,
+      "predicted_level": "medium",
+      "expected_level": "medium",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 67.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "消费欺诈",
+          "score": 52.5,
+          "expected_severity": "medium"
+        },
+        {
+          "name": "群体冒犯",
+          "score": 47.5,
+          "expected_severity": "medium"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_021",
+      "case_name": "电影票房造假争议",
+      "status": "mock",
+      "overall_score": 56.17147761337741,
+      "predicted_level": "medium",
+      "expected_level": "medium",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 67.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "道德伦理",
+          "score": 47.5,
+          "expected_severity": "medium"
+        },
+        {
+          "name": "群体冒犯",
+          "score": 32.5,
+          "expected_severity": "low"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_022",
+      "case_name": "保健品虚假宣传",
+      "status": "mock",
+      "overall_score": 80.46909311764628,
+      "predicted_level": "high",
+      "expected_level": "high",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 82.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "消费欺诈",
+          "score": 85.0,
+          "expected_severity": "high"
+        },
+        {
+          "name": "道德伦理",
+          "score": 72.5,
+          "expected_severity": "high"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_023",
+      "case_name": "租房平台暴雷跑路",
+      "status": "mock",
+      "overall_score": 88.47056659241036,
+      "predicted_level": "high",
+      "expected_level": "high",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 85.0,
+          "expected_severity": "high"
+        },
+        {
+          "name": "消费欺诈",
+          "score": 80.0,
+          "expected_severity": "high"
+        },
+        {
+          "name": "群体冒犯",
+          "score": 72.5,
+          "expected_severity": "high"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_024",
+      "case_name": "校园霸凌事件",
+      "status": "mock",
+      "overall_score": 75.92627700381087,
+      "predicted_level": "high",
+      "expected_level": "high",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 77.5,
+          "expected_severity": "high"
+        },
+        {
+          "name": "道德伦理",
+          "score": 85.0,
+          "expected_severity": "high"
+        },
+        {
+          "name": "未成年人",
+          "score": 80.0,
+          "expected_severity": "high"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_025",
+      "case_name": "日常运动打卡",
+      "status": "mock",
+      "overall_score": 3.422474256619939,
+      "predicted_level": "low",
+      "expected_level": "low",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 2.5,
+          "expected_severity": "low"
+        },
+        {
+          "name": "道德伦理",
+          "score": 2.5,
+          "expected_severity": "low"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_026",
+      "case_name": "美食制作教程",
+      "status": "mock",
+      "overall_score": 10.963194883447947,
+      "predicted_level": "low",
+      "expected_level": "low",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 2.5,
+          "expected_severity": "low"
+        },
+        {
+          "name": "道德伦理",
+          "score": 2.5,
+          "expected_severity": "low"
+        }
+      ]
+    },
+    {
+      "case_id": "CASE_027",
+      "case_name": "旅行风景分享",
+      "status": "mock",
+      "overall_score": 4.113739564555309,
+      "predicted_level": "low",
+      "expected_level": "low",
+      "level_match": true,
+      "dimensions": [
+        {
+          "name": "法律合规",
+          "score": 2.5,
+          "expected_severity": "low"
+        },
+        {
+          "name": "道德伦理",
+          "score": 2.5,
+          "expected_severity": "low"
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

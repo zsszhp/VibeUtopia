@@ -1,0 +1,119 @@
+{
+  "test": "T2_5大平台深度覆盖",
+  "date": "2026-05-14 11:27:25",
+  "results": {
+    "archetype_coverage": true,
+    "backtest_hit_rate": true,
+    "sentiment_diversity": true,
+    "p0_impact_ratio": true,
+    "prompt_version_mgmt": true,
+    "weight_features": true
+  },
+  "go_decision": "GO",
+  "go_conditions": {
+    "每平台≥20原型": true,
+    "回测命中率≥60%": true,
+    "P0平台影响占比≥70%": true
+  },
+  "details": {
+    "archetype_coverage": {
+      "weibo": {
+        "count": 20,
+        "passed": true
+      },
+      "bilibili": {
+        "count": 20,
+        "passed": true
+      },
+      "xiaohongshu": {
+        "count": 20,
+        "passed": true
+      },
+      "douyin": {
+        "count": 20,
+        "passed": true
+      },
+      "zhihu": {
+        "count": 20,
+        "passed": true
+      }
+    },
+    "backtest_hit_rate": {
+      "hit_rate": 1.0,
+      "hits": 10,
+      "total": 10,
+      "details": [
+        {
+          "case": "case_high_1",
+          "weighted_score": 76.0,
+          "predicted": "high",
+          "expected": "high",
+          "hit": true
+        },
+        {
+          "case": "case_high_2",
+          "weighted_score": 81.0,
+          "predicted": "high",
+          "expected": "high",
+          "hit": true
+        },
+        {
+          "case": "case_medium_1",
+          "weighted_score": 51.0,
+          "predicted": "medium",
+          "expected": "medium",
+          "hit": true
+        },
+        {
+          "case": "case_medium_2",
+          "weighted_score": 54.0,
+          "predicted": "medium",
+          "expected": "medium",
+          "hit": true
+        },
+        {
+          "case": "case_low_1",
+          "weighted_score": 12.6,
+          "predicted": "low",
+          "expected": "low",
+          "hit": true
+        },
+        {
+          "case": "case_low_2",
+          "weighted_score": 17.4,
+          "predicted": "low",
+          "expected": "low",
+          "hit": true
+        },
+        {
+          "case": "case_high_3",
+          "weighted_score": 80.2,
+          "predicted": "high",
+          "expected": "high",
+          "hit": true
+        },
+        {
+          "case": "case_medium_3",
+          "weighted_score": 46.6,
+          "predicted": "medium",
+          "expected": "medium",
+          "hit": true
+        },
+        {
+          "case": "case_low_3",
+          "weighted_score": 8.8,
+          "predicted": "low",
+          "expected": "low",
+          "hit": true
+        },
+        {
+          "case": "case_high_4",
+          "weighted_score": 85.0,
+          "predicted": "high",
+          "expected": "high",
+          "hit": true
+        }
+      ]
+    }
+  }
+}

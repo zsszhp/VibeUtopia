@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from backend.config import settings
 from backend.database import get_db
-from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord, AgentRecord, SocialRelation, AgentMemory, SimulationRecord, SimulationStatus, PropagationSnapshot, PropagationEdge, V2AnalysisResult, BacktestRecord, ConsistencyRecord, TrendPredictionRecord, ReportRecord, VideoAnalysisRecord, FrameRecord, BloggerProfileRecord, CompetitorCompareRecord
+from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, SignalRecord, SeedEventRecord, AgentRecord, SocialRelation, AgentMemory, SimulationRecord, SimulationStatus, PropagationSnapshot, PropagationEdge, V2AnalysisResult, BacktestRecord, ConsistencyRecord, TrendPredictionRecord, ReportRecord, VideoAnalysisRecord, FrameRecord, BloggerProfileRecord, CompetitorCompareRecord, HotTopic, ImmersionRecord
 from backend.services.analyzer import run_analysis, MAX_TEXT_LENGTH
 from backend.services.video_extractor import extract_video_text
 from backend.services.signal.fetcher import HotlistFetcher
@@ -26,6 +26,8 @@ from backend.services.graph.graph_store import GraphStore
 from backend.services.graph.graph_updater import GraphUpdater
 from backend.services.graph.ontology_generator import generate_ontology, load_ontology
 from backend.services.graph.ontology_templates import get_default_ontology
+from backend.services.prompt_version_manager import PromptVersionManager
+from backend.services.platform_immersion import PlatformImmersion
 
 logger = logging.getLogger(__name__)
 
@@ -2886,4 +2888,387 @@ async def upload_file(file: UploadFile = File(...)):
     except Exception as e:
         logger.error("文件上传失败: %s", e)
         raise HTTPException(status_code=500, detail=f"文件上传失败: {str(e)}")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# T2.2 Prompt版本管理 API
+# ═══════════════════════════════════════════════════════════════════════
+
+class PromptVersionRequest(BaseModel):
+    prompt_name: str
+    version: str
+    content: str
+    metadata: Optional[Dict[str, Any]] = None
+
+class ABTestCreateRequest(BaseModel):
+    prompt_name: str
+    version_a: str
+    version_b: str
+    test_name: Optional[str] = None
+
+class ABTestResultRequest(BaseModel):
+    test_id: str
+    version: str
+    metrics: Dict[str, float]
+
+
+@router.get("/api/v1/prompts/versions")
+def list_prompt_versions(prompt_name: Optional[str] = None):
+    """列出Prompt版本"""
+    mgr = PromptVersionManager()
+    if prompt_name:
+        return {
+            "prompt_name": prompt_name,
+            "versions": mgr.get_version_summary(prompt_name),
+            "recommended": mgr.get_recommended_version(prompt_name),
+        }
+    return {
+        "prompts": {name: mgr.get_version_summary(name) for name in mgr.list_prompts()},
+    }
+
+
+@router.post("/api/v1/prompts/versions")
+def register_prompt_version(req: PromptVersionRequest):
+    """注册新Prompt版本"""
+    mgr = PromptVersionManager()
+    pv = mgr.register_version(
+        prompt_name=req.prompt_name,
+        version=req.version,
+        content=req.content,
+        metadata=req.metadata,
+    )
+    return {"status": "ok", "version": pv.to_dict()}
+
+
+@router.get("/api/v1/prompts/versions/{prompt_name}/{version}")
+def get_prompt_version(prompt_name: str, version: str):
+    """获取指定Prompt版本内容"""
+    mgr = PromptVersionManager()
+    pv = mgr.get_version(prompt_name, version)
+    if not pv:
+        raise HTTPException(status_code=404, detail="版本不存在")
+    return pv.to_dict()
+
+
+@router.delete("/api/v1/prompts/versions/{prompt_name}/{version}")
+def delete_prompt_version(prompt_name: str, version: str):
+    """删除Prompt版本"""
+    mgr = PromptVersionManager()
+    ok = mgr.delete_version(prompt_name, version)
+    if not ok:
+        raise HTTPException(status_code=404, detail="版本不存在")
+    return {"status": "ok"}
+
+
+@router.post("/api/v1/prompts/ab-tests")
+def create_ab_test(req: ABTestCreateRequest):
+    """创建A/B测试"""
+    mgr = PromptVersionManager()
+    try:
+        test = mgr.create_ab_test(
+            prompt_name=req.prompt_name,
+            version_a=req.version_a,
+            version_b=req.version_b,
+            test_name=req.test_name or "",
+        )
+        return {"status": "ok", "test": test}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/api/v1/prompts/ab-tests/results")
+def record_ab_test_result(req: ABTestResultRequest):
+    """记录A/B测试结果"""
+    mgr = PromptVersionManager()
+    result = mgr.record_ab_test_result(
+        test_id=req.test_id,
+        version=req.version,
+        metrics=req.metrics,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="测试不存在")
+    return {"status": "ok", "test": result}
+
+
+@router.post("/api/v1/prompts/ab-tests/{test_id}/conclude")
+def conclude_ab_test(test_id: str):
+    """完成A/B测试并得出结论"""
+    mgr = PromptVersionManager()
+    result = mgr.conclude_ab_test(test_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="测试不存在")
+    return {"status": "ok", "result": result.to_dict()}
+
+
+@router.get("/api/v1/prompts/ab-tests")
+def list_ab_tests(prompt_name: Optional[str] = None):
+    """列出A/B测试历史"""
+    mgr = PromptVersionManager()
+    tests = mgr.get_ab_test_history(prompt_name)
+    return {"tests": tests}
+
+
+@router.get("/api/v1/prompts/recommended/{prompt_name}")
+def get_recommended_version(prompt_name: str):
+    """获取推荐的 Prompt 版本"""
+    mgr = PromptVersionManager()
+    recommended = mgr.get_recommended_version(prompt_name)
+    if not recommended:
+        return {"prompt_name": prompt_name, "recommended": None, "reason": "无可用版本或 A/B 测试数据"}
+    pv = mgr.get_version(prompt_name, recommended)
+    return {
+        "prompt_name": prompt_name,
+        "recommended": recommended,
+        "version": pv.to_dict() if pv else None,
+    }
+
+
+class ImmersionCreateRequest(BaseModel):
+    """创建浸泡任务请求"""
+    agent_id: str = Field(..., description="Agent ID")
+    persona_json: str = Field(..., description="Agent 7 层人格 JSON")
+    immersion_days: int = Field(default=7, ge=1, le=30, description="浸泡天数")
+    posts_per_day: int = Field(default=20, ge=5, le=100, description="每天浏览帖子数")
+
+
+class ImmersionCreateResponse(BaseModel):
+    """创建浸泡任务响应"""
+    immersion_id: str
+    agent_id: str
+    status: str
+
+
+class ImmersionResultResponse(BaseModel):
+    """浸泡结果响应"""
+    immersion_id: str
+    agent_id: str
+    status: str
+    absorbed_count: int
+    attitudes_count: int
+    immersion_score: float
+    config: dict
+    duration_days: int
+    created_at: str
+    completed_at: Optional[str] = None
+    error: Optional[str] = None
+
+
+@router.post("/api/v1/immersion/create", response_model=ImmersionCreateResponse)
+async def create_immersion(
+    request: ImmersionCreateRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """
+    创建平台浸泡任务
+    
+    Agent 初始化后模拟刷平台，吸收热点形成近期态度。
+    """
+    immersion = PlatformImmersion()
+    
+    try:
+        persona = json.loads(request.persona_json)
+        
+        hot_topics = db.query(HotTopic).filter(
+            HotTopic.status == "active"
+        ).limit(50).all()
+        
+        hot_topics_data = [
+            {
+                "topic_id": t.topic_id,
+                "title": t.title,
+                "platform": t.platform,
+                "category": t.category,
+                "tags": json.loads(t.tags),
+                "keywords": json.loads(t.keywords),
+                "sentiment": t.sentiment,
+            }
+            for t in hot_topics
+        ]
+        
+        if not hot_topics_data:
+            fetcher = HotlistFetcher()
+            for platform in ["weibo", "bilibili", "xiaohongshu", "zhihu", "douyin"]:
+                try:
+                    topics = await fetcher.fetch(platform)
+                    for topic in topics[:10]:
+                        hot_topics_data.append({
+                            "topic_id": f"hot_{platform}_{topic.get('title', '')[:20]}",
+                            "title": topic.get("title", ""),
+                            "platform": platform,
+                            "category": topic.get("category", "general"),
+                            "tags": [],
+                            "keywords": topic.get("keywords", []),
+                            "sentiment": "neutral",
+                        })
+                except Exception as e:
+                    logger.warning(f"Fetch hot topics from {platform} failed: {e}")
+        
+        result = await immersion.immerse(
+            agent_id=request.agent_id,
+            persona=persona,
+            hot_topics=hot_topics_data,
+            immersion_days=request.immersion_days,
+            posts_per_day=request.posts_per_day,
+            db=db,
+        )
+        
+        return ImmersionCreateResponse(
+            immersion_id=result["immersion_id"],
+            agent_id=result["agent_id"],
+            status=result["status"],
+        )
+    
+    except Exception as e:
+        logger.error(f"Create immersion failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/v1/immersion/{immersion_id}", response_model=ImmersionResultResponse)
+async def get_immersion_result(
+    immersion_id: str,
+    db: Session = Depends(get_db),
+):
+    """查询浸泡结果"""
+    immersion = PlatformImmersion()
+    result = await immersion.get_immersion_result(immersion_id, db)
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="Immersion not found")
+    
+    return ImmersionResultResponse(**result)
+
+
+@router.get("/api/v1/agent/{agent_id}/immersion/history")
+async def get_agent_immersion_history(
+    agent_id: str,
+    db: Session = Depends(get_db),
+):
+    """查询 Agent 的浸泡历史"""
+    immersion = PlatformImmersion()
+    history = await immersion.get_agent_immersion_history(agent_id, db)
+    
+    return {"agent_id": agent_id, "history": history}
+
+
+class HotTopicCreateRequest(BaseModel):
+    """创建热点话题请求"""
+    title: str
+    platform: str
+    category: Optional[str] = None
+    tags: List[str] = []
+    keywords: List[str] = []
+    heat_score: float = 0.0
+    rank: Optional[int] = None
+    url: Optional[str] = None
+    sentiment: str = "neutral"
+
+
+class HotTopicResponse(BaseModel):
+    """热点话题响应"""
+    topic_id: str
+    title: str
+    platform: str
+    category: Optional[str]
+    tags: List[str]
+    keywords: List[str]
+    heat_score: float
+    rank: Optional[int]
+    url: Optional[str]
+    sentiment: str
+    created_at: str
+    status: str
+
+
+@router.post("/api/v1/hot-topics", response_model=HotTopicResponse)
+def create_hot_topic(
+    request: HotTopicCreateRequest,
+    db: Session = Depends(get_db),
+):
+    """创建热点话题"""
+    topic_id = f"hot_{uuid.uuid4().hex[:12]}"
+    
+    topic = HotTopic(
+        topic_id=topic_id,
+        title=request.title,
+        platform=request.platform,
+        category=request.category,
+        tags=json.dumps(request.tags),
+        keywords=json.dumps(request.keywords),
+        heat_score=request.heat_score,
+        rank=request.rank,
+        url=request.url,
+        sentiment=request.sentiment,
+    )
+    
+    db.add(topic)
+    db.commit()
+    db.refresh(topic)
+    
+    return HotTopicResponse(
+        topic_id=topic.topic_id,
+        title=topic.title,
+        platform=topic.platform,
+        category=topic.category,
+        tags=json.loads(topic.tags),
+        keywords=json.loads(topic.keywords),
+        heat_score=topic.heat_score,
+        rank=topic.rank,
+        url=topic.url,
+        sentiment=topic.sentiment,
+        created_at=topic.created_at.isoformat(),
+        status=topic.status,
+    )
+
+
+@router.get("/api/v1/hot-topics")
+def list_hot_topics(
+    platform: Optional[str] = None,
+    category: Optional[str] = None,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+):
+    """查询热点话题列表"""
+    query = db.query(HotTopic).filter(HotTopic.status == "active")
+    
+    if platform:
+        query = query.filter(HotTopic.platform == platform)
+    if category:
+        query = query.filter(HotTopic.category == category)
+    
+    topics = query.order_by(HotTopic.heat_score.desc()).limit(limit).all()
+    
+    return {
+        "topics": [
+            {
+                "topic_id": t.topic_id,
+                "title": t.title,
+                "platform": t.platform,
+                "category": t.category,
+                "tags": json.loads(t.tags),
+                "keywords": json.loads(t.keywords),
+                "heat_score": t.heat_score,
+                "rank": t.rank,
+                "url": t.url,
+                "sentiment": t.sentiment,
+                "created_at": t.created_at.isoformat(),
+            }
+            for t in topics
+        ],
+        "total": len(topics),
+    }
+
+
+@router.delete("/api/v1/hot-topics/{topic_id}")
+def delete_hot_topic(topic_id: str, db: Session = Depends(get_db)):
+    """删除热点话题"""
+    topic = db.query(HotTopic).filter(HotTopic.topic_id == topic_id).first()
+    if not topic:
+        raise HTTPException(status_code=404, detail="Topic not found")
+    
+    db.delete(topic)
+    db.commit()
+    
+    return {"status": "deleted", "topic_id": topic_id}
+
 
