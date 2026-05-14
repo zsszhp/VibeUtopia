@@ -148,3 +148,45 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
   - 测试脚本：`tests/phase2_acceptance_test.py`
   - 报告输出：`tests/PHASE2_ACCEPTANCE_REPORT.md` 和 `tests/phase2_acceptance_report.json`
   - 验收通过后才能进入阶段 3（模型优化 + 人生故事生成）
+
+### 阶段 3 实现：模型优化 + 人生故事生成
+- Date: 2026-05-14
+- Context: Agent 在执行阶段 3 任务时发现
+- Category: 代码结构
+- Instructions:
+  - 多模型路由系统：配置文件 `config/model_config.yaml`，支持 Qwen-VL/DeepSeek-VL/GLM-VL 等多模态 API
+  - 模型级别分类：advanced（高级推理/多模态）、standard（常规任务）、lite（简单分类）
+  - Fallback 策略：同厂商同 tier → 同厂商低 tier → 跨厂商同 tier → 跨厂商低 tier
+  - 多 Key 调度：逗号分隔多个 API Key，配额耗尽自动切换下一个
+  - 硬件检测服务：自动识别 GPU/VRAM，推荐模型级别（VRAM≥16GB→advanced，≥8GB→standard，<8GB→lite）
+  - 人生故事驱动人格系统（A/B/C 三级）：
+    * A-tier: AI 访谈生成器（6 轮结构化访谈→数万字人生故事），用于 1-2% 核心 Agent
+    * B-tier: CGSS 采样+LLM 丰富（人口统计采样→千字故事），用于 30% 主要 Agent
+    * C-tier: 模板变体（原型模板 + 随机参数→百字梗概），用于 70% 普通 Agent
+  - ChromaDB 向量检索：内嵌式部署路径 `./data/chroma_memories`，降级为数据库检索
+  - Memory Stream 三因子检索：Recency(0.5) + Importance(0.3) + Relevance(0.2)
+  - 人格质量验证：7 维度完整性检查 + Big Five 一致性验证 + 数值范围校验
+  - 报告质量优化：6 维度风险细化打分 + 句子级修改建议 + 平台差异化建议
+
+### 阶段 3 新增 API 接口
+- Date: 2026-05-14
+- Context: Agent 在实现阶段 3 API 路由时发现
+- Category: 代码结构
+- Instructions:
+  - 多模态分析：POST /api/v3/analyze-multimodal（图片 + 文本分析）
+  - 音频转写：POST /api/v3/transcribe-audio（阿里 Paraformer）
+  - 人格生成：POST /api/v3/generate-persona（A/B/C三级）
+  - 批量人格生成：POST /api/v3/generate-persona-batch（混合 A/B/C 三级）
+  - 记忆检索：POST /api/v3/retrieve-memory（ChromaDB 向量检索）
+  - 记忆存储：POST /api/v3/store-memory
+  - 模型路由：POST /api/v3/route-model（获取最优模型）
+  - 可用模型列表：GET /api/v3/available-models
+  - 模型覆盖设置：POST /api/v3/set-model-override（强制指定厂商和模型）
+  - 硬件信息：GET /api/v3/hardware-info
+  - 推荐模型：GET /api/v3/recommended-models
+  - 模型状态：GET /api/v3/model-status（Key 池状态监控）
+  - LLM 测试：GET /api/v3/llm-test
+  - 报告优化：POST /api/v3/optimize-report
+  - 风险等级定义：GET /api/v3/risk-levels
+  - 风险维度列表：GET /api/v3/risk-dimensions
+  - 所有 v3 API 统一在 `backend/routes_v3.py` 中定义
