@@ -70,3 +70,12 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
   - 新增4个维度：事实错误、平台禁区、情绪极化、价值观倾向
   - 红线维度评分标准：触碰即HIGH 76+（政治敏感、法律合规、民族宗教、事实错误、平台禁区）
   - 多维度叠加机制：3个及以上维度触发时总分必须≥76
+
+### LLM 多 API Key 轮换配置
+- Date: 2026-05-15
+- Context: 用户提供两个 API Key 用于轮换
+- Instructions:
+  - API Key 配置在 .env 文件中：`LONGCAT_API_KEY=key1,key2`
+  - 使用策略：优先使用 Key 1，配额用完后切换到 Key 2
+  - 可用模型：LongCat-Flash-Chat、LongCat-Flash-Thinking-2601、LongCat-Flash-Omni-2603
+  - 优先级：LongCat-Flash-Omni-2603 > LongCat-Flash-Thinking-2601 > LongCat-Flash-Chat
