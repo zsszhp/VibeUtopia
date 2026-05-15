@@ -13,7 +13,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 from backend.database import SessionLocal
 from backend.models import Task, V2AnalysisResult
