@@ -90,3 +90,17 @@ frontend-vue/dist/
 
 # 上传目录
 uploads/
+
+# 中间数据（回测报告/验证结果/AB测试产物）
+data/backtest/report_*.json
+data/validation/
+data/test_chroma_memories/
+data/ab_test_cases.json
+data/*_report.json
+
+# Prompt AB测试产物
+backend/prompts/ab_tests/
+backend/prompts/versions/
+
+# 临时文件
+.git_commit_msg.txt
