@@ -57,7 +57,27 @@ providers:
         vision: false
         text: true
 
-  # --- DeepSeek (支持多模态) ---
+  # --- SenseNova (豆包火山引擎) ---
+  sensenova:
+    name: "SenseNova"
+    api_key_env: "SENSENOVA_API_KEY"
+    base_url: "https://api.sensenova.cn/v1"
+    models:
+      # DeepSeek v4 flash (主力模型)
+      - id: "deepseek-v4-flash"
+        tier: advanced
+        vision: false
+        text: true
+      - id: "deepseek-v4"
+        tier: advanced
+        vision: false
+        text: true
+      - id: "deepseek-v3"
+        tier: standard
+        vision: false
+        text: true
+
+  # --- DeepSeek (备用) ---
   deepseek:
     name: "DeepSeek"
     api_key_env: "DEEPSEEK_API_KEY"
@@ -69,6 +89,10 @@ providers:
         vision: true
         text: true
       # DeepSeek 文本模型
+      - id: "deepseek-v4-flash"
+        tier: advanced
+        vision: false
+        text: true
       - id: "deepseek-chat"
         tier: standard
         vision: false
