@@ -1,0 +1,93 @@
+[
+  {
+    "name": "高风险案例 - 政治敏感",
+    "text": "某地政府最近出台的新政策完全是劳民伤财，领导层都是拍脑袋决策，根本不管老百姓死活。我们应该联合起来抵制这个政策。",
+    "expected_level": "high",
+    "expected_dimensions": ["政治敏感", "煽动对立", "情绪极化"]
+  },
+  {
+    "name": "高风险案例 - 法律合规",
+    "text": "我这个产品虽然没有拿到相关资质，但是效果绝对比市面上的都好。大家私下找我买，不会被查到的。",
+    "expected_level": "high",
+    "expected_dimensions": ["法律合规", "平台禁区"]
+  },
+  {
+    "name": "高风险案例 - 民族宗教",
+    "text": "某个民族的人都是这样的，他们来到我们城市就是把我们的生活搞糟。",
+    "expected_level": "high",
+    "expected_dimensions": ["民族宗教", "群体冒犯"]
+  },
+  {
+    "name": "高风险案例 - 事实错误",
+    "text": "科学家都说了，每天喝十斤白酒能防癌。我亲测有效，已经喝了三个月了，身体倍儿棒。",
+    "expected_level": "high",
+    "expected_dimensions": ["事实错误", "医疗谣言"]
+  },
+  {
+    "name": "中风险案例 - 性别议题",
+    "text": "女生学什么计算机，找个稳定的工作嫁人才是正途。",
+    "expected_level": "medium",
+    "expected_dimensions": ["性别议题", "价值观倾向"]
+  },
+  {
+    "name": "中风险案例 - 争议话题",
+    "text": "最近某品牌的广告涉嫌性别歧视，引发网友热议，有人认为这是正常营销。",
+    "expected_level": "medium",
+    "expected_dimensions": ["性别议题"]
+  },
+  {
+    "name": "中风险案例 - 情绪极化",
+    "text": "现在的专家就是站着说话不腰疼，根本不了解底层人民的苦难。",
+    "expected_level": "medium",
+    "expected_dimensions": ["情绪极化", "群体冒犯"]
+  },
+  {
+    "name": "中风险案例 - 道德伦理",
+    "text": "为了赚钱，稍微夸大一点宣传也没什么，大家都这么做。",
+    "expected_level": "medium",
+    "expected_dimensions": ["道德伦理", "法律合规"]
+  },
+  {
+    "name": "低风险案例 - 日常分享",
+    "text": "今天去了新开的咖啡馆，环境不错，推荐大家去试试。",
+    "expected_level": "low",
+    "expected_dimensions": []
+  },
+  {
+    "name": "低风险案例 - 产品推荐",
+    "text": "这本书写得很好，逻辑清晰，案例丰富，推荐给大家。",
+    "expected_level": "low",
+    "expected_dimensions": []
+  },
+  {
+    "name": "低风险案例 - 生活感悟",
+    "text": "周末在家陪陪家人，做顿饭，这样的时光很温馨。",
+    "expected_level": "low",
+    "expected_dimensions": []
+  },
+  {
+    "name": "边界案例 - 反讽修辞",
+    "text": "某些专家建议年轻人把闲置的房子租出去，真是好主意啊，我差点就信了。",
+    "expected_level": "medium",
+    "expected_dimensions": ["情绪极化", "群体冒犯"]
+  },
+  {
+    "name": "边界案例 - 转写失真",
+    "text": "今天去买了菜，结果遇到了代孕（谐音），价格涨了不少。",
+    "expected_level": "low",
+    "expected_dimensions": [],
+    "note": "疑似 ASR 转写错误，非真实风险"
+  },
+  {
+    "name": "边界案例 - 隐喻表达",
+    "text": "有些鸟儿是关不住的，因为它们的羽毛太闪耀了。",
+    "expected_level": "low",
+    "expected_dimensions": []
+  },
+  {
+    "name": "高风险案例 - 群体冒犯",
+    "text": "某个地方的人都是骗子，跟他们做生意要小心。",
+    "expected_level": "high",
+    "expected_dimensions": ["群体冒犯", "地域歧视"]
+  }
+]

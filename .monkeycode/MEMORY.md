@@ -31,6 +31,23 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
 
 ## 条目
 
+### 阶段 2.5 Prompt 版本管理机制（2026-05-15 完成）
+- Date: 2026-05-15
+- Context: 阶段 2.5 任务完成
+- Category: 代码结构 | 测试方法
+- Instructions:
+  - 版本管理器：`backend/services/prompt_version_manager.py` (448 行)
+  - A/B 测试运行器：`backend/services/prompt_ab_test_runner.py` (253 行)
+  - CLI 工具：`backend/services/prompt_manager_cli.py` (243 行)，支持 7 个命令（register/list/show/create-ab-test/run-ab-test/history/recommend）
+  - 配置文件：`backend/prompts/prompt_config.yaml`（活跃版本、A/B 测试、回滚策略、发布流程）
+  - 变更记录：`backend/prompts/changelog.md`
+  - 测试案例库：`data/ab_test_cases.json` (15 个案例：5 高 +4 中+3 低 +3 边界)
+  - A/B 测试脚本：`tests/run_prompt_ab_test.py`
+  - 已注册版本：risk_assessment v1.0, v20260514115816（存储在 backend/prompts/versions/risk_assessment/）
+  - 历史测试记录：4 条（存储在 backend/prompts/ab_tests/）
+  - 评估指标：accuracy, avg_risk_score, avg_response_time, parse_success_rate
+  - 详细报告：`docs/T2.2_Prompt 版本管理_完成报告.md`
+
 ### 多人协作 Git 工作流规范（强制执行）
 - Date: 2026-05-15 (更新)
 - Context: 用户强调多人开发项目，必须遵循 Git 协作规范

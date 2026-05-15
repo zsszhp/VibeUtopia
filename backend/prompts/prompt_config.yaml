@@ -1,0 +1,87 @@
+# Prompt 版本配置文件
+# 用于管理各模块 Prompt 的活跃版本和 A/B 测试配置
+
+active_versions:
+  # 风险评估 Prompt - 当前使用 v1.0 稳定版本
+  risk_assessment: "v1.0"
+  
+  # 平台人格仿真 Prompt - 各平台初始版本
+  persona_bilibili: "v1.0"
+  persona_weibo: "v1.0"
+  persona_xiaohongshu: "v1.0"
+  persona_douyin: "v1.0"
+  persona_zhihu: "v1.0"
+  persona_tieba: "v1.0"
+  persona_kuaishou: "v1.0"
+  persona_douban: "v1.0"
+  persona_hupu: "v1.0"
+  persona_taptap: "v1.0"
+  persona_toutiao: "v1.0"
+  persona_wechat_channels: "v1.0"
+  persona_wechat_official: "v1.0"
+  
+  # 其他功能 Prompt
+  rewrite: "v1.0"
+  topic_recommend: "v1.0"
+  trend_prediction: "v1.0"
+
+# A/B 测试配置
+ab_test:
+  # 是否启用 A/B 测试模式
+  enabled: false
+  
+  # 当前实验配置
+  experiments:
+    # 示例：风险评估 Prompt 优化测试
+    - name: "risk_assessment_v2_optimization"
+      prompt_name: "risk_assessment"
+      control_version: "v1.0"
+      treatment_version: "v2.0"
+      traffic_split: 0.5  # 50% 流量使用新版本
+      start_date: "2026-05-15"
+      end_date: null  # null 表示持续进行中
+      success_metrics:
+        - accuracy: 0.05  # 准确率提升 5%
+        - false_positive_rate: -0.03  # 误报率降低 3%
+      status: "pending"  # pending/running/completed/stopped
+
+# 版本回滚策略
+rollback:
+  # 自动回滚条件
+  auto_rollback_enabled: true
+  
+  # 触发条件：新版本表现低于基准
+  performance_threshold:
+    min_accuracy: 0.85  # 最低准确率要求
+    max_false_positive: 0.15  # 最高误报率要求
+  
+  # 回滚目标：回滚到上一个稳定版本
+  rollback_target: "previous_stable"
+
+# 版本发布流程
+release_workflow:
+  # 新版本发布前必须通过的测试
+  required_tests:
+    - "unit_test"
+    - "backtest_validation"
+    - "ab_test_minimum_sample:100"
+  
+  # 审批流程
+  approval_required: true
+  approvers:
+    - "tech_lead"
+    - "product_owner"
+
+# 版本元数据模板
+version_metadata_template:
+  required_fields:
+    - "description"  # 版本描述
+    - "changes"  # 变更列表
+    - "test_results"  # 测试结果
+    - "author"  # 作者
+    - "created_at"  # 创建时间
+  
+  optional_fields:
+    - "performance_impact"  # 性能影响评估
+    - "breaking_changes"  # 破坏性变更说明
+    - "migration_guide"  # 迁移指南
