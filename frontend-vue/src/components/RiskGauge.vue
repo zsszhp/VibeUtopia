@@ -6,7 +6,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
-import * as echarts from 'echarts'
+import type * as ECharts from 'echarts'
 
 const props = defineProps<{
   score: number
@@ -14,12 +14,16 @@ const props = defineProps<{
 }>()
 
 const gaugeRef = ref<HTMLElement>()
-let chart: echarts.ECharts | null = null
+let chart: ECharts.ECharts | null = null
+let echarts: typeof ECharts | null = null
 
 function handleResize() { chart?.resize() }
 
-function render() {
+async function render() {
   if (!gaugeRef.value) return
+  if (!echarts) {
+    echarts = await import('echarts')
+  }
   if (!chart) {
     chart = echarts.init(gaugeRef.value, 'dark')
     window.addEventListener('resize', handleResize)

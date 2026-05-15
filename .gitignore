@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
 *.egg-info/
 dist/
 build/
@@ -12,37 +13,80 @@ venv/
 .venv/
 env/
 
-# 环境变量 (包含 API Key)
-.env
-
-# 数据库
-data/*.db
-data/*.sqlite3
-data/chroma/
-data/uploads/
-
 # IDE
-.idea/
 .vscode/
+.idea/
 *.swp
 *.swo
 *~
 
-# 编辑器/AI 配置
-.comate/
+# 环境变量（包含密钥）
+.env
+
+# 数据库文件
+*.db
+*.sqlite3
+
+# 日志
+*.log
 
 # 系统文件
 .DS_Store
 Thumbs.db
-desktop.ini
 
-# 参考项目 (太大不上传)
-reference/
-files/
+# 压缩文件
+*.zip
+*.rar
+*.7z
+*.tar
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.gz
+*.bz2
+*.xz
 
-# 图标素材 (非代码)
-icon/
+# Windows 可执行文件
+*.exe
+*.msi
+*.bat
+*.cmd
+*.com
+*.scr
+*.dll
 
-# 测试源码 (保留测试脚本, 排除运行时数据)
-!tests/
-data/test_results/
+# macOS
+*.dmg
+*.pkg
+
+# 磁盘映像
+*.iso
+*.img
+*.vhd
+*.vmdk
+
+# 项目临时文件
+.project/
+
+# Comate 规范文件
+.comate/
+
+# Trae 项目文件
+.trae/
+
+# Monkeycode 文件
+.monkeycode/
+
+# 元数据
+metadata.json
+.gitattributes
+
+# Node
+node_modules/
+frontend-vue/node_modules/
+
+# 构建输出
+frontend-vue/dist/
+
+# 上传目录
+uploads/

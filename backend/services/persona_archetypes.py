@@ -1,8 +1,9 @@
-"""人格原型模板库 — 覆盖 11 平台的主要人口统计特征
+"""人格原型模板库 — 覆盖 23 平台的主要人口统计特征
 
 
 P0 平台 (5 个): 微博、B 站、小红书、知乎、抖音
 P1 平台 (6 个): 快手、微信公众号、豆瓣、虎扑、今日头条、贴吧
+P2 平台 (12 个): NGA、米游社、即刻、豆瓣小组、S1、V2EX、少数派、酷安、B站动态、网易云音乐、微博超话、小红书圈子
 
 """
 from dataclasses import dataclass, field
@@ -15,6 +16,21 @@ from backend.services.p1_archetypes import (
     HUPU_ARCHETYPES,
     JINRI_TOUTIAO_ARCHETYPES,
     TIEBA_ARCHETYPES,
+)
+# P2 长尾平台人格原型导入
+from backend.services.p2_archetypes import (
+    NGA_ARCHETYPES,
+    MIYOUSHE_ARCHETYPES,
+    JIKE_ARCHETYPES,
+    DOUBAN_GROUP_ARCHETYPES,
+    S1_ARCHETYPES,
+    V2EX_ARCHETYPES,
+    SSPAI_ARCHETYPES,
+    COOLAPK_ARCHETYPES,
+    BILIBILI_DYNAMIC_ARCHETYPES,
+    NETEASE_MUSIC_ARCHETYPES,
+    WEIBO_SUPER_TOPIC_ARCHETYPES,
+    XIAOHONGSHU_CIRCLE_ARCHETYPES,
 )
 from typing import Optional
 
@@ -2964,6 +2980,19 @@ PLATFORM_ARCHETYPES = {
     "hupu": HUPU_ARCHETYPES,
     "jinri_toutiao": JINRI_TOUTIAO_ARCHETYPES,
     "tieba": TIEBA_ARCHETYPES,
+    # P2 长尾平台
+    "nga": NGA_ARCHETYPES,
+    "miyoushe": MIYOUSHE_ARCHETYPES,
+    "jike": JIKE_ARCHETYPES,
+    "douban_group": DOUBAN_GROUP_ARCHETYPES,
+    "s1": S1_ARCHETYPES,
+    "v2ex": V2EX_ARCHETYPES,
+    "sspai": SSPAI_ARCHETYPES,
+    "coolapk": COOLAPK_ARCHETYPES,
+    "bilibili_dynamic": BILIBILI_DYNAMIC_ARCHETYPES,
+    "netease_music": NETEASE_MUSIC_ARCHETYPES,
+    "weibo_super_topic": WEIBO_SUPER_TOPIC_ARCHETYPES,
+    "xiaohongshu_circle": XIAOHONGSHU_CIRCLE_ARCHETYPES,
 }
 
 

@@ -45,6 +45,7 @@ class RiskItem(Base):
     evidence = Column(MySQLText)
     affected_groups = Column(MySQLText, nullable=True)
     dimension_weight = Column(Float, nullable=True)
+    risk_score = Column(Float, nullable=True)  # 数值化风险分数 0-100
 
 
 class PlatformReaction(Base):

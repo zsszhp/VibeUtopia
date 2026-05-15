@@ -4,17 +4,21 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
-import * as echarts from 'echarts'
+import type * as ECharts from 'echarts'
 import type { RiskDimension } from '../api'
 
 const props = defineProps<{ dimensions: RiskDimension[] }>()
 const radarRef = ref<HTMLElement>()
-let chart: echarts.ECharts | null = null
+let chart: ECharts.ECharts | null = null
+let echarts: typeof ECharts | null = null
 
 function handleResize() { chart?.resize() }
 
-function render() {
+async function render() {
   if (!radarRef.value || !props.dimensions?.length) return
+  if (!echarts) {
+    echarts = await import('echarts')
+  }
   if (!chart) {
     chart = echarts.init(radarRef.value, 'dark')
     window.addEventListener('resize', handleResize)

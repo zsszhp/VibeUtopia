@@ -9,7 +9,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import * as echarts from 'echarts'
+import type * as ECharts from 'echarts'
 import type { PolarizationData } from '../api'
 
 const props = defineProps<{
@@ -17,12 +17,16 @@ const props = defineProps<{
 }>()
 
 const chartRef = ref<HTMLElement>()
-let chart: echarts.ECharts | null = null
+let chart: ECharts.ECharts | null = null
+let echarts: typeof ECharts | null = null
 
 function handleResize() { chart?.resize() }
 
-function render() {
+async function render() {
   if (!chartRef.value || !props.polarizationData?.timeline?.length) return
+  if (!echarts) {
+    echarts = await import('echarts')
+  }
 
   if (!chart) {
     chart = echarts.init(chartRef.value, 'dark')
