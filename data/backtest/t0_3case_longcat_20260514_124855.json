@@ -1,0 +1,32 @@
+{
+  "test_time": "2026-05-14T12:48:55.853421",
+  "total_cases": 3,
+  "correct_cases": 0,
+  "accuracy": 0.0,
+  "results": [
+    {
+      "case_name": "历史虚无主义被点名",
+      "expected_level": "red",
+      "actual_score": 0,
+      "actual_level": "green",
+      "level_correct": false,
+      "dimensions": {}
+    },
+    {
+      "case_name": "文案抄袭被实锤",
+      "expected_level": "yellow",
+      "actual_score": 0,
+      "actual_level": "green",
+      "level_correct": false,
+      "dimensions": {}
+    },
+    {
+      "case_name": "手工酸奶造假",
+      "expected_level": "orange",
+      "actual_score": 0,
+      "actual_level": "green",
+      "level_correct": false,
+      "dimensions": {}
+    }
+  ]
+}

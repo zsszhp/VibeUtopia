@@ -1,0 +1,330 @@
+{
+  "error": "所有案例运行失败",
+  "results": [
+    {
+      "case_id": "BT001",
+      "title": "政治敏感话题讨论",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT002",
+      "title": "品牌产品测评文案",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT003",
+      "title": "性别争议话题",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT004",
+      "title": "美食探店分享",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT005",
+      "title": "民族宗教敏感内容",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT006",
+      "title": "旅游攻略分享",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT007",
+      "title": "医疗健康谣言",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT008",
+      "title": "日常穿搭分享",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT009",
+      "title": "金融投资建议",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT010",
+      "title": "宠物日常记录",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT011",
+      "title": "历史虚无主义言论",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT012",
+      "title": "电影影评",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT013",
+      "title": "煽动对立情绪内容",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT014",
+      "title": "健身经验分享",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT015",
+      "title": "暗讽时事的隐喻内容",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT016",
+      "title": "科技产品评测",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT017",
+      "title": "地域歧视言论",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT018",
+      "title": "读书笔记分享",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT019",
+      "title": "敏感事件蹭热度",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT020",
+      "title": "日常心情记录",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT021",
+      "title": "法律擦边内容",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT022",
+      "title": "教育经验分享",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT023",
+      "title": "道德绑架式传播",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT024",
+      "title": "职场吐槽内容",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    },
+    {
+      "case_id": "BT025",
+      "title": "环保公益倡议",
+      "error": "[Errno 2] No such file or directory: '/workspace/backend/prompts/risk_assessment--help.txt'",
+      "accuracy": {
+        "level_correct": false,
+        "score_in_range": false,
+        "dim_precision": 0,
+        "dim_recall": 0,
+        "dim_f1": 0,
+        "overall": 0
+      }
+    }
+  ]
+}

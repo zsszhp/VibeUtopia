@@ -30,13 +30,18 @@ class Settings:
     LLM_MAX_RETRIES: int = int(os.getenv("LLM_MAX_RETRIES", "3"))
     MODEL_COOLDOWN_SECONDS: int = int(os.getenv("MODEL_COOLDOWN_SECONDS", "300"))
 
-    # 模型路由配置 (LiteLLM)
+    # 模型路由配置
     MODEL_CONFIG_PATH: str = os.getenv(
         "MODEL_CONFIG_PATH",
-        str(Path(__file__).parent / "services" / "model_config.yaml"),
+        str(Path(__file__).parent.parent / "config" / "model_config.yaml"),
     )
-    DEFAULT_PROVIDER: str = os.getenv("DEFAULT_PROVIDER", "deepseek")
-    DEFAULT_MODEL: str = os.getenv("DEFAULT_MODEL", "deepseek-chat")
+    DEFAULT_PROVIDER: str = os.getenv("DEFAULT_PROVIDER", "aliyun")
+    DEFAULT_MODEL: str = os.getenv("DEFAULT_MODEL", "")
+    
+    # 硬件检测配置
+    HARDWARE_DETECTION_ENABLED: bool = os.getenv("HARDWARE_DETECTION_ENABLED", "true").lower() == "true"
+    VRAM_THRESHOLD_LITE: int = int(os.getenv("VRAM_THRESHOLD_LITE", "8"))
+    VRAM_THRESHOLD_STANDARD: int = int(os.getenv("VRAM_THRESHOLD_STANDARD", "16"))
 
     # 知识图谱配置 (Neo4j)
     NEO4J_URI: str = os.getenv("NEO4J_URI", "bolt://localhost:7687")

@@ -7,16 +7,20 @@ providers:
     base_url: "https://api.longcat.chat/openai/v1"
     api_key_env: "LONGCAT_API_KEY"
     models:
-      - id: "LongCat-Flash-Thinking-2601"
-        tier: advanced
       - id: "LongCat-Flash-Omni-2603"
         tier: advanced
         vision: true
         text: false
+        priority: 1  # 最高优先级（多模态任务首选）
+      - id: "LongCat-Flash-Thinking-2601"
+        tier: advanced
+        priority: 2  # 第二优先级（复杂推理任务）
       - id: "LongCat-Flash-Chat"
         tier: standard
+        priority: 3  # 第三优先级（快速对话任务）
       - id: "LongCat-Flash-Lite"
         tier: standard
+        priority: 4  # 最低优先级
 
   deepseek:
     name: "DeepSeek"

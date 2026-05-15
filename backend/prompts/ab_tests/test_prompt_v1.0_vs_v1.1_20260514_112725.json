@@ -1,0 +1,37 @@
+{
+  "test_id": "test_prompt_v1.0_vs_v1.1_20260514_112725",
+  "prompt_name": "test_prompt",
+  "version_a": "v1.0",
+  "version_b": "v1.1",
+  "test_name": "测试A/B对比",
+  "status": "completed",
+  "results_a": [
+    {
+      "metrics": {
+        "accuracy": 0.65,
+        "parse_rate": 0.9
+      },
+      "recorded_at": "2026-05-14T11:27:25.989070+00:00"
+    }
+  ],
+  "results_b": [
+    {
+      "metrics": {
+        "accuracy": 0.72,
+        "parse_rate": 0.95
+      },
+      "recorded_at": "2026-05-14T11:27:25.989209+00:00"
+    }
+  ],
+  "created_at": "2026-05-14T11:27:25.988884+00:00",
+  "winner": "v1.1",
+  "metrics_a_avg": {
+    "accuracy": 0.65,
+    "parse_rate": 0.9
+  },
+  "metrics_b_avg": {
+    "accuracy": 0.72,
+    "parse_rate": 0.95
+  },
+  "concluded_at": "2026-05-14T11:27:25.989453+00:00"
+}

@@ -23,9 +23,16 @@ scenedetect>=0.6.1
 ffmpeg-python>=0.2.0
 Pillow>=10.0.0
 
+# 音频转写（阿里 Paraformer）
+# 通过 HTTP API 调用，无需额外 Python 包
+
 # 信号采集与调度
 apscheduler>=3.10.0
 feedparser>=6.0.0
+
+# 测试框架
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
 
 # 可选依赖 (待路线图阶段启用)
 # pyvis>=0.3.2
