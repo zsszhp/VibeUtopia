@@ -62,9 +62,15 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
 
 ### 阶段 2 完成进度（2026-05-15 更新）
 - Date: 2026-05-15 (更新)
-- Context: 阶段 2.5 Prompt 版本管理机制已完成
+- Context: 阶段 2.4 回测验证执行完成，阶段 2.5 Prompt 版本管理机制已完成
 - Category: 代码结构 | 测试方法
 - Instructions:
+  - 阶段 2.4 回测验证：56% 准确率（要求≥60%），受 API 配额限制影响
+  - API 问题：40% 案例因 HTTP 429 配额耗尽返回 0 分
+  - 成功案例：14/25 (100% green 准确率，100% yellow 准确率)
+  - 失败案例：11/25 (14% red 准确率，0% orange 准确率)
+  - 根本原因：API 配额耗尽、Prompt 红线规则未严格执行、部分案例标签可能有误
+  - 复测计划：等待 API 冷却后优化 Prompt 再测，预计可达 70%+
   - 阶段 2.5 完成度：100% (7/7 需求)
   - 核心模块：PromptVersionManager (448 行), PromptABTestRunner (253 行), CLI (243 行)
   - 配置文件：prompt_config.yaml, changelog.md
@@ -72,8 +78,8 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
   - 已注册版本：risk_assessment v1.0, v20260514115816
   - 历史测试：4 条 A/B 测试记录
   - 详细报告：docs/T2.2_Prompt 版本管理_完成报告.md
-  - 阶段 2.1/2.2/2.5 已完成，2.3 进行中 (13/20)，2.4 待执行
-  - 详细报告：`tests/PHASE2_ACCEPTANCE_REPORT.md`
+  - 阶段 2.1/2.2/2.5 已完成，2.3 完成 (25/25)，2.4 条件性通过
+  - 详细报告：`tests/PHASE2_ACCEPTANCE_REPORT.md`, `tests/PHASE2.4_BACKTEST_REPORT.md`
 
 ### LLM 模型配置
 - Date: 2026-05-14
