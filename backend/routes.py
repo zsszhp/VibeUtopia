@@ -16,6 +16,7 @@ from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, Ho
 from backend.services.analyzer import run_analysis, MAX_TEXT_LENGTH
 from backend.services.video_extractor import extract_video_text
 from backend.services.hardware_detector import get_hardware_summary
+from backend.services.persona.life_story_generator import PersonaFactory
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,55 @@ class UploadResponse(BaseModel):
     file_path: str
     file_name: str
     file_size: int
+
+
+class PersonaGenerateRequest(BaseModel):
+    """人格生成请求"""
+    platform: str = Field("bilibili", description="平台名")
+    archetype: str = Field("主流用户", description="原型类型")
+    tier: str = Field("C", description="生成层级 A/B/C")
+    base_profile: dict | None = Field(None, description="可选的基础人口统计信息")
+
+
+class PersonaGenerateBatchRequest(BaseModel):
+    """批量人格生成请求"""
+    platform: str = Field("bilibili", description="平台名")
+    count: int = Field(10, description="生成数量")
+    tier_distribution: dict | None = Field(None, description="各层级数量 {A:1, B:3, C:6}")
+
+
+class MemoryStoreRequest(BaseModel):
+    """记忆存储请求"""
+    agent_id: str = Field(..., description="Agent ID")
+    content: str = Field(..., description="记忆内容")
+    memory_type: str = Field("observation", description="记忆类型 observation/reflection/plan")
+    importance: float = Field(0.5, description="重要性 0-1")
+    tags: list[str] = Field(default_factory=list, description="标签列表")
+
+
+class MemoryRetrieveRequest(BaseModel):
+    """记忆检索请求"""
+    agent_id: str = Field(..., description="Agent ID")
+    query: str = Field(..., description="查询文本")
+    top_k: int = Field(5, description="返回数量")
+
+
+class MemoryStatusResponse(BaseModel):
+    """Memory Stream 状态响应"""
+    chromadb_available: bool
+    total_memories: int
+    agent_memories: dict
+
+
+class PersonaResponse(BaseModel):
+    """人格响应"""
+    tier: str
+    life_story: str
+    persona_7layers: dict
+    big_five: dict
+    quality_score: float
+    platform: str
+    archetype: str
 
 
 def _get_estimated_duration(depth: str | None) -> tuple[str, int]:
@@ -557,4 +607,202 @@ async def upload_file(file: UploadFile = File(...)):
     except Exception as e:
         logger.error("文件上传失败: %s", e)
         raise HTTPException(status_code=500, detail=f"文件上传失败: {str(e)}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 人生故事人格系统端点 (T1)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# 人格工厂单例
+_persona_factory: PersonaFactory | None = None
+
+
+def get_persona_factory() -> PersonaFactory:
+    """获取人格工厂单例"""
+    global _persona_factory
+    if _persona_factory is None:
+        _persona_factory = PersonaFactory()
+    return _persona_factory
+
+
+@router.post("/persona/generate", response_model=PersonaResponse)
+async def generate_persona(req: PersonaGenerateRequest):
+    """生成单个人生故事人格
+
+    Args:
+        platform: 平台名 (bilibili/weibo/douyin...)
+        archetype: 原型类型 (主流用户/争议用户/边缘用户/KOL/跨界用户)
+        tier: 生成层级 (A/B/C)
+        base_profile: 可选的基础人口统计信息
+
+    Returns:
+        完整人格对象，包含人生故事、7 层人格、Big Five 特质
+    """
+    factory = get_persona_factory()
+    
+    try:
+        persona = await factory.generate(
+            platform=req.platform,
+            archetype=req.archetype,
+            tier=req.tier,
+            base_profile=req.base_profile,
+        )
+        
+        return PersonaResponse(
+            tier=persona.tier,
+            life_story=persona.life_story,
+            persona_7layers=persona.persona_7layers or {},
+            big_five=persona.big_five or {},
+            quality_score=persona.quality_score,
+            platform=persona.platform,
+            archetype=persona.archetype,
+        )
+    except Exception as e:
+        logger.error("人格生成失败：%s", e)
+        raise HTTPException(status_code=500, detail=f"人格生成失败：{str(e)}")
+
+
+@router.post("/persona/generate-batch", response_model=list[PersonaResponse])
+async def generate_persona_batch(req: PersonaGenerateBatchRequest):
+    """批量生成人生故事人格
+
+    Args:
+        platform: 平台名
+        count: 生成数量
+        tier_distribution: 各层级数量 {"A": 1, "B": 3, "C": 6}
+
+    Returns:
+        人格列表
+    """
+    factory = get_persona_factory()
+    
+    try:
+        personas = await factory.generate_batch(
+            platform=req.platform,
+            count=req.count,
+            tier_distribution=req.tier_distribution,
+        )
+        
+        return [
+            PersonaResponse(
+                tier=p.tier,
+                life_story=p.life_story,
+                persona_7layers=p.persona_7layers or {},
+                big_five=p.big_five or {},
+                quality_score=p.quality_score,
+                platform=p.platform,
+                archetype=p.archetype,
+            )
+            for p in personas
+        ]
+    except Exception as e:
+        logger.error("批量人格生成失败：%s", e)
+        raise HTTPException(status_code=500, detail=f"批量人格生成失败：{str(e)}")
+
+
+@router.post("/memory/store")
+async def store_memory(req: MemoryStoreRequest):
+    """存储记忆到 Memory Stream
+
+    Args:
+        agent_id: Agent 唯一标识
+        content: 记忆内容
+        memory_type: 记忆类型 (observation/reflection/plan)
+        importance: 重要性评分 (0-1)
+        tags: 标签列表
+
+    Returns:
+        存储结果
+    """
+    from backend.services.persona.memory_stream import MemoryStreamStore
+    
+    store = MemoryStreamStore()
+    
+    try:
+        memory_id = await store.store(
+            agent_id=req.agent_id,
+            content=req.content,
+            memory_type=req.memory_type,
+            importance=req.importance,
+            tags=req.tags,
+        )
+        
+        return {
+            "success": True,
+            "memory_id": memory_id,
+            "agent_id": req.agent_id,
+        }
+    except Exception as e:
+        logger.error("记忆存储失败：%s", e)
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+@router.post("/memory/retrieve")
+async def retrieve_memory(req: MemoryRetrieveRequest):
+    """从 Memory Stream 检索记忆
+
+    使用三因子检索：Recency(0.5) + Importance(0.3) + Relevance(0.2)
+
+    Args:
+        agent_id: Agent 唯一标识
+        query: 查询文本
+        top_k: 返回数量
+
+    Returns:
+        记忆列表，按相关性排序
+    """
+    from backend.services.persona.memory_stream import MemoryStreamStore
+    
+    store = MemoryStreamStore()
+    
+    try:
+        memories = await store.retrieve(
+            agent_id=req.agent_id,
+            query=req.query,
+            top_k=req.top_k,
+        )
+        
+        return {
+            "success": True,
+            "agent_id": req.agent_id,
+            "memories": memories,
+            "count": len(memories),
+        }
+    except Exception as e:
+        logger.error("记忆检索失败：%s", e)
+        return {
+            "success": False,
+            "error": str(e),
+            "memories": [],
+        }
+
+
+@router.get("/memory/status", response_model=MemoryStatusResponse)
+async def get_memory_status():
+    """获取 Memory Stream 状态
+
+    Returns:
+        ChromaDB 可用性、记忆总数、各 Agent 记忆数量
+    """
+    from backend.services.persona.memory_stream import MemoryStreamStore
+    
+    store = MemoryStreamStore()
+    
+    try:
+        status = await store.get_status()
+        
+        return MemoryStatusResponse(
+            chromadb_available=status.get("chromadb_available", False),
+            total_memories=status.get("total_memories", 0),
+            agent_memories=status.get("agent_memories", {}),
+        )
+    except Exception as e:
+        logger.error("获取记忆状态失败：%s", e)
+        return MemoryStatusResponse(
+            chromadb_available=False,
+            total_memories=0,
+            agent_memories={},
+        )
 

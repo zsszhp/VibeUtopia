@@ -79,3 +79,18 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
   - 使用策略：优先使用 Key 1，配额用完后切换到 Key 2
   - 可用模型：LongCat-Flash-Chat、LongCat-Flash-Thinking-2601、LongCat-Flash-Omni-2603
   - 优先级：LongCat-Flash-Omni-2603 > LongCat-Flash-Thinking-2601 > LongCat-Flash-Chat
+
+## T1 人生故事驱动人格系统集成
+
+- Date: [2026-05-15]
+- Context: 用户在项目中引入人生故事驱动人格系统
+- Category: 代码结构|代码生成|构建方法
+- Instructions:
+  - T1 系统已完成集成，包含 A/B/C 三级人格生成器和 Memory Stream 向量记忆存储
+  - 使用 PersonaFactory 统一生成人格，通过 tier 参数选择策略 (A/B/C)
+  - API 端点位于 /api/v1/persona/* 和 /api/v1/memory/*
+  - C-tier 适用于快速测试 (<1s, 质量 0.91+)，B-tier 适用于批量生成 (~30s, 质量 0.92+)
+  - Memory Stream 使用 ChromaDB 优先，自动降级到数据库检索
+  - 三因子检索权重：Recency(0.5) + Importance(0.3) + Relevance(0.2)
+  - 生成的人格包含 7 层结构 (L1-L7) 和 Big Five 人格特质
+  - 质量校验通过 QualityValidator 自动进行
