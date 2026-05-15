@@ -1,6 +1,7 @@
 import axios from 'axios'
 
 const API_BASE = '/api/v1'
+const V3_BASE = '/api/v3'
 
 // ─── TypeScript 接口定义 ─────────────────────────────────────────
 
@@ -206,4 +207,56 @@ export const api = {
   /** 获取历史报告详情 */
   getHistoryDetail: (taskId: string) =>
     axios.get<ReviewResult>(`${API_BASE}/history/${taskId}`),
+}
+
+// ─── 阶段6 扩展API ─────────────────────────────────────────────────
+
+export const v3Api = {
+  // 信号采集
+  getSignalHotlist: (platform?: string, limit: number = 20) =>
+    axios.get(`${V3_BASE}/signals/hotlist`, { params: { platform, limit } }),
+
+  getSignalEvents: (status?: string, limit: number = 20) =>
+    axios.get(`${V3_BASE}/signals/events`, { params: { status, limit } }),
+
+  getSchedulerStatus: () =>
+    axios.get(`${V3_BASE}/signals/scheduler/status`),
+
+  startScheduler: (mode: string = 'standard') =>
+    axios.post(`${V3_BASE}/signals/scheduler/start`, { mode }),
+
+  stopScheduler: () =>
+    axios.post(`${V3_BASE}/signals/scheduler/stop`),
+
+  // 知识图谱
+  getGraphOverview: () =>
+    axios.get(`${V3_BASE}/graph/overview`),
+
+  getGraphEntity: (entityId: string) =>
+    axios.get(`${V3_BASE}/graph/entity/${entityId}`),
+
+  getGraphPaths: (fromId: string, toId: string, maxDepth: number = 5) =>
+    axios.get(`${V3_BASE}/graph/paths`, { params: { from_id: fromId, to_id: toId, max_depth: maxDepth } }),
+
+  getGraphNeighbors: (entityId: string, depth: number = 1, limit: number = 50) =>
+    axios.get(`${V3_BASE}/graph/neighbors/${entityId}`, { params: { depth, limit } }),
+
+  // 博主分析
+  getBloggerHistory: (bloggerId: string) =>
+    axios.get(`${V3_BASE}/blogger/${bloggerId}/history`),
+
+  getBloggerRiskProfile: (bloggerId: string) =>
+    axios.get(`${V3_BASE}/blogger/${bloggerId}/risk-profile`),
+
+  // 竞品对比
+  competitorCompare: (bloggerId: string, competitorIds: string[], fieldName?: string) =>
+    axios.post(`${V3_BASE}/competitor/compare`, { blogger_id: bloggerId, competitor_ids: competitorIds, field_name: fieldName || '' }),
+
+  // 反事实仿真
+  counterfactualSimulate: (params: { text: string; risk_items: any[]; strategy_type: string }) =>
+    axios.post(`${V3_BASE}/counterfactual/simulate`, params),
+
+  // 决策辅助
+  decisionAdvise: (taskId: string, riskReport: Record<string, any>) =>
+    axios.post(`${V3_BASE}/decision/advise`, { task_id: taskId, risk_report: riskReport }),
 }

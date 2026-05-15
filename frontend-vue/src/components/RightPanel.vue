@@ -158,6 +158,49 @@
         <span class="dim-tag">{{ s.dimension }}</span>
       </div>
     </section>
+
+    <!-- ====== 阶段6 扩展功能区域 ====== -->
+    <div class="extension-divider"></div>
+
+    <!-- 博主画像摘要 -->
+    <section v-if="reviewStore.result" class="blogger-summary-section">
+      <h3 class="section-title">博主画像摘要</h3>
+      <div class="blogger-summary-card">
+        <div class="summary-row">
+          <span class="summary-label">风险偏好</span>
+          <NTag size="tiny" type="warning" round>中等</NTag>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">高频风险维度</span>
+          <span class="summary-value">{{ topRiskDimensions }}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">趋势</span>
+          <span class="summary-value">暂无趋势数据</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 决策建议摘要 -->
+    <section v-if="reviewStore.result" class="decision-summary-section">
+      <h3 class="section-title">决策建议</h3>
+      <div class="decision-summary-card" :class="decisionAdviceClass">
+        <div class="decision-advice-label">{{ decisionAdviceLabel }}</div>
+        <div class="decision-advice-reasoning">{{ decisionAdviceReasoning }}</div>
+        <div v-if="decisionModCount > 0" class="decision-mod-count">
+          需修改 {{ decisionModCount }} 项，预计风险降低 {{ decisionRiskReduction }} 分
+        </div>
+      </div>
+    </section>
+
+    <!-- 反事实仿真入口 -->
+    <section v-if="reviewStore.result?.dimensions?.length" class="counterfactual-entry-section">
+      <h3 class="section-title">反事实仿真</h3>
+      <CounterfactualPanel
+        :text="reviewStore.currentTaskId"
+        :risk-items="counterfactualRiskItems"
+      />
+    </section>
   </div>
 </template>
 
@@ -169,6 +212,7 @@ import PropagationGraph from './PropagationGraph.vue'
 import PolarizationChart from './PolarizationChart.vue'
 import HotspotList from './HotspotList.vue'
 import EntityRiskTimeline from './EntityRiskTimeline.vue'
+import CounterfactualPanel from './CounterfactualPanel.vue'
 
 const reviewStore = useReviewStore()
 const expanded = ref('')
@@ -189,7 +233,6 @@ const avgConfidence = computed(() => {
   return (total / evidenceChains.value.length) * 100
 })
 
-// 置信度标签
 const confidenceTagType = computed(() => {
   const c = reviewStore.result?.confidence ?? 0
   if (c >= 0.8) return 'success' as const
@@ -202,6 +245,57 @@ const confidenceLabel = computed(() => {
   if (c >= 0.8) return '高置信'
   if (c >= 0.6) return '中置信'
   return '低置信'
+})
+
+const topRiskDimensions = computed(() => {
+  const dims = reviewStore.result?.dimensions || []
+  const highRisk = dims
+    .filter((d: any) => d.severity === 'orange' || d.severity === 'red')
+    .map((d: any) => d.name)
+  return highRisk.length ? highRisk.slice(0, 3).join('、') : '暂无高频维度'
+})
+
+const decisionAdviceClass = computed(() => {
+  const score = reviewStore.result?.overall_risk ?? 0
+  if (score >= 80) return 'advice-do-not-publish'
+  if (score >= 60) return 'advice-postpone'
+  if (score >= 30) return 'advice-modify'
+  return 'advice-publish'
+})
+
+const decisionAdviceLabel = computed(() => {
+  const score = reviewStore.result?.overall_risk ?? 0
+  if (score >= 80) return '不建议发布'
+  if (score >= 60) return '暂缓发布'
+  if (score >= 30) return '修改后发布'
+  return '直接发布'
+})
+
+const decisionAdviceReasoning = computed(() => {
+  const score = reviewStore.result?.overall_risk ?? 0
+  const dimCount = reviewStore.result?.dimensions?.length || 0
+  return `综合风险评分 ${score} 分，共 ${dimCount} 个风险维度`
+})
+
+const decisionModCount = computed(() => {
+  const dims = reviewStore.result?.dimensions || []
+  return dims.filter((d: any) => d.severity === 'orange' || d.severity === 'red').length
+})
+
+const decisionRiskReduction = computed(() => {
+  const dims = reviewStore.result?.dimensions || []
+  const highRisk = dims.filter((d: any) => d.severity === 'orange' || d.severity === 'red')
+  return highRisk.reduce((sum: number, d: any) => sum + (d.score || 0) * 0.3, 0).toFixed(0)
+})
+
+const counterfactualRiskItems = computed(() => {
+  const dims = reviewStore.result?.dimensions || []
+  return dims.map((d: any) => ({
+    dimension: d.name,
+    severity: d.severity,
+    evidence: d.evidence,
+    score: d.score,
+  }))
 })
 </script>
 
@@ -478,4 +572,72 @@ const confidenceLabel = computed(() => {
 }
 
 .empty-hint { font-size: 12px; color: #444; }
+
+.extension-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #2a2a3e, transparent);
+  margin: 4px 0;
+}
+
+.blogger-summary-section { margin-top: 4px; }
+
+.blogger-summary-card {
+  background: #12121a;
+  border: 1px solid #1e1e2e;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+
+.summary-label {
+  font-size: 11px;
+  color: #888;
+}
+
+.summary-value {
+  font-size: 11px;
+  color: #aaa;
+}
+
+.decision-summary-section { margin-top: 4px; }
+
+.decision-summary-card {
+  background: #12121a;
+  border: 1px solid #1e1e2e;
+  border-radius: 6px;
+  padding: 10px;
+  border-left: 3px solid #6366f1;
+}
+
+.decision-summary-card.advice-publish { border-left-color: #22c55e; }
+.decision-summary-card.advice-modify { border-left-color: #eab308; }
+.decision-summary-card.advice-postpone { border-left-color: #f97316; }
+.decision-summary-card.advice-do-not-publish { border-left-color: #ef4444; }
+
+.decision-advice-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e0e0e0;
+  margin-bottom: 4px;
+}
+
+.decision-advice-reasoning {
+  font-size: 11px;
+  color: #aaa;
+  line-height: 1.5;
+}
+
+.decision-mod-count {
+  font-size: 11px;
+  color: #6366f1;
+  margin-top: 4px;
+}
+
+.counterfactual-entry-section { margin-top: 4px; }
 </style>

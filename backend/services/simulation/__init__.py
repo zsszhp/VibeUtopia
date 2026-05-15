@@ -2,3 +2,5 @@ from backend.services.simulation.models import PlatformAction, PlatformPost, Sim
 from backend.services.simulation.message_bus import MessageBus
 from backend.services.simulation.engine import SimulationEngine
 from backend.services.simulation.time_model import TimeModel
+from backend.services.simulation.group_agent import GroupAgent, GroupProfile, StanceDistribution
+from backend.services.simulation.scale_manager import ScaleManager, ScaleLevel

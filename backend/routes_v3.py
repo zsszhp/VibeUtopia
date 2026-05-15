@@ -1,4 +1,4 @@
-"""阶段 3 新增 API 路由 — 多模态 API + 人格生成 + ChromaDB
+"""阶段 3+6 新增 API 路由
 
 包含：
 1. 多模态分析 API（支持 Qwen-VL, DeepSeek-VL 等）
@@ -7,6 +7,12 @@
 4. ChromaDB 向量检索 API
 5. 模型路由控制 API
 6. 硬件检测 API
+7. 信号采集面板 API（阶段6）
+8. 知识图谱可视化 API（阶段6）
+9. 博主历史分析 API（阶段6）
+10. 竞品对比 API（阶段6）
+11. 反事实仿真 API（阶段6）
+12. 决策辅助 API（阶段6）
 """
 
 import base64
@@ -509,3 +515,652 @@ async def list_risk_dimensions():
     return {
         "dimensions": get_risk_dimensions(),
     }
+
+
+# ==================== 信号采集面板 API（阶段6） ====================
+
+@router.get("/api/v3/signals/hotlist")
+async def get_signal_hotlist(
+    platform: Optional[str] = None,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+):
+    """获取当前热榜"""
+    from backend.models import SignalRecord
+
+    query = db.query(SignalRecord).filter(SignalRecord.signal_type == "hotlist")
+    if platform:
+        query = query.filter(SignalRecord.source_platform == platform)
+    query = query.order_by(SignalRecord.last_seen.desc()).limit(limit)
+
+    records = query.all()
+    return {
+        "hotlist": [
+            {
+                "signal_id": r.signal_id,
+                "title": r.title,
+                "platform": r.source_platform,
+                "rank": r.rank,
+                "url": r.url,
+                "first_seen": r.first_seen.isoformat() if r.first_seen else None,
+                "last_seen": r.last_seen.isoformat() if r.last_seen else None,
+                "appearance_count": r.appearance_count,
+                "is_new": r.is_new,
+                "category": r.category,
+            }
+            for r in records
+        ],
+        "total": len(records),
+    }
+
+
+@router.get("/api/v3/signals/events")
+async def get_signal_events(
+    status: Optional[str] = None,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+):
+    """获取检测到的事件"""
+    from backend.models import SeedEventRecord
+
+    query = db.query(SeedEventRecord)
+    if status:
+        query = query.filter(SeedEventRecord.status == status)
+    query = query.order_by(SeedEventRecord.updated_at.desc()).limit(limit)
+
+    records = query.all()
+    return {
+        "events": [
+            {
+                "event_id": r.event_id,
+                "title": r.title,
+                "description": r.description,
+                "category": r.category,
+                "signal_strength": r.signal_strength,
+                "status": r.status,
+                "crawl_depth": r.crawl_depth,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+            }
+            for r in records
+        ],
+        "total": len(records),
+    }
+
+
+@router.get("/api/v3/signals/scheduler/status")
+async def get_scheduler_status():
+    """获取调度器状态"""
+    from backend.main import signal_scheduler
+
+    return {
+        "is_running": signal_scheduler.is_running,
+        "current_mode": signal_scheduler.current_mode,
+        "platform_count": len(signal_scheduler._platform_map),
+    }
+
+
+class SchedulerControlRequest(BaseModel):
+    """调度器控制请求"""
+    mode: str = Field(default="standard", description="调度模式: realtime/standard/economy/manual")
+
+
+@router.post("/api/v3/signals/scheduler/start")
+async def start_scheduler(req: SchedulerControlRequest):
+    """启动调度器"""
+    from backend.main import signal_scheduler
+
+    if signal_scheduler.is_running:
+        return {"status": "already_running", "mode": signal_scheduler.current_mode}
+
+    success = signal_scheduler.start(mode=req.mode)
+    if success:
+        return {"status": "started", "mode": req.mode}
+    raise HTTPException(status_code=400, detail=f"启动失败，未知模式: {req.mode}")
+
+
+@router.post("/api/v3/signals/scheduler/stop")
+async def stop_scheduler():
+    """停止调度器"""
+    from backend.main import signal_scheduler
+
+    signal_scheduler.stop()
+    return {"status": "stopped"}
+
+
+# ==================== 知识图谱可视化 API（阶段6） ====================
+
+@router.get("/api/v3/graph/overview")
+async def get_graph_overview():
+    """图谱概览（节点数、边数、社区数）"""
+    from backend.main import graph_store
+
+    if not graph_store.is_connected:
+        return {
+            "connected": False,
+            "node_count": 0,
+            "edge_count": 0,
+            "community_count": 0,
+            "labels": [],
+            "relationship_types": [],
+        }
+
+    stats = graph_store.get_stats()
+    return {
+        "connected": stats.get("connected", False),
+        "node_count": stats.get("node_count", 0),
+        "edge_count": stats.get("relation_count", 0),
+        "community_count": 0,
+        "labels": stats.get("labels", []),
+        "relationship_types": stats.get("relationship_types", []),
+    }
+
+
+@router.get("/api/v3/graph/entity/{entity_id}")
+async def get_graph_entity(entity_id: str):
+    """实体详情"""
+    from backend.main import graph_store
+
+    if not graph_store.is_connected:
+        raise HTTPException(status_code=503, detail="知识图谱服务不可用")
+
+    entity = graph_store.get_entity(entity_id)
+    if not entity:
+        raise HTTPException(status_code=404, detail="实体不存在")
+
+    relations = graph_store.get_relations(entity_id)
+
+    return {
+        "entity": entity,
+        "relations": relations,
+    }
+
+
+class GraphPathsRequest(BaseModel):
+    """实体间路径查询请求"""
+    from_id: str = Field(..., description="起始实体ID")
+    to_id: str = Field(..., description="目标实体ID")
+    max_depth: int = Field(default=5, ge=1, le=10, description="最大搜索深度")
+
+
+@router.get("/api/v3/graph/paths")
+async def get_graph_paths(
+    from_id: str,
+    to_id: str,
+    max_depth: int = 5,
+):
+    """实体间路径查询"""
+    from backend.main import graph_store
+
+    if not graph_store.is_connected:
+        raise HTTPException(status_code=503, detail="知识图谱服务不可用")
+
+    path = graph_store.get_shortest_path(from_id, to_id, max_depth=max_depth)
+    return {
+        "from_id": from_id,
+        "to_id": to_id,
+        "path": path,
+        "found": len(path) > 0,
+    }
+
+
+@router.get("/api/v3/graph/neighbors/{entity_id}")
+async def get_graph_neighbors(
+    entity_id: str,
+    depth: int = 1,
+    limit: int = 50,
+):
+    """实体邻居"""
+    from backend.main import graph_store
+
+    if not graph_store.is_connected:
+        raise HTTPException(status_code=503, detail="知识图谱服务不可用")
+
+    subgraph = graph_store.get_subgraph(entity_id, depth=depth, limit=limit)
+    return {
+        "entity_id": entity_id,
+        "depth": depth,
+        "nodes": subgraph.get("nodes", []),
+        "edges": subgraph.get("edges", []),
+    }
+
+
+# ==================== 博主历史分析 API（阶段6） ====================
+
+@router.get("/api/v3/blogger/{blogger_id}/history")
+async def get_blogger_history(blogger_id: str, db: Session = Depends(get_db)):
+    """博主历史分析"""
+    from backend.services.blogger_history import BloggerHistoryAnalyzer
+
+    analyzer = BloggerHistoryAnalyzer()
+    profile = analyzer.analyze_history(blogger_id, db=db)
+
+    return {
+        "blogger_id": profile.blogger_id,
+        "total_analyses": profile.total_analyses,
+        "avg_risk_score": profile.avg_risk_score,
+        "risk_level_distribution": profile.risk_level_distribution,
+        "high_risk_dimensions": profile.high_risk_dimensions,
+        "risk_tolerance": profile.risk_tolerance,
+        "risk_pattern": profile.risk_pattern,
+        "trend_summary": profile.trend_summary,
+        "dimension_changes": [
+            {
+                "dimension": c.dimension,
+                "direction": c.direction,
+                "current_score": c.current_score,
+                "previous_score": c.previous_score,
+                "change_rate": c.change_rate,
+                "trend_description": c.trend_description,
+            }
+            for c in profile.dimension_changes
+        ],
+        "trend_data": [
+            {
+                "date": t.date,
+                "overall_score": t.overall_score,
+                "dimensions": t.dimensions,
+                "risk_level": t.risk_level,
+            }
+            for t in profile.trend_data
+        ],
+        "prediction": profile.prediction,
+        "confidence": profile.confidence,
+    }
+
+
+@router.get("/api/v3/blogger/{blogger_id}/risk-profile")
+async def get_blogger_risk_profile(blogger_id: str, db: Session = Depends(get_db)):
+    """博主风险画像"""
+    from backend.services.blogger_history import BloggerHistoryAnalyzer
+
+    analyzer = BloggerHistoryAnalyzer()
+    profile = analyzer.get_risk_profile(blogger_id, db=db)
+
+    return {
+        "blogger_id": profile.blogger_id,
+        "risk_tolerance": profile.risk_tolerance,
+        "risk_pattern": profile.risk_pattern,
+        "high_risk_dimensions": profile.high_risk_dimensions,
+        "avg_risk_score": profile.avg_risk_score,
+        "risk_level_distribution": profile.risk_level_distribution,
+        "trend_summary": profile.trend_summary,
+        "prediction": profile.prediction,
+        "confidence": profile.confidence,
+    }
+
+
+# ==================== 竞品对比 API（阶段6） ====================
+
+class CompetitorCompareRequest(BaseModel):
+    """竞品对比请求"""
+    blogger_id: str = Field(..., description="博主ID")
+    competitor_ids: List[str] = Field(..., description="竞品ID列表")
+    field_name: str = Field(default="", description="所属领域")
+
+
+@router.post("/api/v3/competitor/compare")
+async def competitor_compare(req: CompetitorCompareRequest, db: Session = Depends(get_db)):
+    """竞品对比"""
+    from backend.services.competitor_comparator import CompetitorComparator
+
+    comparator = CompetitorComparator()
+    report = comparator.compare(
+        blogger_id=req.blogger_id,
+        competitor_ids=req.competitor_ids,
+        field_name=req.field_name,
+        db=db,
+    )
+
+    return {
+        "blogger_id": report.blogger_id,
+        "competitor_ids": report.competitor_ids,
+        "field_name": report.field_name,
+        "dimension_comparisons": [
+            {
+                "dimension": c.dimension,
+                "blogger_score": c.blogger_score,
+                "competitor_score": c.competitor_score,
+                "field_average": c.field_average,
+                "relative_position": c.relative_position,
+                "advantage": c.advantage,
+                "gap_value": c.gap_value,
+            }
+            for c in report.dimension_comparisons
+        ],
+        "strengths": report.strengths,
+        "weaknesses": report.weaknesses,
+        "overall_risk_rank": report.overall_risk_rank,
+        "total_in_field": report.total_in_field,
+        "risk_position": report.risk_position,
+        "summary": report.summary,
+        "error": report.error,
+    }
+
+
+# ==================== 反事实仿真 API（阶段6） ====================
+
+class CounterfactualSimulateRequest(BaseModel):
+    """反事实仿真请求"""
+    text: str = Field(..., description="原始文案")
+    risk_items: List[Dict[str, Any]] = Field(..., description="风险项列表")
+    strategy_type: str = Field(default="soften", description="修改策略: delete/replace/soften/rephrase")
+
+
+@router.post("/api/v3/counterfactual/simulate")
+async def counterfactual_simulate(req: CounterfactualSimulateRequest):
+    """反事实仿真"""
+    from backend.services.counterfactual_sim import CounterfactualSimulator
+
+    simulator = CounterfactualSimulator()
+    result = await simulator.simulate(
+        text=req.text,
+        risk_items=req.risk_items,
+        strategy_type=req.strategy_type,
+    )
+
+    return {
+        "result_id": result.result_id,
+        "original_text": result.original_text,
+        "modified_text": result.modified_text,
+        "strategy": {
+            "strategy_type": result.strategy.strategy_type if result.strategy else "",
+            "target_sentence": result.strategy.target_sentence if result.strategy else "",
+            "modified_sentence": result.strategy.modified_sentence if result.strategy else "",
+            "description": result.strategy.description if result.strategy else "",
+        } if result.strategy else None,
+        "before": {
+            "overall_risk_score": result.before.overall_risk_score if result.before else 0,
+            "risk_level": result.before.risk_level if result.before else "green",
+            "dimension_scores": result.before.dimension_scores if result.before else {},
+        } if result.before else None,
+        "after": {
+            "overall_risk_score": result.after.overall_risk_score if result.after else 0,
+            "risk_level": result.after.risk_level if result.after else "green",
+            "dimension_scores": result.after.dimension_scores if result.after else {},
+        } if result.after else None,
+        "comparisons": [
+            {
+                "dimension": c.dimension,
+                "before_score": c.before_score,
+                "after_score": c.after_score,
+                "change": c.change,
+                "change_direction": c.change_direction,
+            }
+            for c in result.comparisons
+        ],
+        "overall_improvement": result.overall_improvement,
+        "recommendation": result.recommendation,
+        "error": result.error,
+    }
+
+
+# ==================== 决策辅助 API（阶段6） ====================
+
+class DecisionAdviseRequest(BaseModel):
+    """决策辅助请求"""
+    task_id: str = Field(default="", description="任务ID")
+    risk_report: Dict[str, Any] = Field(..., description="风险评估报告")
+
+
+@router.post("/api/v3/decision/advise")
+async def decision_advise(req: DecisionAdviseRequest):
+    """决策辅助"""
+    from backend.services.decision_advisor import DecisionAdvisor
+
+    advisor = DecisionAdvisor()
+    report = advisor.generate_report(req.task_id, req.risk_report)
+
+    return {
+        "report_id": report.report_id,
+        "task_id": report.task_id,
+        "advice": {
+            "advice_type": report.advice.advice_type if report.advice else "",
+            "advice_label": report.advice.advice_label if report.advice else "",
+            "confidence": report.advice.confidence if report.advice else 0,
+            "overall_risk_score": report.advice.overall_risk_score if report.advice else 0,
+            "risk_level": report.advice.risk_level if report.advice else "green",
+            "modification_priorities": [
+                {
+                    "priority": p.priority,
+                    "dimension": p.dimension,
+                    "sentence": p.sentence,
+                    "severity": p.severity,
+                    "suggested_action": p.suggested_action,
+                    "estimated_risk_reduction": p.estimated_risk_reduction,
+                    "effort": p.effort,
+                }
+                for p in (report.advice.modification_priorities if report.advice else [])
+            ],
+            "estimated_final_risk": report.advice.estimated_final_risk if report.advice else 0,
+            "estimated_risk_reduction": report.advice.estimated_risk_reduction if report.advice else 0,
+            "key_risk_factors": report.advice.key_risk_factors if report.advice else [],
+            "reasoning": report.advice.reasoning if report.advice else "",
+        } if report.advice else None,
+        "risk_summary": report.risk_summary,
+        "recommendations": report.recommendations,
+        "created_at": report.created_at,
+    }
+
+
+# ==================== 阶段5 规模化仿真 API ====================
+
+class SimulationScaleRequest(BaseModel):
+    """仿真规模设置请求"""
+    level: str = Field(default="lightweight", description="规模级别: lightweight/standard/deep/massive")
+    overrides: Optional[Dict[str, Any]] = Field(default=None, description="自定义配置覆盖")
+
+
+class SimulationScaleResponse(BaseModel):
+    """仿真规模设置响应"""
+    level: str
+    level_label: str
+    total_agents: int
+    equivalent_individuals: int
+    estimated_duration_min: float
+    estimated_duration_max: float
+    estimated_cost_min: float
+    estimated_cost_max: float
+    group_agent_enabled: bool
+    tier_breakdown: Dict[str, Any]
+
+
+@router.post("/api/v3/simulation/scale")
+async def set_simulation_scale(req: SimulationScaleRequest) -> SimulationScaleResponse:
+    """设置仿真规模"""
+    from backend.services.simulation.scale_manager import ScaleManager, ScaleLevel, SCALE_LABELS
+
+    manager = ScaleManager()
+
+    try:
+        level = ScaleLevel(req.level)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"无效的规模级别: {req.level}")
+
+    # 自定义配置
+    if req.overrides:
+        manager.customize_config(level, req.overrides)
+
+    manager.set_level(level)
+    cost = manager.get_cost_estimate(level)
+
+    return SimulationScaleResponse(
+        level=cost["level"],
+        level_label=cost["level_label"],
+        total_agents=cost["total_agents"],
+        equivalent_individuals=cost["equivalent_individuals"],
+        estimated_duration_min=cost["estimated_duration_min"],
+        estimated_duration_max=cost["estimated_duration_max"],
+        estimated_cost_min=cost["estimated_cost_min"],
+        estimated_cost_max=cost["estimated_cost_max"],
+        group_agent_enabled=cost["group_agent_enabled"],
+        tier_breakdown=cost["tier_breakdown"],
+    )
+
+
+@router.get("/api/v3/simulation/scale-levels")
+async def get_simulation_scale_levels():
+    """获取所有仿真规模级别"""
+    from backend.services.simulation.scale_manager import ScaleManager
+
+    manager = ScaleManager()
+    return {"levels": manager.get_all_levels()}
+
+
+@router.get("/api/v3/simulation/scale-feasibility")
+async def check_scale_feasibility(level: str = "massive"):
+    """验证仿真规模可行性"""
+    from backend.services.simulation.scale_manager import ScaleManager, ScaleLevel
+
+    manager = ScaleManager()
+    try:
+        scale_level = ScaleLevel(level)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"无效的规模级别: {level}")
+
+    return manager.validate_feasibility(scale_level)
+
+
+class BatchSubmitRequest(BaseModel):
+    """批量分析提交请求"""
+    contents: List[str] = Field(..., description="待分析内容列表")
+    mode: str = Field(default="quick", description="分析模式: quick/deep")
+    batch_id: Optional[str] = Field(default=None, description="批次ID（可选）")
+
+
+class BatchSubmitResponse(BaseModel):
+    """批量分析提交响应"""
+    batch_id: str
+    total_items: int
+    status: str
+    progress: float
+
+
+@router.post("/api/v3/batch/submit")
+async def submit_batch_analysis(req: BatchSubmitRequest) -> BatchSubmitResponse:
+    """批量分析提交"""
+    from backend.services.batch_analyzer import BatchAnalyzer
+
+    analyzer = BatchAnalyzer()
+    await analyzer.start()
+
+    result = await analyzer.submit(
+        contents=req.contents,
+        mode=req.mode,
+        batch_id=req.batch_id or "",
+    )
+
+    return BatchSubmitResponse(
+        batch_id=result.batch_id,
+        total_items=result.total_items,
+        status=result.status.value,
+        progress=result.get_progress(),
+    )
+
+
+@router.get("/api/v3/batch/{batch_id}/status")
+async def get_batch_status(batch_id: str):
+    """批量分析状态"""
+    from backend.services.batch_analyzer import BatchAnalyzer
+
+    analyzer = BatchAnalyzer()
+    status = analyzer.get_status(batch_id)
+
+    if not status:
+        raise HTTPException(status_code=404, detail=f"批次 {batch_id} 不存在")
+
+    return status
+
+
+@router.get("/api/v3/batch/{batch_id}/results")
+async def get_batch_results(batch_id: str):
+    """批量分析结果"""
+    from backend.services.batch_analyzer import BatchAnalyzer
+
+    analyzer = BatchAnalyzer()
+    results = analyzer.get_results(batch_id)
+
+    if not results:
+        raise HTTPException(status_code=404, detail=f"批次 {batch_id} 不存在")
+
+    return results
+
+
+@router.get("/api/v3/batch/cache-stats")
+async def get_batch_cache_stats():
+    """获取批量分析缓存统计"""
+    from backend.services.batch_analyzer import BatchAnalyzer
+
+    analyzer = BatchAnalyzer()
+    return analyzer.get_cache_stats()
+
+
+# ==================== 阶段5 极化预警 API ====================
+
+@router.get("/api/v3/polarization/warning")
+async def get_polarization_warning(
+    polarization_index: float = 0.0,
+    trend: str = "stable",
+):
+    """获取极化预警"""
+    from backend.services.simulation.propagation.polarization import generate_polarization_warning
+
+    warning = generate_polarization_warning(polarization_index, trend)
+    return warning.to_dict()
+
+
+@router.get("/api/v3/polarization/levels")
+async def get_polarization_levels():
+    """获取极化预警等级定义"""
+    from backend.services.simulation.propagation.polarization import (
+        POLARIZATION_LEVEL_LABELS,
+        POLARIZATION_LEVEL_THRESHOLDS,
+    )
+
+    return {
+        "levels": {
+            level.value: {
+                "label": label,
+                "threshold": POLARIZATION_LEVEL_THRESHOLDS.get(level, 0.0),
+            }
+            for level, label in POLARIZATION_LEVEL_LABELS.items()
+        },
+    }
+
+
+# ==================== 阶段5 回测增强 API ====================
+
+@router.post("/api/v3/backtest/consistency")
+async def run_backtest_consistency(
+    case_id: str = "bt_10",
+    run_count: int = 3,
+):
+    """运行回测多轮一致性检查"""
+    from backend.services.backtest import BacktestConsistencyChecker, PREDEFINED_CASES
+
+    case = None
+    for c in PREDEFINED_CASES:
+        if c.case_id == case_id:
+            case = c
+            break
+
+    if not case:
+        raise HTTPException(status_code=404, detail=f"案例 {case_id} 不存在")
+
+    checker = BacktestConsistencyChecker(run_count=run_count)
+    result = await checker.check_case(case)
+
+    return result.to_dict()
+
+
+@router.post("/api/v3/backtest/v2-vs-mvp")
+async def generate_v2_vs_mvp_report(
+    enable_consistency: bool = True,
+):
+    """生成 V2 vs MVP 对比报告"""
+    from backend.services.backtest import V2VsMVPComparator
+
+    comparator = V2VsMVPComparator(consistency_run_count=3)
+    report = await comparator.generate_report(enable_consistency=enable_consistency)
+
+    return report.to_dict()

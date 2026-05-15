@@ -2,6 +2,12 @@
 
 同时运行MVP和V2评估，对比预测vs实际结果，
 5维度准确率评估（方向40%/平台20%/维度20%/群体10%/极化10%）
+
+V2.5 增强：
+- 多轮一致性检查（3轮仿真一致性验证）
+- 可信度标注系统
+- V2 vs MVP 对比报告生成
+- Go/No-Go 判定逻辑增强
 """
 
 import asyncio
@@ -9,9 +15,11 @@ import json
 import logging
 import time
 import uuid
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 from backend.database import SessionLocal
 from backend.models import Task, BacktestRecord
@@ -417,3 +425,431 @@ class BacktestRunner:
             db.rollback()
         finally:
             db.close()
+
+
+# ==================== V2.5 多轮一致性检查 ====================
+
+@dataclass
+class ConsistencyRunResult:
+    """单轮回测运行结果"""
+    run_index: int = 0
+    mvp_score: int = 0
+    v2_score: int = 0
+    mvp_dimensions: dict = field(default_factory=dict)
+    v2_dimensions: dict = field(default_factory=dict)
+    v2_accuracy: float = 0.0
+    error: str = ""
+
+
+@dataclass
+class MultiRunConsistency:
+    """多轮一致性检查结果"""
+    case_id: str = ""
+    title: str = ""
+    run_count: int = 3
+    runs: List[ConsistencyRunResult] = field(default_factory=list)
+    direction_consistency: float = 0.0
+    score_consistency: float = 0.0
+    dimension_consistency: float = 0.0
+    overall_consistency: float = 0.0
+    confidence_label: str = ""
+    confidence_score: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "case_id": self.case_id,
+            "title": self.title,
+            "run_count": self.run_count,
+            "direction_consistency": round(self.direction_consistency, 3),
+            "score_consistency": round(self.score_consistency, 3),
+            "dimension_consistency": round(self.dimension_consistency, 3),
+            "overall_consistency": round(self.overall_consistency, 3),
+            "confidence_label": self.confidence_label,
+            "confidence_score": round(self.confidence_score, 3),
+        }
+
+
+class BacktestConsistencyChecker:
+    """回测多轮一致性检查器
+
+    对同一案例运行3次仿真，验证结果稳定性。
+    """
+
+    def __init__(self, run_count: int = 3):
+        self.run_count = run_count
+
+    async def check_case(self, case: BacktestCase) -> MultiRunConsistency:
+        """对单个案例运行多轮回测一致性检查"""
+        result = MultiRunConsistency(
+            case_id=case.case_id,
+            title=case.title,
+            run_count=self.run_count,
+        )
+
+        for i in range(self.run_count):
+            logger.info(
+                "BacktestConsistencyChecker: 案例 %s 第 %d/%d 轮",
+                case.title, i + 1, self.run_count,
+            )
+            try:
+                run_result = await self._run_single(case, i)
+                result.runs.append(run_result)
+            except Exception as e:
+                logger.error("案例 %s 第 %d 轮失败: %s", case.title, i + 1, e)
+                result.runs.append(ConsistencyRunResult(run_index=i, error=str(e)))
+
+        self._compute_consistency(result)
+        return result
+
+    async def _run_single(self, case: BacktestCase, run_index: int) -> ConsistencyRunResult:
+        """运行单轮回测"""
+        run_result = ConsistencyRunResult(run_index=run_index)
+
+        if not case.seed_content or len(case.seed_content.strip()) < 10:
+            run_result.error = "无有效文案"
+            return run_result
+
+        db = SessionLocal()
+        try:
+            task_id = f"btc_{case.case_id}_r{run_index}_{uuid.uuid4().hex[:6]}"
+            task = Task(id=task_id, text=case.seed_content[:500], status="processing", model="backtest-consistency")
+            db.add(task)
+            db.commit()
+        finally:
+            db.close()
+
+        analysis = await run_enhanced_analysis(
+            task_id=task_id,
+            text=case.seed_content,
+            mode="quick",
+            enable_signal=True,
+            enable_entity_chain=True,
+            enable_simulation=False,
+        )
+
+        runner = BacktestRunner()
+        run_result.mvp_score = analysis.mvp_overall_score
+        run_result.v2_score = analysis.v2_overall_score
+        run_result.mvp_dimensions = analysis.mvp_dimensions
+        run_result.v2_dimensions = analysis.v2_dimensions
+        run_result.v2_accuracy = runner._calc_accuracy(
+            analysis.v2_dimensions, analysis.v2_overall_score, case
+        ).weighted_accuracy
+
+        return run_result
+
+    def _compute_consistency(self, result: MultiRunConsistency):
+        """计算多轮一致性指标"""
+        valid_runs = [r for r in result.runs if not r.error]
+        if len(valid_runs) < 2:
+            result.confidence_label = "数据不足"
+            return
+
+        # 方向一致性
+        directions = []
+        for r in valid_runs:
+            if r.v2_score > 50:
+                directions.append("不建议发")
+            elif r.v2_score > 25:
+                directions.append("建议修改")
+            else:
+                directions.append("可发")
+
+        from collections import Counter
+        dir_counts = Counter(directions)
+        most_common = dir_counts.most_common(1)[0]
+        result.direction_consistency = most_common[1] / len(directions)
+
+        # 分数一致性（变异系数的逆）
+        scores = [r.v2_score for r in valid_runs]
+        if scores:
+            avg_score = sum(scores) / len(scores)
+            if avg_score > 0:
+                std_score = (sum((s - avg_score) ** 2 for s in scores) / len(scores)) ** 0.5
+                cv = std_score / avg_score
+                result.score_consistency = max(0.0, 1.0 - cv)
+
+        # 维度一致性
+        dim_sets = [set(r.v2_dimensions.keys()) for r in valid_runs if r.v2_dimensions]
+        if len(dim_sets) >= 2:
+            common = dim_sets[0]
+            for ds in dim_sets[1:]:
+                common = common & ds
+            all_dims = dim_sets[0]
+            for ds in dim_sets[1:]:
+                all_dims = all_dims | ds
+            result.dimension_consistency = len(common) / len(all_dims) if all_dims else 0.0
+
+        # 综合一致性
+        result.overall_consistency = (
+            result.direction_consistency * 0.4 +
+            result.score_consistency * 0.3 +
+            result.dimension_consistency * 0.3
+        )
+
+        # 可信度标注
+        result.confidence_score = result.overall_consistency
+        if result.overall_consistency >= 0.8:
+            result.confidence_label = "高可信"
+        elif result.overall_consistency >= 0.6:
+            result.confidence_label = "中可信"
+        elif result.overall_consistency >= 0.4:
+            result.confidence_label = "低可信"
+        else:
+            result.confidence_label = "不可信"
+
+
+# ==================== V2.5 可信度标注系统 ====================
+
+class CredibilityLevel(str, Enum):
+    """可信度等级"""
+    HIGH = "high"            # 高可信（一致性>80%）
+    MEDIUM = "medium"        # 中可信（60-80%）
+    LOW = "low"              # 低可信（40-60%）
+    UNRELIABLE = "unreliable"  # 不可信（<40%）
+
+
+CREDIBILITY_LABELS = {
+    CredibilityLevel.HIGH: "高可信",
+    CredibilityLevel.MEDIUM: "中可信",
+    CredibilityLevel.LOW: "低可信",
+    CredibilityLevel.UNRELIABLE: "不可信",
+}
+
+
+@dataclass
+class CredibilityAnnotation:
+    """可信度标注"""
+    level: CredibilityLevel = CredibilityLevel.MEDIUM
+    level_label: str = ""
+    consistency_score: float = 0.0
+    direction_stability: float = 0.0
+    score_stability: float = 0.0
+    dimension_stability: float = 0.0
+    sample_size: int = 0
+    notes: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "level": self.level.value,
+            "level_label": self.level_label,
+            "consistency_score": round(self.consistency_score, 3),
+            "direction_stability": round(self.direction_stability, 3),
+            "score_stability": round(self.score_stability, 3),
+            "dimension_stability": round(self.dimension_stability, 3),
+            "sample_size": self.sample_size,
+            "notes": self.notes,
+        }
+
+
+def annotate_credibility(consistency: MultiRunConsistency) -> CredibilityAnnotation:
+    """根据多轮一致性结果标注可信度"""
+    score = consistency.overall_consistency
+
+    if score >= 0.8:
+        level = CredibilityLevel.HIGH
+    elif score >= 0.6:
+        level = CredibilityLevel.MEDIUM
+    elif score >= 0.4:
+        level = CredibilityLevel.LOW
+    else:
+        level = CredibilityLevel.UNRELIABLE
+
+    notes = []
+    if consistency.direction_consistency < 0.6:
+        notes.append("方向判断不稳定，多次运行结果不一致")
+    if consistency.score_consistency < 0.5:
+        notes.append("评分波动较大，绝对分数参考价值有限")
+    if consistency.dimension_consistency < 0.5:
+        notes.append("风险维度检测不稳定，建议关注共同检测到的维度")
+
+    if level == CredibilityLevel.HIGH:
+        notes.append("结果高度可信，可作为决策参考")
+    elif level == CredibilityLevel.MEDIUM:
+        notes.append("结果基本可信，建议结合人工判断")
+
+    return CredibilityAnnotation(
+        level=level,
+        level_label=CREDIBILITY_LABELS.get(level, ""),
+        consistency_score=score,
+        direction_stability=consistency.direction_consistency,
+        score_stability=consistency.score_consistency,
+        dimension_stability=consistency.dimension_consistency,
+        sample_size=consistency.run_count,
+        notes=notes,
+    )
+
+
+# ==================== V2.5 V2 vs MVP 对比报告 ====================
+
+@dataclass
+class ComparisonDetail:
+    """V2 vs MVP 单维度对比"""
+    dimension: str = ""
+    mvp_score: int = 0
+    v2_score: int = 0
+    improvement: float = 0.0
+    accuracy_gain: float = 0.0
+
+
+@dataclass
+class V2VsMVPReport:
+    """V2 vs MVP 对比报告"""
+    report_id: str = field(default_factory=lambda: f"cmp_{uuid.uuid4().hex[:8]}")
+    total_cases: int = 0
+    mvp_avg_accuracy: float = 0.0
+    v2_avg_accuracy: float = 0.0
+    overall_improvement: float = 0.0
+    dimension_comparisons: List[ComparisonDetail] = field(default_factory=list)
+    consistency_results: List[MultiRunConsistency] = field(default_factory=list)
+    credibility_annotations: List[CredibilityAnnotation] = field(default_factory=list)
+    go_no_go: str = ""
+    go_no_go_reason: str = ""
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "report_id": self.report_id,
+            "total_cases": self.total_cases,
+            "mvp_avg_accuracy": round(self.mvp_avg_accuracy, 3),
+            "v2_avg_accuracy": round(self.v2_avg_accuracy, 3),
+            "overall_improvement": round(self.overall_improvement, 3),
+            "go_no_go": self.go_no_go,
+            "go_no_go_reason": self.go_no_go_reason,
+            "dimension_comparisons": [
+                {
+                    "dimension": d.dimension,
+                    "mvp_score": d.mvp_score,
+                    "v2_score": d.v2_score,
+                    "improvement": round(d.improvement, 3),
+                    "accuracy_gain": round(d.accuracy_gain, 3),
+                }
+                for d in self.dimension_comparisons
+            ],
+            "consistency_summary": [c.to_dict() for c in self.consistency_results],
+            "credibility_summary": [c.to_dict() for c in self.credibility_annotations],
+            "created_at": self.created_at,
+        }
+
+
+class V2VsMVPComparator:
+    """V2 vs MVP 对比报告生成器"""
+
+    def __init__(self, consistency_run_count: int = 3):
+        self._runner = BacktestRunner()
+        self._consistency_checker = BacktestConsistencyChecker(run_count=consistency_run_count)
+
+    async def generate_report(
+        self,
+        cases: Optional[List[BacktestCase]] = None,
+        enable_consistency: bool = True,
+    ) -> V2VsMVPReport:
+        """生成 V2 vs MVP 对比报告"""
+        if cases is None:
+            cases = self._runner._load_cases()
+
+        report = V2VsMVPReport(total_cases=len(cases))
+
+        # 运行基础回测
+        backtest_report = await self._runner.run_backtest(cases)
+        report.mvp_avg_accuracy = backtest_report.mvp_avg_accuracy
+        report.v2_avg_accuracy = backtest_report.v2_avg_accuracy
+        report.overall_improvement = backtest_report.overall_improvement
+
+        # 维度对比
+        report.dimension_comparisons = self._compare_dimensions(backtest_report)
+
+        # 多轮一致性检查
+        if enable_consistency:
+            for case in cases:
+                if case.seed_content and len(case.seed_content.strip()) >= 10:
+                    consistency = await self._consistency_checker.check_case(case)
+                    report.consistency_results.append(consistency)
+
+                    credibility = annotate_credibility(consistency)
+                    report.credibility_annotations.append(credibility)
+
+        # Go/No-Go 判定
+        report.go_no_go, report.go_no_go_reason = self._judge_go_no_go(report)
+
+        return report
+
+    def _compare_dimensions(self, backtest_report: BacktestReport) -> List[ComparisonDetail]:
+        """对比各维度的 MVP vs V2 表现"""
+        dim_stats: Dict[str, Dict[str, List[float]]] = {}
+
+        for comp in backtest_report.comparisons:
+            for dim, score in comp.mvp_dimensions.items():
+                dim_stats.setdefault(dim, {"mvp": [], "v2": [], "mvp_acc": [], "v2_acc": []})
+                dim_stats[dim]["mvp"].append(score)
+
+            for dim, score in comp.v2_dimensions.items():
+                dim_stats.setdefault(dim, {"mvp": [], "v2": [], "mvp_acc": [], "v2_acc": []})
+                dim_stats[dim]["v2"].append(score)
+
+            # 准确率增益
+            for dim in dim_stats:
+                mvp_acc = comp.mvp_accuracy.dimension_accuracy
+                v2_acc = comp.v2_accuracy.dimension_accuracy
+                dim_stats[dim]["mvp_acc"].append(mvp_acc)
+                dim_stats[dim]["v2_acc"].append(v2_acc)
+
+        comparisons = []
+        for dim, stats in dim_stats.items():
+            mvp_avg = sum(stats["mvp"]) / len(stats["mvp"]) if stats["mvp"] else 0
+            v2_avg = sum(stats["v2"]) / len(stats["v2"]) if stats["v2"] else 0
+            mvp_acc_avg = sum(stats["mvp_acc"]) / len(stats["mvp_acc"]) if stats["mvp_acc"] else 0
+            v2_acc_avg = sum(stats["v2_acc"]) / len(stats["v2_acc"]) if stats["v2_acc"] else 0
+
+            comparisons.append(ComparisonDetail(
+                dimension=dim,
+                mvp_score=int(mvp_avg),
+                v2_score=int(v2_avg),
+                improvement=v2_avg - mvp_avg,
+                accuracy_gain=v2_acc_avg - mvp_acc_avg,
+            ))
+
+        return comparisons
+
+    def _judge_go_no_go(self, report: V2VsMVPReport) -> Tuple[str, str]:
+        """Go/No-Go 判定逻辑（增强版）
+
+        判定标准：
+        - Go: V2准确率>55% 且 改善>10% 且 一致性>60%
+        - Conditional Go: V2准确率>45% 或 改善>5%
+        - No-Go: V2准确率<45% 且 改善<5%
+        """
+        v2_acc = report.v2_avg_accuracy
+        improvement = report.overall_improvement
+
+        # 计算平均一致性
+        avg_consistency = 0.0
+        if report.consistency_results:
+            avg_consistency = sum(c.overall_consistency for c in report.consistency_results) / len(report.consistency_results)
+
+        # 计算可信度分布
+        high_cred_count = sum(1 for c in report.credibility_annotations if c.level == CredibilityLevel.HIGH)
+        medium_cred_count = sum(1 for c in report.credibility_annotations if c.level == CredibilityLevel.MEDIUM)
+
+        # Go 判定
+        if v2_acc > 0.55 and improvement > 0.1 and avg_consistency > 0.6:
+            reason = (
+                f"V2准确率{v2_acc:.1%}，改善{improvement:.1%}，"
+                f"一致性{avg_consistency:.1%}，高可信占比{high_cred_count}/{len(report.credibility_annotations)}"
+            )
+            return "Go", reason
+
+        # Conditional Go 判定
+        if v2_acc > 0.45 or improvement > 0.05:
+            reason = (
+                f"V2准确率{v2_acc:.1%}，改善{improvement:.1%}，"
+                f"一致性{avg_consistency:.1%}，需关注低可信案例"
+            )
+            return "Conditional Go", reason
+
+        # No-Go 判定
+        reason = (
+            f"V2准确率{v2_acc:.1%}（<45%），改善{improvement:.1%}（<5%），"
+            f"一致性{avg_consistency:.1%}，不建议上线"
+        )
+        return "No-Go", reason
