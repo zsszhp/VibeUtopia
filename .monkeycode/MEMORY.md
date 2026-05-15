@@ -98,7 +98,7 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
 
 ## T1 人生故事驱动人格系统集成
 
-- Date: [2026-05-15]
+- Date: 2026-05-15
 - Context: 用户在项目中引入人生故事驱动人格系统
 - Category: 代码结构 | 代码生成 | 构建方法
 - Instructions:
@@ -110,3 +110,22 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
   - 三因子检索权重：Recency(0.5) + Importance(0.3) + Relevance(0.2)
   - 生成的人格包含 7 层结构 (L1-L7) 和 Big Five 人格特质
   - 质量校验通过 QualityValidator 自动进行
+
+### 阶段 3 进度：T7 人生故事生成系统开发中
+- Date: 2026-05-15
+- Context: Agent 开始实现阶段 3 核心功能 T7（优先级 P0）
+- Category: 代码结构
+- Instructions:
+  - **任务**: 实现人生故事生成系统（蓝图 T7.1 + T7.2 + T7.3）
+  - **计划创建文件**:
+    - `backend/services/story_generation_service.py` - 核心服务
+    - `backend/api/story_routes.py` - API 路由
+    - `data/stories/` - 输出目录
+    - `tests/test_story_generation.py` - 单元测试
+  - **子任务**:
+    - T7.1 人生时间线构建：基于人格画像生成 5 阶段时间线（童年/青少年/成年早期/中期/晚期）
+    - T7.2 关键场景故事生成：4 类场景（转折点/挑战期/高光时刻/关系节点），每场景 800-1500 字
+    - T7.3 人生叙事整合：3 种叙事弧线（英雄之旅/成长弧线/悲剧弧线）+ 主题提炼
+  - **复用组件**: StoryRiskAssociator（已实现的人格特质映射逻辑）
+  - **依赖**: T1 人格生成系统（已完成）、Phase 2.5（已完成）
+  - **状态**: 准备开发（2026-05-15）
