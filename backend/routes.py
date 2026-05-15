@@ -28,10 +28,12 @@ from backend.services.graph.ontology_generator import generate_ontology, load_on
 from backend.services.graph.ontology_templates import get_default_ontology
 from backend.services.prompt_version_manager import PromptVersionManager
 from backend.services.platform_immersion import PlatformImmersion
+from backend.routes_story import router as story_router
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+router.include_router(story_router)
 
 
 class AnalyzeRequest(BaseModel):
