@@ -217,16 +217,16 @@ class MemoryStreamStore:
         """获取最近的记忆"""
         if self._collection is not None:
             try:
+                # ChromaDB 不支持 order_by，改用 get 后手动排序
                 results = self._collection.get(
                     where={"agent_id": agent_id},
                     limit=limit,
-                    order_by=["created_at"],
                 )
 
                 if not results or not results["ids"]:
                     return []
 
-                return [
+                memories = [
                     {
                         "memory_id": results["ids"][i],
                         "content": results["documents"][i],
@@ -236,8 +236,13 @@ class MemoryStreamStore:
                     }
                     for i in range(len(results["ids"]))
                 ]
+                
+                # 按 created_at 降序排序
+                memories.sort(key=lambda x: x["created_at"], reverse=True)
+                return memories[:limit]
+                
             except Exception as e:
-                logger.warning("ChromaDB获取最近记忆失败: %s", e)
+                logger.warning("ChromaDB 获取最近记忆失败：%s", e)
 
         return self._get_recent_db(agent_id, limit)
 
