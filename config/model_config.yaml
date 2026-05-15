@@ -104,7 +104,15 @@ providers:
     api_key_env: "LONGCAT_API_KEY"
     base_url: "https://api.longcat.chat/openai/v1"
     models:
+      - id: "LongCat-Flash-Omni-2603"
+        tier: advanced
+        vision: true
+        text: false  # Omni 是纯视觉模型，不支持纯文本任务，仅用于多模态分析
       - id: "LongCat-Flash-Thinking-2601"
+        tier: advanced
+        vision: false
+        text: true
+      - id: "LongCat-Flash-Chat"
         tier: standard
         vision: false
         text: true

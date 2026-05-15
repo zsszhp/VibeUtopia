@@ -175,7 +175,7 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
 - Instructions:
   - 多模态分析：POST /api/v3/analyze-multimodal（图片 + 文本分析）
   - 音频转写：POST /api/v3/transcribe-audio（阿里 Paraformer）
-  - 人格生成：POST /api/v3/generate-persona（A/B/C三级）
+  - 人格生成：POST /api/v3/generate-persona（A/B/C 三级）
   - 批量人格生成：POST /api/v3/generate-persona-batch（混合 A/B/C 三级）
   - 记忆检索：POST /api/v3/retrieve-memory（ChromaDB 向量检索）
   - 记忆存储：POST /api/v3/store-memory
@@ -190,3 +190,14 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
   - 风险等级定义：GET /api/v3/risk-levels
   - 风险维度列表：GET /api/v3/risk-dimensions
   - 所有 v3 API 统一在 `backend/routes_v3.py` 中定义
+
+### LLM API Key 配置与模型优先级
+- Date: 2026-05-15
+- Context: 用户提供两个 API Key 用于 LongCat 系列模型调用
+- Instructions:
+  - **API Key 池**: ak_2dP4Hf9Tc4sx3258dE9008Q81b638（Key1）, ak_2mC1K99ZH6lS9Wh3dY3SE2C30YM7x（Key2）
+  - **Key 切换策略**: Key1 配额耗尽后自动切换到 Key2
+  - **模型优先级顺序**: LongCat-Flash-Omni-2603 > LongCat-Flash-Thinking-2601 > LongCat-Flash-Chat
+  - **Omni 模型限制**: LongCat-Flash-Omni-2603 的 text=false，纯文本任务会自动跳过，仅用于多模态分析（图片 + 文本）
+  - **纯文本任务路由**: 自动跳过 Omni → LongCat-Flash-Thinking-2601 → LongCat-Flash-Chat
+  - **多模态任务路由**: LongCat-Flash-Omni-2603 → LongCat-VL
