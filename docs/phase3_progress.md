@@ -49,11 +49,43 @@
 - 当前 API 配额耗尽 (HTTP 429)，已跳过实际调用测试
 - 待 API 配额恢复后进行完整端到端测试
 
+### 2. ChromaDB Memory Stream 验证 (2026-05-15)
+
+**完成内容**:
+- ✅ ChromaDB 内嵌式部署 (v1.5.9)
+- ✅ 单条记忆存储测试
+- ✅ 批量记忆存储测试 (5 条)
+- ✅ 三因子检索测试 (Recency 0.5 + Importance 0.3 + Relevance 0.2)
+- ✅ 按记忆类型过滤
+- ✅ 检索延迟验证 (平均 190ms, 最大 210ms < 500ms 要求)
+- ✅ 获取最近记忆测试
+
+**测试报告**: `tests/chromadb_memory_test_report.json`
+
+**测试结果**:
+```
+✅ 所有测试通过！ChromaDB Memory Stream 功能正常。
+- 单条存储 ✅
+- 批量存储 ✅
+- 三因子检索 ✅
+- 类型过滤 ✅
+- 检索延迟 ✅ (190ms < 500ms)
+- 最近记忆 ✅
+```
+
+**实现细节**:
+- 存储路径：`/tmp/test_chroma_memories` (PersistentClient)
+- 集合名称：`memory_stream`
+- 距离度量：余弦相似度 (cosine)
+- 降级机制：ChromaDB 不可用时自动降级到 MySQL/SQLite
+
+**Recency 衰减公式**: `e^(-0.05 × hours_elapsed)`
+
 ---
 
 ## 🔄 进行中任务
 
-### 2. API 配额恢复后完整测试
+### 3. API 配额恢复后完整测试
 
 **等待中**: API 配额冷却 (300 秒)
 
@@ -67,12 +99,6 @@
 ---
 
 ## 📅 后续计划
-
-### 3. ChromaDB 向量检索接入
-- [ ] ChromaDB 内嵌式部署
-- [ ] Memory Stream 存储 (ChromaDB+MySQL)
-- [ ] 三因子检索实现 (Recency+Importance+Relevance)
-- [ ] 记忆类型支持 (observation/reflection/plan)
 
 ### 4. 多模态 API 路由
 - [ ] 接入 LiteLLM 统一 API
@@ -92,8 +118,8 @@
 | 日期 | 里程碑 | 状态 |
 |------|--------|------|
 | 2026-05-15 | 人生故事生成器结构验证 | ✅ 完成 |
+| 2026-05-15 | ChromaDB Memory Stream 验证 | ✅ 完成 |
 | TBA | API 配额恢复后完整测试 | 🟡 等待中 |
-| TBA | ChromaDB 接入完成 | ⚪ 未开始 |
 | TBA | 多模态 API 路由完成 | ⚪ 未开始 |
 | TBA | 11 平台覆盖完成 | ⚪ 未开始 |
 | TBA | 阶段 3 验收测试 | ⚪ 未开始 |
@@ -114,4 +140,4 @@
 ---
 
 **最后更新**: 2026-05-15  
-**下次检查点**: API 配额恢复后执行完整测试
+**下次检查点**: API 配额恢复后执行完整测试 / 开始多模态 API 路由
