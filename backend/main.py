@@ -9,6 +9,7 @@ from backend.services.signal.scheduler import SignalScheduler
 from backend.services.graph.graph_store import GraphStore
 from backend.services.analyzer import set_broadcast_func
 from backend.config import settings
+from backend.services.chroma_model_warmup import initialize_on_startup
 
 # 全局调度器实例
 signal_scheduler = SignalScheduler()
@@ -30,8 +31,10 @@ async def lifespan(app: FastAPI):
     init_db()
     # 尝试连接 Neo4j
     graph_store.connect()
-    # 注入WebSocket广播函数到analyzer
+    # 注入 WebSocket 广播函数到 analyzer
     set_broadcast_func(broadcast_review_update)
+    # 预热 ChromaDB 模型 (优化首次检索延迟)
+    initialize_on_startup()
     yield
     # 关闭时停止调度器
     if signal_scheduler.is_running:

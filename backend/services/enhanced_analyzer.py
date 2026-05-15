@@ -28,6 +28,7 @@ from backend.services.entity_risk_chain import EntityRiskChain, EntityRiskChainR
 from backend.services.dynamic_weights import DynamicWeights, DynamicWeightsResult
 from backend.services.llm_client import call_llm, parse_llm_json
 from backend.services.story_risk_associator import StoryRiskAssociator, StoryRiskAssociation
+from backend.services.trait_risk_mapper import TraitRiskMapper, get_mapper
 
 logger = logging.getLogger(__name__)
 
@@ -455,7 +456,7 @@ def _infer_persona_from_analysis(result: EnhancedAnalysisResult) -> Dict[str, An
 def _apply_story_association_to_result(result: EnhancedAnalysisResult):
     """应用人生故事关联结果到风险评估
     
-    使用人生故事关联器计算的维度权重，调整风险评分。
+    使用人生故事关联器和人格特质映射器计算的维度权重，调整风险评分。
     
     Args:
         result: 增强分析结果
@@ -468,11 +469,38 @@ def _apply_story_association_to_result(result: EnhancedAnalysisResult):
     # 获取基础风险评分
     base_scores = result.mvp_dimensions.copy()
     
-    # 应用权重调整
+    # Step 1: 应用人生故事关联器的权重调整
     adjusted_scores = association.apply_to_risk_assessment(
         association=association,
         base_scores=base_scores,
     )
+    
+    # Step 2: 使用人格特质映射器进一步增强 (A/B 回测关键)
+    try:
+        mapper = get_mapper()
+        persona = _infer_persona_from_analysis(result)
+        mapping_result = mapper.map_persona_to_risk_weights(persona)
+        
+        # 应用映射器的权重
+        adjusted_scores = mapper.apply_weights_to_scores(
+            base_scores=adjusted_scores,
+            weights=mapping_result.final_weights,
+        )
+        
+        # 记录人格特质影响
+        if mapping_result.explanation:
+            logger.info(
+                "人格特质映射：%s",
+                mapping_result.explanation,
+            )
+        
+        # 检查是否有红线维度提升 (A/B 回测关键指标)
+        if mapper.has_red_line_boost(mapping_result.final_weights):
+            logger.info(
+                "检测到红线维度权重提升 (人格特质影响)",
+            )
+    except Exception as e:
+        logger.warning("人格特质映射失败：%s", e)
     
     # 更新结果
     result.mvp_dimensions = adjusted_scores
