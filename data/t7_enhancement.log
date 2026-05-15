@@ -1,0 +1,742 @@
+2026-05-15 06:16:58,375 - __main__ - INFO - ================================================================================
+2026-05-15 06:16:58,375 - __main__ - INFO - T7 深度信号采集增强
+2026-05-15 06:16:58,375 - __main__ - INFO - 开始时间：2026-05-15T06:16:58.375877
+2026-05-15 06:16:58,376 - __main__ - INFO - ================================================================================
+2026-05-15 06:16:58,376 - __main__ - INFO - 
+================================================================================
+2026-05-15 06:16:58,376 - __main__ - INFO - 任务 1：信号关联验证
+2026-05-15 06:16:58,376 - __main__ - INFO - ================================================================================
+2026-05-15 06:16:58,757 - backend.services.llm_client - INFO - 模型配置加载完成: 2 个 provider, 11 个可用模型 (支持 .env 动态覆盖)
+2026-05-15 06:16:58,758 - __main__ - INFO - 
+测试案例：中美领导人会晤
+2026-05-15 06:16:58,759 - __main__ - INFO - ----------------------------------------
+2026-05-15 06:16:58,905 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:16:59,009 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:16:59,010 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:16:59,159 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:16:59,160 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:16:59,276 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:16:59,277 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:16:59,278 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:16:59,560 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-05-15 06:16:59,561 - backend.services.llm_client - WARNING - 模型 longcat Key1 标记为临时不可用，冷却 300 秒
+2026-05-15 06:16:59,561 - backend.services.llm_client - WARNING - 模型 longcat:LongCat-Flash-Thinking-2601:0 配额耗尽 (LongCat LongCat-Flash-Thinking-2601 HTTP 429: {"error":{"message":"服务端模型:longcat-flash-thinking-2601-platform 可用容量超过限制","type":"rate_limit_error","code":"too_many_requests"}})，触发 fallback
+2026-05-15 06:16:59,772 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-05-15 06:16:59,773 - backend.services.llm_client - WARNING - 模型 longcat Key2 标记为临时不可用，冷却 300 秒
+2026-05-15 06:16:59,773 - backend.services.llm_client - WARNING - 模型 longcat:LongCat-Flash-Thinking-2601:1 配额耗尽 (LongCat LongCat-Flash-Thinking-2601 HTTP 429: {"error":{"message":"服务端模型:longcat-flash-thinking-2601-platform 可用容量超过限制","type":"rate_limit_error","code":"too_many_requests"}})，触发 fallback
+2026-05-15 06:16:59,901 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:16:59,999 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:00,000 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:00,147 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:00,148 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:00,247 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:00,248 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:00,248 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:17:00,392 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:00,494 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:00,495 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:00,670 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:00,671 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:00,777 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:00,778 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:00,778 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:17:04,208 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:17:04,209 - backend.services.signal_matcher - INFO - SignalMatcher: 提取到 7 个关键词: ['中美领导人会晤', '中国', '美国', '习近平', '拜登', '中美关系', '元首外交']
+2026-05-15 06:17:04,261 - backend.services.signal_matcher - INFO - SignalMatcher: 查询到 10 条信号, 0 条种子事件
+2026-05-15 06:17:04,388 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:04,524 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:04,525 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:04,658 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:04,658 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:04,762 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:04,763 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:04,763 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:17:04,892 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:04,992 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:04,993 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:05,159 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:05,160 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:06,185 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:06,186 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:06,186 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:17:06,355 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:06,463 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:06,464 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:06,604 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:06,605 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:06,702 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:06,703 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:06,703 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:17:10,417 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:17:10,418 - __main__ - INFO -   关键词：['中美领导人会晤', '中国', '美国', '习近平', '拜登', '中美关系', '元首外交']
+2026-05-15 06:17:10,418 - __main__ - INFO -   匹配到 4 条热点
+2026-05-15 06:17:10,418 - __main__ - INFO -   风险提升：0.38
+2026-05-15 06:17:10,418 - __main__ - INFO -   耗时：11.66s
+2026-05-15 06:17:10,418 - __main__ - INFO -     - [weibo] 中美领导人小范围会晤 (关联度：1.00)
+2026-05-15 06:17:10,418 - __main__ - INFO -     - [bilibili-hot-search] 习近平为特朗普举行欢迎宴会 (关联度：0.95)
+2026-05-15 06:17:10,418 - __main__ - INFO -     - [zhihu] 特朗普访华欢迎宴会都有哪些中国企业家参加了？ (关联度：0.90)
+2026-05-15 06:17:10,418 - __main__ - INFO - 
+测试案例：iPhone18 发布
+2026-05-15 06:17:10,418 - __main__ - INFO - ----------------------------------------
+2026-05-15 06:17:10,523 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:10,626 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:10,627 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:10,757 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:10,758 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:10,856 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:10,857 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:10,857 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:17:11,022 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:11,127 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:11,128 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:11,371 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:11,382 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:11,525 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:11,526 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:11,526 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:17:11,648 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:11,748 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:11,749 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:11,884 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:11,885 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:12,015 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:12,016 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:12,016 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:17:13,162 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:17:13,163 - backend.services.signal_matcher - INFO - SignalMatcher: 提取到 4 个关键词: ['iPhone18', '苹果', '苹果发布会', '智能手机']
+2026-05-15 06:17:13,177 - backend.services.signal_matcher - INFO - SignalMatcher: 查询到 10 条信号, 0 条种子事件
+2026-05-15 06:17:13,373 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:13,477 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:13,477 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:13,594 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:13,595 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:13,707 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:13,707 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:13,707 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:17:13,821 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:13,922 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:13,923 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:14,018 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:14,019 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:14,129 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:14,130 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:14,130 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:17:14,255 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:14,432 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:14,433 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:14,556 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:14,557 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:14,653 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:14,654 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:14,654 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:17:17,339 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:17:17,340 - __main__ - INFO -   关键词：['iPhone18', '苹果', '苹果发布会', '智能手机']
+2026-05-15 06:17:17,340 - __main__ - INFO -   匹配到 1 条热点
+2026-05-15 06:17:17,340 - __main__ - INFO -   风险提升：0.05
+2026-05-15 06:17:17,340 - __main__ - INFO -   耗时：6.92s
+2026-05-15 06:17:17,340 - __main__ - INFO -     - [weibo] iPhone18 (关联度：1.00)
+2026-05-15 06:17:17,340 - __main__ - INFO - 
+测试案例：支付宝安全问题
+2026-05-15 06:17:17,340 - __main__ - INFO - ----------------------------------------
+2026-05-15 06:17:17,479 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:17,583 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:17,584 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:17,706 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:17,707 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:17,811 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:17,812 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:17,812 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:17:17,958 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:18,064 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:18,064 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:18,176 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:18,177 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:18,316 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:18,317 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:18,317 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:17:18,451 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:18,540 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:18,540 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:18,660 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:18,661 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:18,765 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:18,765 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:18,766 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:17:21,393 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:17:21,394 - backend.services.signal_matcher - INFO - SignalMatcher: 提取到 6 个关键词: ['支付宝', '安全问题', '账户安全', '支付安全', '网络安全', '蚂蚁集团']
+2026-05-15 06:17:21,401 - backend.services.signal_matcher - INFO - SignalMatcher: 查询到 10 条信号, 0 条种子事件
+2026-05-15 06:17:21,508 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:21,614 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:21,615 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:21,739 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:21,740 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:21,844 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:21,845 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:21,845 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:17:21,987 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:22,083 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:22,083 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:22,209 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:22,210 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:22,321 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:22,322 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:22,322 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:17:22,469 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:22,635 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:22,636 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:22,750 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:22,751 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:22,993 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:22,994 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:22,994 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:17:26,956 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:17:26,957 - __main__ - INFO -   关键词：['支付宝', '安全问题', '账户安全', '支付安全', '网络安全', '蚂蚁集团']
+2026-05-15 06:17:26,958 - __main__ - INFO -   匹配到 2 条热点
+2026-05-15 06:17:26,958 - __main__ - INFO -   风险提升：0.18
+2026-05-15 06:17:26,958 - __main__ - INFO -   耗时：9.62s
+2026-05-15 06:17:26,958 - __main__ - INFO -     - [weibo] 支付宝正寻求警方帮助 (关联度：0.90)
+2026-05-15 06:17:26,958 - __main__ - INFO -     - [baidu] 支付宝：正寻求警方帮助 (关联度：0.90)
+2026-05-15 06:17:26,958 - __main__ - INFO - 
+测试案例：浪姐节目争议
+2026-05-15 06:17:26,958 - __main__ - INFO - ----------------------------------------
+2026-05-15 06:17:27,076 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:27,189 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:27,190 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:27,295 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:27,296 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:27,514 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:27,515 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:27,515 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:17:27,632 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:27,777 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:27,778 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:27,869 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:27,870 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:27,984 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:27,985 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:27,985 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:17:28,100 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:28,217 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:28,218 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:28,328 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:28,328 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:28,447 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:28,447 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:28,447 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:17:30,963 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:17:30,964 - backend.services.signal_matcher - INFO - SignalMatcher: 提取到 5 个关键词: ['浪姐', '乘风破浪的姐姐', '综艺节目争议', '芒果TV', '女性成长综艺']
+2026-05-15 06:17:30,971 - backend.services.signal_matcher - INFO - SignalMatcher: 查询到 10 条信号, 0 条种子事件
+2026-05-15 06:17:31,112 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:31,290 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:31,291 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:31,397 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:31,398 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:31,528 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:31,529 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:31,529 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:17:31,635 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:31,753 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:31,754 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:31,859 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:31,860 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:31,993 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:31,994 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:31,994 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:17:32,094 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:32,188 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:32,189 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:32,317 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:32,318 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:32,413 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:32,414 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:32,414 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:17:37,158 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:17:37,159 - __main__ - INFO -   关键词：['浪姐', '乘风破浪的姐姐', '综艺节目争议', '芒果TV', '女性成长综艺']
+2026-05-15 06:17:37,159 - __main__ - INFO -   匹配到 2 条热点
+2026-05-15 06:17:37,159 - __main__ - INFO -   风险提升：0.25
+2026-05-15 06:17:37,159 - __main__ - INFO -   耗时：10.20s
+2026-05-15 06:17:37,159 - __main__ - INFO -     - [weibo] 浪姐 遛观众 (关联度：0.90)
+2026-05-15 06:17:37,159 - __main__ - INFO -     - [weibo] 原来这么多人拒绝过浪姐 (关联度：0.80)
+2026-05-15 06:17:37,159 - __main__ - INFO - 
+================================================================================
+2026-05-15 06:17:37,159 - __main__ - INFO - 【信号关联验证统计】
+2026-05-15 06:17:37,159 - __main__ - INFO -   - 测试案例数：4
+2026-05-15 06:17:37,159 - __main__ - INFO -   - 平均匹配热点数：2.2 条/案例
+2026-05-15 06:17:37,159 - __main__ - INFO -   - 平均风险提升：0.21
+2026-05-15 06:17:37,159 - __main__ - INFO -   - 平均响应时间：9.60s
+2026-05-15 06:17:37,159 - __main__ - INFO - ================================================================================
+2026-05-15 06:17:37,159 - __main__ - INFO - 
+================================================================================
+2026-05-15 06:17:37,160 - __main__ - INFO - 任务 2：深度评论爬取
+2026-05-15 06:17:37,160 - __main__ - INFO - ================================================================================
+2026-05-15 06:17:37,238 - __main__ - INFO - 选定 3 个高信号强度事件进行深度爬取
+2026-05-15 06:17:37,238 - __main__ - INFO - 
+【事件】中美领导人小范围会晤
+2026-05-15 06:17:37,238 - __main__ - INFO -   平台：weibo, 出现次数：6, 排名：1
+2026-05-15 06:17:37,452 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:37,615 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:37,616 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:37,730 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:37,766 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:37,953 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:37,954 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:37,954 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:17:38,074 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:38,221 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:38,222 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:38,379 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:38,380 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:38,557 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:38,558 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:38,558 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:17:38,658 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:38,858 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:38,858 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:38,953 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:38,953 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:39,129 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:39,130 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:39,130 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:17:42,488 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:17:42,489 - __main__ - INFO -   搜索关键词：['中美领导人会晤', '中美高层对话', '中美关系最新动态']
+2026-05-15 06:17:42,489 - __main__ - INFO -   爬取关键词 '中美领导人会晤' 的评论...
+2026-05-15 06:17:42,556 - httpx - INFO - HTTP Request: GET https://m.weibo.cn/api/container/getIndex?containerid=100103type%3D1%26q%3D%E4%B8%AD%E7%BE%8E%E9%A2%86%E5%AF%BC%E4%BA%BA%E4%BC%9A%E6%99%A4&page_type=searchall "HTTP/1.1 302 Found"
+2026-05-15 06:17:42,648 - httpx - INFO - HTTP Request: GET https://www.zhihu.com/api/v4/search_v3?q=%E4%B8%AD%E7%BE%8E%E9%A2%86%E5%AF%BC%E4%BA%BA%E4%BC%9A%E6%99%A4&t=general&correction=1&offset=0&limit=10 "HTTP/1.1 403 Forbidden"
+2026-05-15 06:17:42,649 - __main__ - INFO -     爬取到 0 条评论
+2026-05-15 06:17:42,649 - __main__ - INFO -   爬取关键词 '中美高层对话' 的评论...
+2026-05-15 06:17:42,716 - httpx - INFO - HTTP Request: GET https://m.weibo.cn/api/container/getIndex?containerid=100103type%3D1%26q%3D%E4%B8%AD%E7%BE%8E%E9%AB%98%E5%B1%82%E5%AF%B9%E8%AF%9D&page_type=searchall "HTTP/1.1 432 "
+2026-05-15 06:17:43,073 - httpx - INFO - HTTP Request: GET https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=%E4%B8%AD%E7%BE%8E%E9%AB%98%E5%B1%82%E5%AF%B9%E8%AF%9D&page_size=2 "HTTP/1.1 200 OK"
+2026-05-15 06:17:43,192 - httpx - INFO - HTTP Request: GET https://api.bilibili.com/x/v2/reply?type=1&oid=115451036174999&sort=1&ps=10 "HTTP/1.1 200 OK"
+2026-05-15 06:17:43,276 - httpx - INFO - HTTP Request: GET https://api.bilibili.com/x/v2/reply?type=1&oid=116573633253272&sort=1&ps=10 "HTTP/1.1 200 OK"
+2026-05-15 06:17:43,466 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:43,593 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:43,594 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:43,690 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:43,691 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:43,873 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:43,874 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:43,874 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:17:44,043 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:44,194 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:44,195 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:44,296 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:44,297 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:44,418 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:44,418 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:44,419 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:17:44,581 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:44,696 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:44,697 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:44,794 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:44,795 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:44,905 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:44,906 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:44,906 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:17:50,274 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:17:50,275 - backend.services.llm_client - WARNING - LLM JSON 解析失败，返回降级结果
+2026-05-15 06:17:50,467 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:50,608 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:50,608 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:50,712 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:50,712 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:50,886 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:50,887 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:50,887 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:17:50,981 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:51,112 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:51,113 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:51,211 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:51,212 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:51,321 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:51,322 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:51,322 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:17:51,423 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:51,552 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:51,553 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:51,827 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:51,827 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:52,065 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:52,066 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:52,066 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:17:54,771 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:17:54,883 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:54,989 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:54,990 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:55,084 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:55,085 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:55,198 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:55,199 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:55,199 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:17:55,338 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:55,486 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:55,487 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:55,586 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:55,587 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:55,729 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:55,730 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:55,730 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:17:55,823 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:55,993 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:55,993 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:56,102 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:56,103 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:56,325 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:56,325 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:56,326 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:17:57,848 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:17:57,993 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:58,116 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:58,117 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:58,322 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:58,322 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:58,416 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:58,417 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:58,418 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:17:58,572 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:58,694 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:58,695 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:58,820 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:58,821 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:58,982 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:58,983 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:58,983 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:17:59,139 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:59,239 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:59,240 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:59,406 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:59,407 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:59,517 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:17:59,518 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:17:59,518 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:18:09,997 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:18:10,117 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:10,224 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:10,225 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:10,353 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:10,354 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:10,514 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:10,514 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:10,515 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:18:10,641 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:10,734 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:10,735 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:10,851 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:10,852 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:10,951 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:10,952 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:10,953 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:18:11,152 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:11,331 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:11,332 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:11,526 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:11,526 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:11,625 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:11,626 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:11,626 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:18:12,952 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:18:13,209 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:13,323 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:13,324 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:13,537 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:13,538 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:13,653 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:13,654 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:13,654 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:18:13,790 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:13,889 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:13,890 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:14,004 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:14,005 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:14,132 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:14,133 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:14,133 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:18:14,347 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:14,449 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:14,449 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:14,575 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:14,575 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:14,673 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:14,673 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:14,674 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:18:16,103 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:18:16,209 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:16,337 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:16,338 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:16,465 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:16,466 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:16,560 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:16,561 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:16,561 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:18:16,739 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:16,871 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:16,872 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:17,026 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:17,027 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:17,144 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:17,144 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:17,144 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:18:17,255 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:17,420 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:17,421 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:17,541 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:17,542 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:17,642 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:17,642 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:17,643 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:18:19,119 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:18:19,120 - __main__ - INFO -     爬取到 6 条评论
+2026-05-15 06:18:19,120 - __main__ - INFO -   情感分布：正面 4, 负面 0, 中性 2
+2026-05-15 06:18:19,120 - __main__ - INFO - 
+【事件】iPhone18
+2026-05-15 06:18:19,120 - __main__ - INFO -   平台：weibo, 出现次数：6, 排名：4
+2026-05-15 06:18:19,268 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:19,367 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:19,368 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:19,495 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:19,496 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:19,611 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:19,612 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:19,612 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:18:19,754 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:19,851 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:19,852 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:19,980 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:19,981 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:20,161 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:20,162 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:20,162 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:18:20,283 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:20,406 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:20,407 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:20,566 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:20,566 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:20,667 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:20,668 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:20,668 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:18:26,302 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:18:26,303 - __main__ - INFO -   搜索关键词：['iPhone18', 'iPhone 18', '苹果18']
+2026-05-15 06:18:26,303 - __main__ - INFO -   爬取关键词 'iPhone18' 的评论...
+2026-05-15 06:18:26,386 - httpx - INFO - HTTP Request: GET https://m.weibo.cn/api/container/getIndex?containerid=100103type%3D1%26q%3DiPhone18&page_type=searchall "HTTP/1.1 432 "
+2026-05-15 06:18:26,523 - httpx - INFO - HTTP Request: GET https://edith.xiaohongshu.com/api/sns/web/v1/search/notes?keyword=iPhone18&page=1&page_size=2&sort=general "HTTP/1.1 404 Not Found"
+2026-05-15 06:18:26,657 - httpx - INFO - HTTP Request: GET https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=iPhone18&page_size=2 "HTTP/1.1 412 Precondition Failed"
+2026-05-15 06:18:26,878 - httpx - INFO - HTTP Request: GET https://www.zhihu.com/api/v4/search_v3?q=iPhone18&t=general&correction=1&offset=0&limit=10 "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:26,879 - __main__ - INFO -     爬取到 0 条评论
+2026-05-15 06:18:26,879 - __main__ - INFO -   爬取关键词 'iPhone 18' 的评论...
+2026-05-15 06:18:26,946 - httpx - INFO - HTTP Request: GET https://m.weibo.cn/api/container/getIndex?containerid=100103type%3D1%26q%3DiPhone+18&page_type=searchall "HTTP/1.1 432 "
+2026-05-15 06:18:27,102 - httpx - INFO - HTTP Request: GET https://www.zhihu.com/api/v4/search_v3?q=iPhone+18&t=general&correction=1&offset=0&limit=10 "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:27,103 - __main__ - INFO -     爬取到 0 条评论
+2026-05-15 06:18:27,103 - __main__ - INFO -   情感分布：正面 0, 负面 0, 中性 0
+2026-05-15 06:18:27,103 - __main__ - INFO - 
+【事件】天坛里的对称之美
+2026-05-15 06:18:27,103 - __main__ - INFO -   平台：weibo, 出现次数：6, 排名：3
+2026-05-15 06:18:27,265 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:27,370 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:27,371 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:27,501 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:27,501 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:27,596 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:27,596 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-vl2:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:27,597 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-vl2:0 调用失败，尝试下一个模型
+2026-05-15 06:18:27,722 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:27,841 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:27,842 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:27,979 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:27,979 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:28,083 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:28,084 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-chat:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:28,084 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-chat:0 调用失败，尝试下一个模型
+2026-05-15 06:18:28,209 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:28,299 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:28,299 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试1次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:28,420 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:28,421 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试2次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:28,520 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:28,520 - backend.services.llm_client - WARNING - LLM 调用失败 deepseek:deepseek-coder:0 (重试3次): Client error '401 Authorization Required' for url 'https://api.deepseek.com/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+2026-05-15 06:18:28,521 - backend.services.llm_client - WARNING - 模型 deepseek:deepseek-coder:0 调用失败，尝试下一个模型
+2026-05-15 06:18:31,309 - httpx - INFO - HTTP Request: POST https://api.longcat.chat/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-15 06:18:31,310 - __main__ - INFO -   搜索关键词：['天坛对称之美', '天坛建筑对称', '天坛摄影对称']
+2026-05-15 06:18:31,310 - __main__ - INFO -   爬取关键词 '天坛对称之美' 的评论...
+2026-05-15 06:18:31,433 - httpx - INFO - HTTP Request: GET https://m.weibo.cn/api/container/getIndex?containerid=100103type%3D1%26q%3D%E5%A4%A9%E5%9D%9B%E5%AF%B9%E7%A7%B0%E4%B9%8B%E7%BE%8E&page_type=searchall "HTTP/1.1 432 "
+2026-05-15 06:18:31,567 - httpx - INFO - HTTP Request: GET https://edith.xiaohongshu.com/api/sns/web/v1/search/notes?keyword=%E5%A4%A9%E5%9D%9B%E5%AF%B9%E7%A7%B0%E4%B9%8B%E7%BE%8E&page=1&page_size=2&sort=general "HTTP/1.1 404 Not Found"
+2026-05-15 06:18:31,684 - httpx - INFO - HTTP Request: GET https://www.zhihu.com/api/v4/search_v3?q=%E5%A4%A9%E5%9D%9B%E5%AF%B9%E7%A7%B0%E4%B9%8B%E7%BE%8E&t=general&correction=1&offset=0&limit=10 "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:31,684 - __main__ - INFO -     爬取到 0 条评论
+2026-05-15 06:18:31,685 - __main__ - INFO -   爬取关键词 '天坛建筑对称' 的评论...
+2026-05-15 06:18:31,817 - httpx - INFO - HTTP Request: GET https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=%E5%A4%A9%E5%9D%9B%E5%BB%BA%E7%AD%91%E5%AF%B9%E7%A7%B0&page_size=2 "HTTP/1.1 412 Precondition Failed"
+2026-05-15 06:18:32,010 - httpx - INFO - HTTP Request: GET https://www.zhihu.com/api/v4/search_v3?q=%E5%A4%A9%E5%9D%9B%E5%BB%BA%E7%AD%91%E5%AF%B9%E7%A7%B0&t=general&correction=1&offset=0&limit=10 "HTTP/1.1 401 Authorization Required"
+2026-05-15 06:18:32,011 - __main__ - INFO -     爬取到 0 条评论
+2026-05-15 06:18:32,011 - __main__ - INFO -   情感分布：正面 0, 负面 0, 中性 0
+2026-05-15 06:18:32,011 - __main__ - INFO - 
+================================================================================
+2026-05-15 06:18:32,011 - __main__ - INFO - 【深度评论爬取统计】
+2026-05-15 06:18:32,012 - __main__ - INFO -   - 爬取事件数：3
+2026-05-15 06:18:32,012 - __main__ - INFO -   - 总评论数：6
+2026-05-15 06:18:32,012 - __main__ - INFO -   - 平均每事件：2.0 条
+2026-05-15 06:18:32,012 - __main__ - INFO - ================================================================================
+2026-05-15 06:18:32,012 - __main__ - INFO - 
+================================================================================
+2026-05-15 06:18:32,013 - __main__ - INFO - 【JSON 报告】
+2026-05-15 06:18:32,013 - __main__ - INFO - ================================================================================
+2026-05-15 06:18:32,013 - __main__ - INFO - 
+报告已保存到：data/t7_enhancement_report.json
