@@ -163,7 +163,9 @@ async def assess_with_story_agent(text: str) -> Dict[str, Any]:
         
         # 使用标准风险评估（但带有人格增强）
         # 这里简化处理，实际应该整合人格信息到评估流程
-        result = await run_analysis(text)
+        import uuid
+        task_id = str(uuid.uuid4())
+        result = await run_analysis(task_id, text)
         
         # 添加人格增强信息
         result["persona_type"] = "story_enhanced"
@@ -182,7 +184,9 @@ async def assess_with_attribute_agent(text: str) -> Dict[str, Any]:
         persona = create_attribute_persona(text)
         
         # 使用标准风险评估
-        result = await run_analysis(text)
+        import uuid
+        task_id = str(uuid.uuid4())
+        result = await run_analysis(task_id, text)
         
         # 标记为属性标签
         result["persona_type"] = "attribute_only"
