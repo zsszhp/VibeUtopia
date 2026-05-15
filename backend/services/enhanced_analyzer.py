@@ -27,6 +27,7 @@ from backend.services.signal_matcher import SignalMatcher, SignalMatchResult
 from backend.services.entity_risk_chain import EntityRiskChain, EntityRiskChainResult
 from backend.services.dynamic_weights import DynamicWeights, DynamicWeightsResult
 from backend.services.llm_client import call_llm, parse_llm_json
+from backend.services.story_risk_associator import StoryRiskAssociator, StoryRiskAssociation
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,9 @@ class EnhancedAnalysisResult:
     signal_match_result: Optional[SignalMatchResult] = None
     entity_risk_chain_result: Optional[EntityRiskChainResult] = None
     dynamic_weights_result: Optional[DynamicWeightsResult] = None
+
+    # Phase 2.5: 人生故事关联增强 (新增)
+    story_association_result: Optional[StoryRiskAssociation] = None
 
     # Phase 3: 仿真增强（deep模式）
     simulation_id: str = ""
@@ -185,6 +189,29 @@ async def _run_phase2(
             logger.warning("信号关联失败: %s", e)
 
     # 实体风险链
+
+    # Phase 2.5: 人生故事关联增强
+    if enable_signal or enable_entity_chain:
+        try:
+            # 从 Phase 1 和 Phase 2 的结果推断人格画像
+            persona = _infer_persona_from_analysis(result)
+            
+            # 获取人生故事 (简化：从 persona 获取)
+            life_story = persona.get("life_story", {})
+            
+            # 创建关联器并执行关联
+            associator = StoryRiskAssociator()
+            result.story_association_result = associator.associate(
+                persona=persona,
+                life_story=life_story,
+                text=text,
+            )
+            
+            # 应用关联结果到风险评估
+            if result.story_association_result:
+                _apply_story_association_to_result(result)
+        except Exception as e:
+            logger.warning("人生故事关联失败：%s", e)
     if enable_entity_chain:
         try:
             # 尝试使用全局graph_store（如果可用）
@@ -367,3 +394,101 @@ def _persist_result(result: EnhancedAnalysisResult):
         db.rollback()
     finally:
         db.close()
+
+
+def _infer_persona_from_analysis(result: EnhancedAnalysisResult) -> Dict[str, Any]:
+    """从分析结果推断人格画像
+    
+    基于 MVP 评估结果和平台反应，推断用户的 Big Five 人格特质。
+    这是一个简化的推断逻辑，实际应用中应该使用更复杂的模型。
+    
+    Args:
+        result: 增强分析结果
+    
+    Returns:
+        人格画像字典
+    """
+    # 默认人格画像
+    persona = {
+        "big_five": {
+            "openness": 0.5,
+            "conscientiousness": 0.5,
+            "extraversion": 0.5,
+            "agreeableness": 0.5,
+            "neuroticism": 0.5,
+        },
+        "mbti_type": "ISTJ",
+        "attachment_style": "secure",
+        "enneagram_type": 6,
+        "archetype": "普通人",
+        "life_story": {},
+    }
+    
+    # 基于平台反应调整人格特质
+    if result.mvp_platform_reactions:
+        # 统计各平台的情绪分布
+        emotions = {}
+        for platform_result in result.mvp_platform_reactions:
+            for emotion in platform_result.get("emotions", []):
+                emo_type = emotion.get("type", "")
+                emo_ratio = emotion.get("ratio", 0.0)
+                emotions[emo_type] = emotions.get(emo_type, 0.0) + emo_ratio
+        
+        # 归一化
+        total = sum(emotions.values())
+        if total > 0:
+            for emo_type in emotions:
+                emotions[emo_type] /= total
+        
+        # 根据情绪分布推断人格
+        if emotions.get("negative", 0.0) > 0.3:
+            # 负面反应多 → 神经质偏高
+            persona["big_five"]["neuroticism"] = min(1.0, 0.5 + emotions["negative"] * 0.5)
+        
+        if emotions.get("positive", 0.0) > 0.5:
+            # 正面反应多 → 外向性偏高
+            persona["big_five"]["extraversion"] = min(1.0, 0.5 + emotions["positive"] * 0.3)
+    
+    return persona
+
+
+def _apply_story_association_to_result(result: EnhancedAnalysisResult):
+    """应用人生故事关联结果到风险评估
+    
+    使用人生故事关联器计算的维度权重，调整风险评分。
+    
+    Args:
+        result: 增强分析结果
+    """
+    if not result.story_association_result:
+        return
+    
+    association = result.story_association_result
+    
+    # 获取基础风险评分
+    base_scores = result.mvp_dimensions.copy()
+    
+    # 应用权重调整
+    adjusted_scores = association.apply_to_risk_assessment(
+        association=association,
+        base_scores=base_scores,
+    )
+    
+    # 更新结果
+    result.mvp_dimensions = adjusted_scores
+    
+    # 重新计算综合评分
+    from backend.services.analyzer import calculate_overall_score
+    
+    dimensions_list = [
+        {"name": name, "score": score}
+        for name, score in adjusted_scores.items()
+    ]
+    
+    overall_score, _, _ = calculate_overall_score(dimensions_list)
+    result.mvp_overall_score = overall_score
+    
+    logger.info(
+        "应用人生故事关联：调整了 %d 个风险维度，综合评分变为 %d",
+        len(adjusted_scores), overall_score,
+    )
