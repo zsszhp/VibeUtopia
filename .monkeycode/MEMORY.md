@@ -42,15 +42,22 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
   - 这是强制性工作流，不能跳过任何步骤
 
 ### LLM 模型配置
-- Date: 2026-05-15
-- Context: 用户配置模型使用策略和 Key 轮换规则
+- Date: 2026-05-15 (updated: 2026-05-15)
+- Context: 用户配置模型使用策略和 Key 轮换规则（阶段 3 模型优化）
 - Category: 环境配置
 - Instructions:
-  - 使用 LongCat 系列模型：Thinking-2601(advanced)、Omni-2603(advanced/vision-only)、Chat(standard)、Lite(standard)
-  - **模型优先级**: LongCat-Flash-Omni-2603 > LongCat-Flash-Thinking-2601 > LongCat-Flash-Chat
-  - Omni 模型标记 text=false，不用于纯文本任务（返回 400 错误）
-  - **多 Key 轮换**: 配置多个 API Key 时用逗号分隔，当前 Key 配额耗尽时自动切换下一个
+  - 可用 API Keys（双 Key 轮换）：ak_2dP4Hf9Tc4sx3258dE9008Q81b638（Key1）, ak_2mC1K99ZH6lS9Wh3dY3SE2C30YM7x（Key2）
+  - Key 轮换策略：按顺序使用，Key1 配额耗尽后自动切换到 Key2
+  - 模型优先级顺序（严格按此顺序选择）：
+    1. LongCat-Flash-Omni-2603（最高优先级，多模态任务首选）
+    2. LongCat-Flash-Thinking-2601（第二优先级，复杂推理任务）
+    3. LongCat-Flash-Chat（第三优先级，快速对话任务）
+    4. LongCat-Flash-Lite（最低优先级）
+  - Omni 模型限制：text=false，仅用于多模态分析（图片 + 文本），纯文本任务自动跳过
+  - 纯文本任务路由：自动跳过 Omni → Thinking-2601 → Chat → Lite
+  - 多模态任务路由：Omni-2603 → Qwen-VL/GLM-VL
   - API Key 配置在 .env 文件的 LONGCAT_API_KEY 中，支持逗号分隔多个 Key
+  - 配置文件位置：backend/services/model_config.yaml（priority 字段）、.env（LONGCAT_MODEL_PRIORITY）
 
 ### 回测运行方式
 - Date: 2026-05-14
