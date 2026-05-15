@@ -596,6 +596,20 @@ async def run_analysis(task_id: str, text: str):
         # 广播分析完成
         await _broadcast_step(task_id, "report", 1.0, "分析完成")
         await _broadcast_complete(task_id, risk_level, overall_score, len(dimensions))
+        
+        # 返回分析结果
+        return {
+            "task_id": task_id,
+            "status": "completed",
+            "risk_level": risk_level,
+            "overall_score": overall_score,
+            "suggestion": suggestion,
+            "dimensions": dimensions,
+            "platform_reactions": platform_results,
+            "transcript_quality": transcript_quality,
+            "cross_modal_result": cross_modal_result,
+            "confidence": confidence_result,
+        }
 
     except Exception as e:
         logger.error("任务 %s: 分析失败 - %s", task_id, e)
