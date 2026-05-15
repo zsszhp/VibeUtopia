@@ -56,6 +56,70 @@ export interface CrossEffect {
   combined_severity: string
 }
 
+export interface ConfidenceBreakdown {
+  overall: number
+  factors: {
+    data_quality: number
+    consistency: number
+    evidence: number
+    platform_validation: number
+  }
+}
+
+export interface EvidenceChain {
+  id: string
+  source: string
+  content: string
+  confidence: number
+  cross_validation: string[]
+}
+
+export interface SimulationNode {
+  id: string
+  name: string
+  influence: number
+  faction: 'support' | 'oppose' | 'neutral'
+  details?: Record<string, any>
+}
+
+export interface SimulationEdge {
+  source: string
+  target: string
+  strength: number
+}
+
+export interface SimulationData {
+  nodes: SimulationNode[]
+  edges: SimulationEdge[]
+}
+
+export interface PolarizationDataPoint {
+  time: string
+  polarization_index: number
+  support_count: number
+  oppose_count: number
+  neutral_count: number
+}
+
+export interface PolarizationData {
+  timeline: PolarizationDataPoint[]
+  thresholds: {
+    low: number
+    medium: number
+    high: number
+  }
+}
+
+export interface EntityChainItem {
+  id: string
+  name: string
+  risk_score: number
+  risk_level: 'green' | 'yellow' | 'orange' | 'red'
+  dimensions: string[]
+  timestamp: string
+  details?: Record<string, any>
+}
+
 export interface ReviewResult {
   task_id: string
   status: string
@@ -69,6 +133,11 @@ export interface ReviewResult {
   confidence?: number
   uncertainty_sources?: string[]
   cross_effects?: CrossEffect[]
+  confidence_breakdown?: ConfidenceBreakdown
+  evidence_chains?: EvidenceChain[]
+  simulation_data?: SimulationData
+  polarization_data?: PolarizationData
+  entity_chains?: EntityChainItem[]
   error?: string
 }
 
@@ -133,4 +202,8 @@ export const api = {
       }
     })
   },
+
+  /** 获取历史报告详情 */
+  getHistoryDetail: (taskId: string) =>
+    axios.get<ReviewResult>(`${API_BASE}/history/${taskId}`),
 }

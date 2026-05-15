@@ -55,6 +55,12 @@ class EnhancedAnalysisResult:
     # Phase 2.5: 人生故事关联增强 (新增)
     story_association_result: Optional[StoryRiskAssociation] = None
 
+    # Phase 2.6: 多模态分析增强 (Paraformer音频转写 + 多模态风险检测)
+    audio_transcription: str = ""
+    audio_risk_score: int = 0
+    audio_risk_summary: str = ""
+    multimodal_integrated_score: int = 0
+
     # Phase 3: 仿真增强（deep模式）
     simulation_id: str = ""
     simulation_summary: dict = field(default_factory=dict)
@@ -79,6 +85,7 @@ async def run_enhanced_analysis(
     enable_signal: bool = True,
     enable_entity_chain: bool = True,
     enable_simulation: bool = False,
+    audio_transcription: str = "",
 ) -> EnhancedAnalysisResult:
     """编排增强风控分析4阶段Pipeline
 
@@ -89,6 +96,7 @@ async def run_enhanced_analysis(
         enable_signal: 是否启用信号关联
         enable_entity_chain: 是否启用实体风险链
         enable_simulation: 是否启用仿真增强（deep模式自动启用）
+        audio_transcription: Paraformer音频转写文本（可选）
 
     Returns:
         EnhancedAnalysisResult: 增强分析结果
@@ -112,6 +120,11 @@ async def run_enhanced_analysis(
         # 用动态权重重新计算V2分数
         if result.dynamic_weights_result and result.dynamic_weights_result.adjustments:
             _recalculate_with_dynamic_weights(result)
+
+        # ===== Phase 2.6: 多模态分析增强 =====
+        if audio_transcription:
+            logger.info("增强分析 %s: Phase 2.6 多模态分析增强开始", task_id)
+            await _run_phase2_6(text, result, audio_transcription)
 
         # ===== Phase 3: 仿真增强（可选）=====
         if enable_simulation:
@@ -269,6 +282,55 @@ async def _run_phase3(text: str, result: EnhancedAnalysisResult):
         result.simulation_summary = {"error": str(e)}
 
 
+async def _run_phase2_6(text: str, result: EnhancedAnalysisResult, audio_transcription: str):
+    """Phase 2.6: 多模态分析增强（Paraformer音频转写 + 多模态风险检测）
+
+    将音频转写结果与文本分析结果进行多模态融合：
+    1. 使用MultiModalAnalyzer分析音频转写内容的风险
+    2. 使用integrate_multimodal_score融合多模态分数
+    3. 更新风险评分和置信度
+    """
+    result.audio_transcription = audio_transcription
+
+    try:
+        from backend.services.multimodal_analyzer import MultiModalAnalyzer, integrate_multimodal_score
+
+        analyzer = MultiModalAnalyzer()
+
+        # 分析音频转写内容的风险
+        audio_risk = await analyzer.analyze_audio(
+            audio_transcript=audio_transcription,
+        )
+        result.audio_risk_score = audio_risk.get("overall_audio_risk_score", 0)
+        result.audio_risk_summary = audio_risk.get("summary", "")
+
+        # 多模态分数融合
+        text_score = result.mvp_overall_score
+        audio_score = result.audio_risk_score
+        result.multimodal_integrated_score = integrate_multimodal_score(
+            text_score=text_score,
+            audio_score=audio_score,
+        )
+
+        # 如果多模态融合分数高于MVP分数，更新风险评分
+        if result.multimodal_integrated_score > result.mvp_overall_score:
+            boost = result.multimodal_integrated_score - result.mvp_overall_score
+            result.mvp_overall_score = result.multimodal_integrated_score
+            result.risk_boosts["audio_multimodal"] = boost
+            logger.info(
+                "多模态分析增强：音频风险分=%d，融合分=%d，提升=%d",
+                audio_score, result.multimodal_integrated_score, boost,
+            )
+        else:
+            logger.info(
+                "多模态分析增强：音频风险分=%d，融合分=%d，无提升",
+                audio_score, result.multimodal_integrated_score,
+            )
+
+    except Exception as e:
+        logger.warning("多模态分析增强失败: %s", e)
+
+
 def _recalculate_with_dynamic_weights(result: EnhancedAnalysisResult):
     """用动态权重重新计算V2风险分数"""
     dw = result.dynamic_weights_result
@@ -346,6 +408,10 @@ def _compile_final_report(result: EnhancedAnalysisResult):
         agent_count = result.simulation_summary.get("total_agents", 0)
         sources["simulation"] = f"轻量仿真({agent_count}Agent)"
 
+    if result.audio_transcription:
+        confidence += 0.1
+        sources["audio_multimodal"] = f"Paraformer音频转写+多模态分析(风险分={result.audio_risk_score})"
+
     result.confidence = min(1.0, confidence)
     result.confidence_sources = sources
 
@@ -390,6 +456,26 @@ def _persist_result(result: EnhancedAnalysisResult):
         )
         db.add(v2_record)
         db.commit()
+
+        # 持久化多模态分析结果（追加到simulation_summary或单独记录）
+        if result.audio_transcription:
+            try:
+                existing = db.query(V2AnalysisResult).filter(
+                    V2AnalysisResult.task_id == result.task_id
+                ).first()
+                if existing and existing.simulation_summary:
+                    sim_data = json.loads(existing.simulation_summary)
+                else:
+                    sim_data = {}
+                sim_data["audio_transcription"] = result.audio_transcription[:2000]
+                sim_data["audio_risk_score"] = result.audio_risk_score
+                sim_data["audio_risk_summary"] = result.audio_risk_summary
+                sim_data["multimodal_integrated_score"] = result.multimodal_integrated_score
+                if existing:
+                    existing.simulation_summary = json.dumps(sim_data, ensure_ascii=False)
+                    db.commit()
+            except Exception as e:
+                logger.warning("持久化多模态分析结果失败: %s", e)
     except Exception as e:
         logger.error("持久化V2分析结果失败: %s", e)
         db.rollback()

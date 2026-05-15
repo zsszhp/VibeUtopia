@@ -48,6 +48,9 @@
 
     <!-- WebSocket连接管理 -->
     <WebSocketManager />
+
+    <!-- 设置弹窗 -->
+    <SettingsDialog v-model:show="showSettings" />
   </div>
 </template>
 
@@ -59,6 +62,7 @@ import { useReviewStore, useModelsStore } from './stores'
 import LeftPanel from './components/LeftPanel.vue'
 import RightPanel from './components/RightPanel.vue'
 import WebSocketManager from './components/WebSocketManager.vue'
+import SettingsDialog from './components/SettingsDialog.vue'
 
 const reviewStore = useReviewStore()
 const modelsStore = useModelsStore()

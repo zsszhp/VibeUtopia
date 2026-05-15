@@ -101,11 +101,21 @@
     <section class="heatmap-section">
       <h3 class="section-title">平台覆盖</h3>
       <div class="platform-grid">
-        <div
-          v-for="p in platforms"
-          :key="p"
-          class="platform-cell"
-        >{{ p }}</div>
+        <NTooltip v-for="p in platformHeatData" :key="p.name" trigger="hover">
+          <template #trigger>
+            <div
+              class="platform-cell"
+              :style="{ backgroundColor: p.color }"
+            >{{ p.name }}</div>
+          </template>
+          <div class="platform-tooltip">
+            <div class="pt-name">{{ p.name }}</div>
+            <div class="pt-row">风险覆盖: <span class="pt-val">{{ (p.risk * 100).toFixed(0) }}%</span></div>
+            <div class="pt-row">正向: <span class="pt-positive">{{ p.positive }}%</span></div>
+            <div class="pt-row">中性: <span class="pt-neutral">{{ p.neutral }}%</span></div>
+            <div class="pt-row">负向: <span class="pt-negative">{{ p.negative }}%</span></div>
+          </div>
+        </NTooltip>
       </div>
     </section>
   </div>
@@ -113,6 +123,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { NTooltip } from 'naive-ui'
 import { useReviewStore, useHistoryStore } from '../stores'
 import { api } from '../api'
 
@@ -197,11 +208,47 @@ function formatTime(t: string | null) {
   return new Date(t).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
-const platforms = [
+const platformNames = [
   '抖音', '微博', '小红书', 'B站', '快手', '知乎', '微信视频号',
   '今日头条', '豆瓣', '贴吧', '虎扑', '公众号',
   'Facebook', 'Twitter', 'TikTok', 'Instagram', 'YouTube', 'Reddit',
 ]
+
+interface PlatformHeatItem {
+  name: string
+  risk: number
+  positive: number
+  neutral: number
+  negative: number
+  color: string
+}
+
+function riskToColor(risk: number): string {
+  if (risk >= 0.75) return 'rgba(239,68,68,0.6)'
+  if (risk >= 0.5) return 'rgba(249,115,22,0.5)'
+  if (risk >= 0.25) return 'rgba(234,179,8,0.35)'
+  return 'rgba(99,102,241,0.2)'
+}
+
+const platformHeatData = computed<PlatformHeatItem[]>(() => {
+  const reactions = reviewStore.result?.platform_reactions
+  return platformNames.map(name => {
+    if (reactions && reactions[name]) {
+      const r = reactions[name]
+      const total = r.positive + r.neutral + r.negative
+      const risk = total > 0 ? r.negative / total : 0
+      return {
+        name,
+        risk,
+        positive: total > 0 ? Math.round((r.positive / total) * 100) : 0,
+        neutral: total > 0 ? Math.round((r.neutral / total) * 100) : 0,
+        negative: total > 0 ? Math.round((r.negative / total) * 100) : 0,
+        color: riskToColor(risk),
+      }
+    }
+    return { name, risk: 0, positive: 0, neutral: 0, negative: 0, color: riskToColor(0) }
+  })
+})
 
 historyStore.fetchHistory()
 </script>
@@ -414,9 +461,34 @@ historyStore.fetchHistory()
   padding: 4px 2px;
   text-align: center;
   font-size: 10px;
-  color: #666;
-  background: #1a1a2e;
+  color: #ccc;
   border-radius: 3px;
-  cursor: default;
+  cursor: pointer;
+  transition: all 0.2s;
 }
+
+.platform-cell:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 8px rgba(99,102,241,0.3);
+}
+
+.platform-tooltip {
+  font-size: 11px;
+}
+
+.pt-name {
+  font-weight: 600;
+  color: #e0e0e0;
+  margin-bottom: 4px;
+}
+
+.pt-row {
+  color: #aaa;
+  margin-top: 2px;
+}
+
+.pt-val { color: #8b5cf6; font-weight: 600; }
+.pt-positive { color: #22c55e; }
+.pt-neutral { color: #888; }
+.pt-negative { color: #ef4444; }
 </style>

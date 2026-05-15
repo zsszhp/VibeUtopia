@@ -8,9 +8,12 @@
           <div class="conf-fill-lg" :style="{ width: ((reviewStore.result.confidence ?? 0) * 100) + '%' }"></div>
         </div>
         <span class="conf-value">{{ ((reviewStore.result.confidence ?? 0) * 100).toFixed(0) }}%</span>
+        <NTag :type="confidenceTagType" size="small" round class="conf-tag">
+          {{ confidenceLabel }}
+        </NTag>
       </div>
-      
-      <!-- 阶段1.2新增: 置信度详细分解 -->
+
+      <!-- 置信度详细分解 -->
       <div v-if="reviewStore.result.confidence_breakdown" class="confidence-breakdown">
         <div class="breakdown-item">
           <span class="breakdown-label">数据质量</span>
@@ -41,9 +44,15 @@
           <span class="breakdown-value">{{ (reviewStore.result.confidence_breakdown.factors?.platform_validation * 100).toFixed(0) }}%</span>
         </div>
       </div>
-      
+
+      <!-- 不确定性来源 Tooltip -->
       <div v-if="reviewStore.result.uncertainty_sources?.length" class="uncertainty-list">
-        <span v-for="src in reviewStore.result.uncertainty_sources" :key="src" class="uncertainty-tag">{{ src }}</span>
+        <NTooltip v-for="src in reviewStore.result.uncertainty_sources" :key="src" trigger="hover">
+          <template #trigger>
+            <span class="uncertainty-tag">{{ src }}</span>
+          </template>
+          不确定性来源: {{ src }}
+        </NTooltip>
       </div>
     </section>
 
@@ -76,7 +85,7 @@
               <span class="suggestion-label">建议:</span>
               <p>{{ dim.suggestion }}</p>
             </div>
-            <!-- 阶段1.2新增: 受影响群体 -->
+            <!-- 受影响群体 -->
             <div v-if="dim.affected_groups?.length" class="affected-groups">
               <span class="ag-label">影响群体:</span>
               <span v-for="g in dim.affected_groups" :key="g" class="ag-tag">{{ g }}</span>
@@ -87,7 +96,7 @@
       <p v-else class="empty-hint">暂无风险数据</p>
     </section>
 
-    <!-- 阶段1.2新增: 证据链摘要 -->
+    <!-- 证据链摘要 -->
     <section v-if="evidenceChains?.length" class="evidence-section">
       <h3 class="section-title">证据链</h3>
       <div class="evidence-summary">
@@ -106,19 +115,28 @@
       </div>
     </section>
 
-    <!-- 热点关联 -->
-    <section v-if="signalCorrelations?.length" class="signal-section">
+    <!-- 传播推演可视化 -->
+    <section class="propagation-section">
+      <h3 class="section-title">传播推演</h3>
+      <PropagationGraph :simulation-data="reviewStore.result?.simulation_data" />
+    </section>
+
+    <!-- 极化趋势 -->
+    <section class="polarization-section">
+      <h3 class="section-title">极化趋势</h3>
+      <PolarizationChart :polarization-data="reviewStore.result?.polarization_data" />
+    </section>
+
+    <!-- 热点关联列表 -->
+    <section class="hotspot-section">
       <h3 class="section-title">热点关联</h3>
-      <div v-for="sc in signalCorrelations" :key="sc.signal_id" class="signal-item">
-        <div class="signal-header">
-          <span class="signal-platform">[{{ sc.platform }}]</span>
-          <span class="signal-title">{{ sc.title }}</span>
-        </div>
-        <div class="signal-meta">
-          <span class="signal-score">关联度: {{ (sc.correlation_score * 100).toFixed(0) }}%</span>
-          <span class="signal-boost">风险提升: +{{ (sc.risk_boost * 100).toFixed(0) }}%</span>
-        </div>
-      </div>
+      <HotspotList :hotspots="signalCorrelations" />
+    </section>
+
+    <!-- 实体风险链时间线 -->
+    <section class="entity-chain-section">
+      <h3 class="section-title">实体风险链</h3>
+      <EntityRiskTimeline :entities="reviewStore.result?.entity_chains" />
     </section>
 
     <!-- 交叉效应 -->
@@ -145,7 +163,12 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { NTag, NTooltip } from 'naive-ui'
 import { useReviewStore } from '../stores'
+import PropagationGraph from './PropagationGraph.vue'
+import PolarizationChart from './PolarizationChart.vue'
+import HotspotList from './HotspotList.vue'
+import EntityRiskTimeline from './EntityRiskTimeline.vue'
 
 const reviewStore = useReviewStore()
 const expanded = ref('')
@@ -155,7 +178,6 @@ const suggestions = computed(() => reviewStore.result?.suggestions)
 const signalCorrelations = computed(() => reviewStore.result?.signal_correlations)
 const crossEffects = computed(() => reviewStore.result?.cross_effects)
 
-// 阶段1.2新增: 证据链数据
 const evidenceChains = computed(() => reviewStore.result?.evidence_chains || [])
 const crossValidatedCount = computed(() => {
   if (!evidenceChains.value) return 0
@@ -165,6 +187,21 @@ const avgConfidence = computed(() => {
   if (!evidenceChains.value || evidenceChains.value.length === 0) return 0
   const total = evidenceChains.value.reduce((sum: number, ec: any) => sum + (ec.confidence || 0), 0)
   return (total / evidenceChains.value.length) * 100
+})
+
+// 置信度标签
+const confidenceTagType = computed(() => {
+  const c = reviewStore.result?.confidence ?? 0
+  if (c >= 0.8) return 'success' as const
+  if (c >= 0.6) return 'warning' as const
+  return 'error' as const
+})
+
+const confidenceLabel = computed(() => {
+  const c = reviewStore.result?.confidence ?? 0
+  if (c >= 0.8) return '高置信'
+  if (c >= 0.6) return '中置信'
+  return '低置信'
 })
 </script>
 
@@ -214,7 +251,10 @@ const avgConfidence = computed(() => {
   text-align: right;
 }
 
-/* 阶段1.2新增: 置信度详细分解 */
+.conf-tag {
+  flex-shrink: 0;
+}
+
 .confidence-breakdown {
   margin-top: 12px;
   display: flex;
@@ -269,6 +309,7 @@ const avgConfidence = computed(() => {
   border-radius: 3px;
   background: rgba(234,179,8,0.15);
   color: #eab308;
+  cursor: default;
 }
 
 .risk-item {
@@ -337,7 +378,6 @@ const avgConfidence = computed(() => {
 .suggestion-label { font-size: 11px; color: #6366f1; }
 .suggestion p { font-size: 12px; color: #aaa; margin-top: 2px; }
 
-/* 阶段1.2新增: 受影响群体 */
 .affected-groups {
   margin-top: 6px;
   display: flex;
@@ -359,7 +399,6 @@ const avgConfidence = computed(() => {
   color: #6366f1;
 }
 
-/* 阶段1.2新增: 证据链摘要 */
 .evidence-section { margin-top: 4px; }
 
 .evidence-summary {
@@ -392,35 +431,10 @@ const avgConfidence = computed(() => {
   margin-top: 4px;
 }
 
-.signal-section { margin-top: 4px; }
-
-.signal-item {
-  padding: 6px 8px;
-  background: #1a1a2e;
-  border-radius: 4px;
-  margin-bottom: 4px;
-  border-left: 2px solid #f97316;
-}
-
-.signal-header {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 2px;
-}
-
-.signal-platform { font-size: 10px; color: #f97316; font-weight: 600; }
-.signal-title { font-size: 12px; color: #ccc; }
-
-.signal-meta {
-  display: flex;
-  gap: 8px;
-  font-size: 10px;
-  color: #888;
-}
-
-.signal-score { color: #6366f1; }
-.signal-boost { color: #ef4444; }
+.propagation-section { margin-top: 4px; }
+.polarization-section { margin-top: 4px; }
+.hotspot-section { margin-top: 4px; }
+.entity-chain-section { margin-top: 4px; }
 
 .cross-effects-section { margin-top: 4px; }
 

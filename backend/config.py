@@ -17,6 +17,8 @@ class Settings:
     QWEN_BASE_URL: str = os.getenv("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
     QWEN_VL_MODEL: str = os.getenv("QWEN_VL_MODEL", "qwen-vl-plus")
 
+    ALIYUN_API_KEY: str = os.getenv("ALIYUN_API_KEY", "")
+
     GLM_API_KEY: str = os.getenv("GLM_API_KEY", "")
     GLM_BASE_URL: str = os.getenv("GLM_BASE_URL", "https://open.bigmodel.cn/api/paas/v4")
     GLM_VL_MODEL: str = os.getenv("GLM_VL_MODEL", "glm-4v-flash")

@@ -171,18 +171,45 @@ async def submit_review(
             if item.get("type") == "text" and item.get("content"):
                 texts_to_analyze.append(item["content"])
 
-    # 处理视频文件（提取文案）
+    # 处理视频文件（提取文案 + Paraformer音频转写）
+    audio_transcriptions: list[str] = []
     if req.video_files:
         for video_path in req.video_files:
             if os.path.exists(video_path):
+                # 提取视频文案（OCR + 本地音频转写）
                 extract_result = await extract_video_text(video_path)
                 if not extract_result.get("error"):
                     text = extract_result.get("text", "").strip()
                     if len(text) >= 10:
                         texts_to_analyze.append(text)
 
+                # Paraformer 云端音频转写（降级：API Key未配置时跳过）
+                try:
+                    from backend.services.audio_transcriber import ParaformerTranscriber
+                    transcriber = ParaformerTranscriber()
+                    if transcriber.api_key:
+                        paraformer_result = await transcriber.transcribe(
+                            audio_file_path=video_path,
+                            speaker_separation=True,
+                        )
+                        para_text = paraformer_result.get("text", "").strip()
+                        if para_text:
+                            audio_transcriptions.append(para_text)
+                            logger.info("Paraformer音频转写成功: %d字", len(para_text))
+                    else:
+                        logger.info("Paraformer API Key未配置，跳过云端音频转写")
+                except RuntimeError as e:
+                    logger.warning("Paraformer不可用，跳过音频转写: %s", e)
+                except Exception as e:
+                    logger.warning("Paraformer音频转写失败，降级跳过: %s", e)
+
     # 合并所有文本
     combined_text = "\n\n".join(texts_to_analyze)
+
+    # 将Paraformer音频转写结果追加到分析文本
+    if audio_transcriptions:
+        audio_section = "\n\n【音频转写内容】\n" + "\n".join(audio_transcriptions)
+        combined_text += audio_section
 
     if len(combined_text.strip()) < 10:
         raise HTTPException(status_code=400, detail="内容太短，无法进行分析（至少需要10个字符）")
