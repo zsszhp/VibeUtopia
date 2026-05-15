@@ -45,3 +45,4 @@ icon/
 
 # 测试源码 (保留测试脚本, 排除运行时数据)
 !tests/
+data/test_results/
