@@ -249,10 +249,8 @@ def run_all_tests():
     """运行所有测试（无 pytest）"""
     print("开始运行 T7+T8 人生故事与人格演化测试\n")
     
+    # 只运行已定义的测试类
     test_classes = [
-        TestTimelineBuilder,
-        TestSceneGenerator,
-        TestNarrativeIntegrator,
         TestPersonalityEvolver,
         TestTriggerEventsDB,
         TestAPIEndpoints,
