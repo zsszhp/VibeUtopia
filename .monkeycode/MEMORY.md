@@ -168,3 +168,37 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
   - 待进入阶段 4 前必须完成 A/B 回测，验证准确率提升≥15%
   - 详细报告：`tests/PHASE3_ACCEPTANCE_REPORT.md`、`tests/PHASE3_AB_TEST_REPORT.md`
   - 提交版本：commit fe69b55（阶段 3 人生故事生成系统实现）
+
+### T7 深度信号采集实施（2026-05-15 完成）
+- Date: 2026-05-15
+- Context: Agent 在运行 T7 信号采集任务时发现
+- Category: 代码结构 | 构建方法 | 测试方法
+- Instructions:
+  - **手动采集脚本**: `tests/run_signal_collection.py` - 支持手动触发一次完整的信号采集流程
+  - **4 步采集流程**: 热榜采集 → RSS 采集 → 增量检测 → 事件聚类
+  - **平台覆盖**: 11+ 平台热榜聚合（NewsNow API），当前可用 9 个平台（微博、百度、知乎、B 站、抖音、头条、贴吧、澎湃、财联社、凤凰网、华尔街见闻）
+  - **RSS 源**: Hacker News 等（雅虎财经 HTTP 429 限流）
+  - **增量检测**: 基于 24 小时历史窗口，识别新上榜、排名变化、下榜事件
+  - **事件聚类**: 基于关键词 Jaccard 相似度（阈值 0.4）将信号聚为事件簇
+  - **日志输出**: `data/signal_collection.log`
+  - **采集效果**:
+    - 热榜信号：254 条/次（微博 30、百度 30、知乎 20、B 站 30、抖音 30、头条 30、贴吧 29、澎湃 20、财联社 13、凤凰网 12、华尔街见闻 10）
+    - RSS 信号：20 条/次（Hacker News）
+    - 增量检测：新上榜 10-15 条，排名变化 40+ 条
+    - 事件聚类：188 个事件簇
+  - **降级情况**:
+    - 小红书、快手：NewsNow API 返回 500（平台暂不支持）
+    - 雅虎财经：HTTP 429 限流
+  - **数据库表**: `signal_records`（信号记录）、`seed_event_records`（种子事件）
+  - **核心模块**: `backend/services/signal/`（11 个文件，~1800 行代码）
+    - `fetcher.py` - 热榜聚合器
+    - `rss_fetcher.py` - RSS 采集器
+    - `incremental.py` - 增量检测器
+    - `event_detector.py` - 事件检测与聚类
+    - `deep_crawler.py` - 深度评论爬取器
+    - `sentiment.py` - BERT-LoRA 情感标注器
+    - `keyword_extractor.py` - LLM 关键词提取
+    - `scheduler.py` - 定时调度器
+    - `models.py` - 数据模型
+    - `signal_config.yaml` - 配置文件
+
