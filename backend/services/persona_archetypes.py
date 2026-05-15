@@ -1,8 +1,21 @@
-"""人格原型模板库 — 覆盖5大平台的主要人口统计特征
+"""人格原型模板库 — 覆盖 11 平台的主要人口统计特征
 
-每个原型包含7层模板参数，LLM基于模板+随机变异生成具体人格。
+
+P0 平台 (5 个): 微博、B 站、小红书、知乎、抖音
+P1 平台 (6 个): 快手、微信公众号、豆瓣、虎扑、今日头条、贴吧
+
 """
 from dataclasses import dataclass, field
+
+# P1 平台人格原型导入
+from backend.services.p1_archetypes import (
+    KUAISHOU_ARCHETYPES,
+    WECHAT_MP_ARCHETYPES,
+    DOUBAN_ARCHETYPES,
+    HUPU_ARCHETYPES,
+    JINRI_TOUTIAO_ARCHETYPES,
+    TIEBA_ARCHETYPES,
+)
 from typing import Optional
 
 
@@ -2944,6 +2957,13 @@ PLATFORM_ARCHETYPES = {
     "zhihu": ZHIHU_ARCHETYPES,
     "douyin": DOUYIN_ARCHETYPES,
     "weibo": WEIBO_ARCHETYPES,
+    # P1 平台
+    "kuaishou": KUAISHOU_ARCHETYPES,
+    "wechat_mp": WECHAT_MP_ARCHETYPES,
+    "douban": DOUBAN_ARCHETYPES,
+    "hupu": HUPU_ARCHETYPES,
+    "jinri_toutiao": JINRI_TOUTIAO_ARCHETYPES,
+    "tieba": TIEBA_ARCHETYPES,
 }
 
 
