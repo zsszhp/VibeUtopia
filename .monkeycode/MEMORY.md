@@ -215,3 +215,30 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
     - `models.py` - 数据模型
     - `signal_config.yaml` - 配置文件
 
+### T7 深度信号采集增强（2026-05-15 完成）
+- Date: 2026-05-15
+- Context: Agent 在运行 T7 增强任务时发现
+- Category: 代码结构 | 测试方法
+- Instructions:
+  - **增强脚本**: `tests/run_t7_enhancement.py` - 信号关联验证 + 深度评论爬取
+  - **信号关联验证结果**（4 个测试案例）:
+    - 平均匹配热点数：2.25 条/案例
+    - 平均风险提升：0.215（21.5%）
+    - 平均响应时间：9.6s
+    - 最高风险提升案例：浪姐节目争议（0.25，匹配 2 条热点）
+    - 最低风险提升案例：iPhone18 发布（0.05，匹配 1 条热点）
+  - **深度评论爬取结果**（TOP3 高信号强度事件）:
+    - 爬取事件数：3 个
+    - 总评论数：6 条（中美领导人会晤事件贡献 6 条）
+    - 情感分布：正面 4 条（67%），中性 2 条（33%），负面 0 条
+    - 平台 API 可用情况：
+      - 微博 API：部分可用（432 限流）
+      - 知乎 API：401 需认证
+      - B 站 API：412 需 cookie
+      - 小红书 API：404 路径变更
+  - **LLM 降级**: DeepSeek API 401，成功降级到 LongCat API
+  - **输出报告**: `data/t7_enhancement_report.json`
+  - **日志输出**: `data/t7_enhancement.log`
+  - **运行方式**: `PYTHONPATH=/workspace python3 tests/run_t7_enhancement.py`
+  - **提交版本**: commit d939cec
+
