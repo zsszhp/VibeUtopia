@@ -152,50 +152,101 @@ def create_attribute_persona(text: str) -> Dict[str, Any]:
     }
 
 
-async def assess_with_story_agent(text: str) -> Dict[str, Any]:
-    """A 组：使用人生故事 Agent 评估"""
-    try:
-        # 生成人生故事增强的人格
-        persona = create_story_enhanced_persona(text)
-        
-        if not persona:
-            return {"error": "人格生成失败"}
-        
-        # 使用标准风险评估（但带有人格增强）
-        # 这里简化处理，实际应该整合人格信息到评估流程
-        import uuid
-        task_id = str(uuid.uuid4())
-        result = await run_analysis(task_id, text)
-        
-        # 添加人格增强信息
-        result["persona_type"] = "story_enhanced"
-        result["has_life_story"] = True
-        
-        return result
-        
-    except Exception as e:
-        return {"error": str(e)}
+async def assess_with_story_agent(text: str, max_retries: int = 2) -> Dict[str, Any]:
+    """A 组：使用人生故事 Agent 评估
+    
+    增加错误处理和重试机制，应对 API 配额耗尽问题
+    """
+    for attempt in range(max_retries + 1):
+        try:
+            # 生成人生故事增强的人格
+            persona = create_story_enhanced_persona(text)
+            
+            if not persona:
+                return {"error": "人格生成失败", "retryable": False}
+            
+            # 使用标准风险评估（但带有人格增强）
+            import uuid
+            task_id = str(uuid.uuid4())
+            result = await run_analysis(task_id, text)
+            
+            # 处理 run_analysis 返回 None 的情况（API 失败）
+            if result is None:
+                if attempt < max_retries:
+                    print(f"      ⚠️ API 返回 None，等待重试 ({attempt+1}/{max_retries})...")
+                    await asyncio.sleep(5 * (attempt + 1))  # 指数退避
+                    continue
+                else:
+                    return {"error": "API 配额耗尽", "risk_level": "unknown", "retryable": True}
+            
+            # 添加人格增强信息
+            result["persona_type"] = "story_enhanced"
+            result["has_life_story"] = True
+            
+            return result
+            
+        except Exception as e:
+            error_msg = str(e)
+            # 判断是否为配额错误
+            if "429" in error_msg or "quota" in error_msg.lower():
+                if attempt < max_retries:
+                    print(f"      ⚠️ API 配额限制，等待重试 ({attempt+1}/{max_retries})...")
+                    await asyncio.sleep(10 * (attempt + 1))  # 配额错误等待更久
+                    continue
+            
+            # 最后一次重试失败
+            if attempt == max_retries:
+                return {"error": error_msg, "risk_level": "unknown", "retryable": True}
+    
+    # 所有重试失败
+    return {"error": "API 调用失败", "risk_level": "unknown", "retryable": True}
 
 
-async def assess_with_attribute_agent(text: str) -> Dict[str, Any]:
-    """B 组：使用属性标签 Agent 评估"""
-    try:
-        # 生成传统属性标签人格
-        persona = create_attribute_persona(text)
-        
-        # 使用标准风险评估
-        import uuid
-        task_id = str(uuid.uuid4())
-        result = await run_analysis(task_id, text)
-        
-        # 标记为属性标签
-        result["persona_type"] = "attribute_only"
-        result["has_life_story"] = False
-        
-        return result
-        
-    except Exception as e:
-        return {"error": str(e)}
+async def assess_with_attribute_agent(text: str, max_retries: int = 2) -> Dict[str, Any]:
+    """B 组：使用属性标签 Agent 评估
+    
+    增加错误处理和重试机制，应对 API 配额耗尽问题
+    """
+    for attempt in range(max_retries + 1):
+        try:
+            # 生成传统属性标签人格
+            persona = create_attribute_persona(text)
+            
+            # 使用标准风险评估
+            import uuid
+            task_id = str(uuid.uuid4())
+            result = await run_analysis(task_id, text)
+            
+            # 处理 run_analysis 返回 None 的情况（API 失败）
+            if result is None:
+                if attempt < max_retries:
+                    print(f"      ⚠️ API 返回 None，等待重试 ({attempt+1}/{max_retries})...")
+                    await asyncio.sleep(5 * (attempt + 1))  # 指数退避
+                    continue
+                else:
+                    return {"error": "API 配额耗尽", "risk_level": "unknown", "retryable": True}
+            
+            # 标记为属性标签
+            result["persona_type"] = "attribute_only"
+            result["has_life_story"] = False
+            
+            return result
+            
+        except Exception as e:
+            error_msg = str(e)
+            # 判断是否为配额错误
+            if "429" in error_msg or "quota" in error_msg.lower():
+                if attempt < max_retries:
+                    print(f"      ⚠️ API 配额限制，等待重试 ({attempt+1}/{max_retries})...")
+                    await asyncio.sleep(10 * (attempt + 1))  # 配额错误等待更久
+                    continue
+            
+            # 最后一次重试失败
+            if attempt == max_retries:
+                return {"error": error_msg, "risk_level": "unknown", "retryable": True}
+    
+    # 所有重试失败
+    return {"error": "API 调用失败", "risk_level": "unknown", "retryable": True}
 
 
 def check_accuracy_match(result: Dict[str, Any], expected_level: str) -> bool:
