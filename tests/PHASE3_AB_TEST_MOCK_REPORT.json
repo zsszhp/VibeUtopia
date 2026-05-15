@@ -1,0 +1,306 @@
+{
+  "test_date": "2026-05-15T07:25:21.621644",
+  "test_type": "mock_llm",
+  "total_cases": 36,
+  "a_group": {
+    "correct": 36,
+    "accuracy": 1.0
+  },
+  "b_group": {
+    "correct": 36,
+    "accuracy": 1.0
+  },
+  "improvement_percent": 0.0,
+  "status": "FAIL",
+  "associator_tested": true,
+  "case_results": [
+    {
+      "case_id": "哈佛蒋雨融演讲争议",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "闫学晶直播翻车",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "毒教材插图事件",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "带娃直播过度曝光",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "优思益假洋牌事件",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "同济大学教师论文造假",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "李佳琦眉笔事件",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "AI一键脱衣黑产",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "炫富拜金被点名",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "王妈背刺打工人",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "东方甄选小作文风波",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "张雨绮代孕风波",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "全红婵饭圈侵入式监控",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "手工酸奶造假",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "虐猫视频争议",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "花西子眉笔事件",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "成都 49 中坠亡事件",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "历史虚无主义被点名",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "宗教 cos 亵渎争议",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "AI 换脸技术滥用争议",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "金融诈骗荐股割韭菜",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "破坏原始森林",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "春节档电影票价争议",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "自残 ASMR 封禁",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "铁头日本核污水事件",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "文案抄袭被实锤",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "钟薛高火烧不化",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "医疗谣言伪科学养生",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "董宇辉小作文风波",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "瑞幸咖啡造假",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "哈尔滨旅游爆火",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "地域歧视言论翻车",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "淄博烧烤现象级爆火",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "秦朗巴黎丢作业事件",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "软色情 ASMR 封禁",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    },
+    {
+      "case_id": "网红小英卖惨塌房",
+      "expected_level": "green",
+      "a_match": true,
+      "b_match": true,
+      "a_score": 13,
+      "b_score": 18
+    }
+  ]
+}
