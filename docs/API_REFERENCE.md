@@ -1,6 +1,6 @@
 # VibeUtopia API 参考文档
 
-> 版本：v0.5.0 | 基础路径：`http://localhost:8000`
+> 版本：v1.0.0 | 基础路径：`http://localhost:8000`
 
 ## 目录
 
@@ -253,7 +253,7 @@ GET /api/v1/models
       "fallback": "faster-whisper-local"
     },
     "ocr": {
-      "primary": "local-paddleocr",
+      "primary": "qwen3-vl-plus-api",
       "fallback": "glm-ocr-api"
     },
     "agent_simulation": {

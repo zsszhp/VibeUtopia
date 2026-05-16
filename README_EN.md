@@ -13,7 +13,7 @@ English | [中文](README.md)
 
 ## ✨ Key Highlights
 
-- 🛡️ **7-Dimension Risk Assessment** — Political sensitivity, gender issues, ethnic/religious, moral/ethical, legal compliance, group offense, current events
+- 🛡️ **11-Dimension Risk Assessment** — Political sensitivity, legal compliance, ethnic/religious, factual errors, platform violations, gender issues, group offense, moral/ethical, current events, emotional polarization, value orientation
 - 🎯 **Sentence-Level Precision** — Pinpoint exactly which sentence carries risk, its category, and severity
 - 👥 **Multi-Platform Persona Simulation** — Realistic user reactions and sentiment distribution on Bilibili/Xiaohongshu/Zhihu/Douyin
 - ✍️ **Safe Rewrite Suggestions** — At least 2 safe rewrite alternatives preserving original meaning
@@ -28,7 +28,7 @@ English | [中文](README.md)
 
 | Feature | Description |
 |---------|-------------|
-| 7-Dimension Risk Assessment | Independent scoring across 7 dimensions + overall score with "Safe / Revise / Don't Publish" verdict |
+| 11-Dimension Risk Assessment | Independent scoring across 11 dimensions + overall score with "Safe / Revise / Don't Publish" verdict |
 | Sentence-Level Localization | Precise identification of risky sentences, risk category, and reasoning |
 | Multi-Platform Persona Simulation | Simulated positive/neutral/negative reactions from Bilibili/Xiaohongshu/Zhihu/Douyin users |
 | Safe Rewrite Suggestions | 2+ safe rewrite alternatives for high-risk sentences |
@@ -47,12 +47,21 @@ English | [中文](README.md)
 | Signal Acquisition + World Building | R5 | Hot search aggregation, knowledge graph, 7-layer persona factory, social simulation engine, propagation dynamics |
 | Blogger Services | R6 | Blogger style profiling, topic recommendation, competitor benchmarking |
 
-### V2+ (Planned)
+### V2+ (Implemented)
 
-- 1000+ Agent large-scale social simulation
-- Counterfactual simulation ("what if" analysis)
-- Long-term memory and social evolution
-- Additional platform support (Weibo, Twitter, etc.)
+- ✅ 1000+ Agent large-scale social simulation (GA-S3 GroupAgent, equivalent to 100k+ individuals)
+- ✅ Counterfactual simulation (4 strategies: delete/replace/soften/rephrase, before-after comparison)
+- ✅ Long-term memory and social evolution (Memory Stream + Reflection + life story driven)
+- ✅ Decision support (4-level advice + modification priorities + risk estimation)
+- ✅ Blogger services (style profiling + topic recommendation + competitor benchmarking)
+- ✅ Signal collection panel (hotlist + event detection + scheduler control)
+- ✅ Knowledge graph visualization (D3.js force-directed graph + entity query + path search)
+
+### V3 (Planned)
+
+- More platform support (Weibo, Twitter, etc. 25+ platforms)
+- Local model deployment (Ollama / vLLM integration)
+- Multi-language content risk control
 
 ---
 
@@ -61,22 +70,26 @@ English | [中文](README.md)
 VibeUtopia employs a five-layer architecture:
 
 ```
-┌─────────────────────────────────────────────────┐
-│         Analysis & Decision Layer (R3/R6)       │
-│  Trend Prediction · Report Gen · Blogger · Comp │
-├─────────────────────────────────────────────────┤
-│           Simulation Layer (R5)                  │
-│  Social Sim Engine · Propagation · Polarization │
-├─────────────────────────────────────────────────┤
-│           World Building Layer (R5)              │
-│  Knowledge Graph · Persona Factory · Social Net │
-├─────────────────────────────────────────────────┤
-│           Signal Collection Layer (R5)           │
-│  Hot Aggregation · Crawling · Event Detection   │
-├─────────────────────────────────────────────────┤
-│         Basic Risk Control Layer (MVP/R1/R2/R4) │
-│  7-Dim Assessment · Persona Sim · Backtest · MM │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│       Analysis & Decision Layer (R3/R6/V2+)         │
+│  Trend Prediction · Report Gen · Blogger · Compete  │
+│  Decision Support · Counterfactual · Blogger History │
+├─────────────────────────────────────────────────────┤
+│          Simulation Layer (R5/V2+)                   │
+│  Social Sim Engine · Propagation · Polarization      │
+│  GA-S3 GroupAgent · Scale Progression · Batch        │
+├─────────────────────────────────────────────────────┤
+│         World Building Layer (R5/V2+)                │
+│  Knowledge Graph · Persona Factory · Social Net      │
+│  Life Story A/B/C · Memory Stream · Reflection       │
+├─────────────────────────────────────────────────────┤
+│        Signal Collection Layer (R5)                  │
+│  Hot Aggregation · Crawling · Event Detection        │
+├─────────────────────────────────────────────────────┤
+│      Basic Risk Control Layer (MVP/R1/R2/R4)        │
+│  11-Dim Assessment · Persona Sim · Backtest · MM     │
+│  Paraformer Audio · Cross-Modal Detection            │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -90,7 +103,8 @@ VibeUtopia employs a five-layer architecture:
 | **ORM** | SQLAlchemy 2.0 | Database operations |
 | **Database** | SQLite (MVP) / MySQL (V2) | Relational storage |
 | **Graph Database** | Neo4j 5 | Knowledge graph + social network |
-| **LLM Integration** | httpx + OpenAI-compatible protocol | Supports DeepSeek / Alibaba Cloud / any compatible API |
+| **Vector Database** | ChromaDB | Agent memory storage (Memory Stream) |
+| **LLM Integration** | httpx + LiteLLM | Supports DeepSeek / Alibaba Cloud / Zhipu / SiliconFlow / LongCat multi-model routing |
 | **Frontend Framework** | Vue 3 + TypeScript | Composition API |
 | **UI Components** | Naive UI | Dark theme component library |
 | **Visualization** | ECharts + D3.js | Charts + knowledge graph visualization |
@@ -98,7 +112,7 @@ VibeUtopia employs a five-layer architecture:
 | **Build Tool** | Vite 8 | Fast dev & build |
 | **Video Processing** | OpenCV + PySceneDetect + FFmpeg | Keyframe extraction + scene detection |
 | **OCR** | Qwen3-VL-Plus / GLM-OCR API | Text recognition in video frames (API mode) |
-| **Audio Transcription** | faster-whisper | Efficient speech-to-text |
+| **Audio Transcription** | faster-whisper / Paraformer API | Efficient speech-to-text (local + cloud dual mode) |
 | **Containerization** | Docker Compose | Neo4j and other infrastructure |
 
 ---
@@ -181,11 +195,6 @@ Double-click `start.bat` to start both backend and frontend automatically.
 | Entry Point | URL |
 |------|------|
 | Vue3 Frontend | http://localhost:3000 |
-| Backend API Docs | http://localhost:8000/docs |
-| Neo4j Browser | http://localhost:7474 |
-|-------------|-----|
-| Vue3 Frontend | http://localhost:5173 |
-| Streamlit Frontend (MVP) | (deprecated, use Vue3) |
 | Backend API Docs | http://localhost:8000/docs |
 | Neo4j Browser | http://localhost:7474 |
 
@@ -346,8 +355,6 @@ VibeUtopia/
 │       ├── video_extractor.py      # Video transcript extraction
 │       └── ...                     # V2 additional services
 ├── frontend-vue/                   # Vue3 + Naive UI Frontend
-│   └── app.py
-├── frontend-vue/                   # Vue3 Frontend (V2)
 │   ├── src/
 │   │   ├── views/                  # Page components
 │   │   ├── components/             # Shared components
@@ -372,14 +379,15 @@ VibeUtopia/
 
 | Phase | Version | Status | Key Deliverables |
 |-------|---------|--------|-----------------|
-| Basic Risk Control | MVP | ✅ Done | 7-dim assessment + persona sim + safe rewrite + video extraction |
+| Basic Risk Control | MVP | ✅ Done | 11-dim assessment + persona sim + safe rewrite + video extraction |
 | Enhanced Analysis | V2.R1 | ✅ Done | Dual-mode analysis + risk context + entity risk chain |
 | Quality Assurance | V2.R2 | ✅ Done | Backtest system + consistency verification |
 | Trends & Reports | V2.R3 | ✅ Done | Trend prediction + 4 report types |
 | Multi-Modal Video | V2.R4 | ✅ Done | Keyframe + OCR + audio + cross-modal |
 | World Building + Simulation | V2.R5 | ✅ Done | Knowledge graph + persona factory + simulation engine + propagation |
 | Blogger Services | V2.R6 | ✅ Done | Blogger profiling + topic recommendation + competitor analysis |
-| Large-Scale Simulation | V2+ | 🔜 Planned | 1000+ Agents + counterfactual sim + social evolution |
+| Large-Scale Sim + Decision | V2+ | ✅ Done | 1000+ Agents + counterfactual sim + decision support + social evolution |
+| More Platforms + Local Models | V3 | 🔜 Planned | 25+ platforms + Ollama/vLLM + multi-language |
 
 ---
 

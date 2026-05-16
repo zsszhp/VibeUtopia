@@ -145,6 +145,17 @@ providers:
         vision: true
         text: true
 
+  # --- 商汤 SenseNova (DeepSeek V4 Flash) ---
+  sensenova:
+    name: "商汤 SenseNova"
+    api_key_env: "SENSENOVA_API_KEY"
+    base_url: "https://token.sensenova.cn/v1"
+    models:
+      - id: "deepseek-v4-flash"
+        tier: advanced
+        vision: false
+        text: true
+
   # --- 阿里 Paraformer (音频转写专用) ---
   paraformer:
     name: "阿里 Paraformer"
