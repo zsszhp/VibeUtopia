@@ -411,6 +411,7 @@ VibeUtopia 的架构设计受到了以下优秀开源项目的启发，详见 [�
 - [TrendRadar](https://github.com/sansan0/TrendRadar) — 多平台热搜聚合
 - [DeepSearchAgent-Demo](https://github.com/666ghj/DeepSearchAgent-Demo) — 迭代搜索策略
 - [ex-skill](https://github.com/perkfly/ex-skill) — 多层人格结构
+- [VideoRAG](https://github.com/HKUDS/VideoRAG) — 视频大模型检索增强生成
 
 ---
 
