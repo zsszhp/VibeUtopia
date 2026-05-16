@@ -6,16 +6,24 @@ from backend.services.llm_client import call_llm, load_prompt, parse_llm_json
 logger = logging.getLogger(__name__)
 
 PLATFORMS = [
-    "bilibili", "xiaohongshu", "zhihu", "douyin",
-    "weibo", "kuaishou", "wechat_channels",
-    "douban", "hupu", "toutiao", "tieba", "taptap", "wechat_official",
+    # P0 核心平台
+    "bilibili", "xiaohongshu", "zhihu", "douyin", "weibo",
+    # P1 次核心平台
+    "kuaishou", "wechat_channels", "douban", "hupu", "toutiao",
+    "tieba", "taptap", "wechat_official", "shipinhao",
+    "twitter", "facebook", "instagram", "youtube", "telegram", "reddit",
+    # P2 长尾平台
+    "tiktok_global", "linkedin", "nga", "v2ex", "maimai",
+    "boss_zhilian", "smzdm", "zhihu_zhuanlan", "jike",
 ]
 PLATFORM_NAMES = {
+    # P0
     "bilibili": "B站",
     "xiaohongshu": "小红书",
     "zhihu": "知乎",
     "douyin": "抖音",
     "weibo": "微博",
+    # P1
     "kuaishou": "快手",
     "wechat_channels": "微信视频号",
     "douban": "豆瓣",
@@ -24,6 +32,23 @@ PLATFORM_NAMES = {
     "tieba": "贴吧",
     "taptap": "TapTap",
     "wechat_official": "公众号",
+    "shipinhao": "微信视频号",
+    "twitter": "Twitter/X",
+    "facebook": "Facebook",
+    "instagram": "Instagram",
+    "youtube": "YouTube",
+    "telegram": "Telegram",
+    "reddit": "Reddit",
+    # P2
+    "tiktok_global": "TikTok(国际)",
+    "linkedin": "LinkedIn",
+    "nga": "NGA",
+    "v2ex": "V2EX",
+    "maimai": "脉脉",
+    "boss_zhilian": "Boss直聘",
+    "smzdm": "什么值得买",
+    "zhihu_zhuanlan": "知乎专栏",
+    "jike": "即刻",
 }
 
 
