@@ -156,6 +156,54 @@ providers:
         vision: false
         text: true
 
+  # --- Ollama (本地部署，V3.2) ---
+  ollama:
+    name: "Ollama (本地部署)"
+    api_key_env: "OLLAMA_API_KEY"
+    base_url: "http://localhost:11434/v1"
+    models:
+      - id: "qwen2.5:7b"
+        tier: standard
+        vision: false
+        text: true
+      - id: "qwen2.5:14b"
+        tier: advanced
+        vision: false
+        text: true
+      - id: "qwen2.5:32b"
+        tier: advanced
+        vision: false
+        text: true
+      - id: "deepseek-r1:14b"
+        tier: advanced
+        vision: false
+        text: true
+      - id: "llama3.2:8b"
+        tier: standard
+        vision: false
+        text: true
+      - id: "llama3.2-vision:11b"
+        tier: standard
+        vision: true
+        text: true
+      - id: "qwen2-vl:7b"
+        tier: standard
+        vision: true
+        text: true
+      - id: "minicpm-v:8b"
+        tier: standard
+        vision: true
+        text: true
+
+  # --- vLLM (本地高性能推理，V3.2) ---
+  vllm:
+    name: "vLLM (本地高性能推理)"
+    api_key_env: "VLLM_API_KEY"
+    base_url: "http://localhost:8000/v1"
+    models: []
+    # vLLM 模型通过运行时 API 动态发现，无需预配置
+    # 启动后会自动从 http://localhost:8000/v1/models 获取可用模型
+
   # --- 阿里 Paraformer (音频转写专用) ---
   paraformer:
     name: "阿里 Paraformer"

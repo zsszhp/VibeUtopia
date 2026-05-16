@@ -62,6 +62,10 @@ app.include_router(router_v3, prefix="/api/v3")
 from backend.routes_blogger import router as router_blogger
 app.include_router(router_blogger, prefix="/api/v1")
 
+# 注册本地模型部署管理路由 (V3.2)
+from backend.routes_local_models import router as router_local_models
+app.include_router(router_local_models)
+
 
 # ─── WebSocket端点 ────────────────────────────────────────────────
 

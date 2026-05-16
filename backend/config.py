@@ -22,6 +22,12 @@ class Settings:
     GLM_API_KEY: str = os.getenv("GLM_API_KEY", "")
     GLM_BASE_URL: str = os.getenv("GLM_BASE_URL", "https://open.bigmodel.cn/api/paas/v4")
     GLM_VL_MODEL: str = os.getenv("GLM_VL_MODEL", "glm-4v-flash")
+
+    # V3.2 本地模型部署配置 (Ollama / vLLM)
+    OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+    OLLAMA_API_KEY: str = os.getenv("OLLAMA_API_KEY", "ollama")
+    VLLM_BASE_URL: str = os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1")
+    VLLM_API_KEY: str = os.getenv("VLLM_API_KEY", "vllm")
     
     # 数据库配置
     # 生产环境推荐：mysql+pymysql://user:pass@host:port/db
