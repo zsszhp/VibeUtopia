@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-"""博主历史分析模块 — 阶段6
+"""博主历史分析模块 — 阶段6 + 阶段7知识引擎扩展
 
 分析博主历史发布内容的风险趋势，追踪风险维度变化，
 生成博主风险画像（长期风险偏好），基于历史数据预测未来风险。
+
+阶段7扩展：整合知识引擎的全知识画像（风格、观点、话题、受众），
+从纯风险画像升级为博主全维度知识画像。
 """
 
 import json
@@ -51,6 +54,25 @@ class RiskProfile:
     trend_data: List[RiskTrendPoint] = field(default_factory=list)
     prediction: Dict = field(default_factory=dict)
     confidence: float = 0.0
+
+
+@dataclass
+class BloggerFullProfile:
+    """博主全知识画像（风险画像 + 知识引擎画像）"""
+    blogger_id: str = ""
+    risk_profile: RiskProfile = field(default_factory=RiskProfile)
+    narrative_style: str = ""
+    expression_style: str = ""
+    vocabulary_profile: Dict[str, Any] = field(default_factory=dict)
+    core_viewpoints: List[Dict[str, Any]] = field(default_factory=list)
+    topic_stances: Dict[str, str] = field(default_factory=dict)
+    primary_topics: List[str] = field(default_factory=list)
+    topic_distribution: Dict[str, float] = field(default_factory=dict)
+    estimated_audience: Dict[str, Any] = field(default_factory=dict)
+    total_videos: int = 0
+    total_duration_hours: float = 0.0
+    knowledge_graph_stats: Dict[str, Any] = field(default_factory=dict)
+    last_updated: str = ""
 
 
 class BloggerHistoryAnalyzer:
@@ -420,3 +442,44 @@ class BloggerHistoryAnalyzer:
             )
 
         return prediction
+
+    async def get_full_profile(self, blogger_id: str, db=None) -> BloggerFullProfile:
+        """获取博主全知识画像（风险画像 + 知识引擎画像）
+
+        整合风险画像和知识引擎画像，提供博主的全维度视图。
+
+        Args:
+            blogger_id: 博主ID
+            db: 数据库会话
+
+        Returns:
+            BloggerFullProfile
+        """
+        risk_profile = self.analyze_history(blogger_id, db)
+
+        full_profile = BloggerFullProfile(
+            blogger_id=blogger_id,
+            risk_profile=risk_profile,
+        )
+
+        try:
+            from backend.services.blogger_knowledge_service import BloggerKnowledgeService
+            knowledge_service = BloggerKnowledgeService()
+            knowledge_profile = await knowledge_service.get_blogger_profile(blogger_id)
+
+            full_profile.narrative_style = knowledge_profile.narrative_style
+            full_profile.expression_style = knowledge_profile.expression_style
+            full_profile.vocabulary_profile = knowledge_profile.vocabulary_profile
+            full_profile.core_viewpoints = knowledge_profile.core_viewpoints
+            full_profile.topic_stances = knowledge_profile.topic_stances
+            full_profile.primary_topics = knowledge_profile.primary_topics
+            full_profile.topic_distribution = knowledge_profile.topic_distribution
+            full_profile.estimated_audience = knowledge_profile.estimated_audience
+            full_profile.total_videos = knowledge_profile.total_videos
+            full_profile.total_duration_hours = knowledge_profile.total_duration_hours
+            full_profile.knowledge_graph_stats = knowledge_profile.knowledge_graph_stats
+            full_profile.last_updated = knowledge_profile.last_updated
+        except Exception as e:
+            logger.warning("知识引擎画像获取失败，仅返回风险画像: %s", e)
+
+        return full_profile

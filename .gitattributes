@@ -1,0 +1,5 @@
+# tests/video/ 下的测试视频/音频/封面使用LFS跟踪
+tests/video/**/*.mp4 filter=lfs diff=lfs merge=lfs -text
+tests/video/**/*.mp3 filter=lfs diff=lfs merge=lfs -text
+tests/video/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+tests/video/**/*.jpeg filter=lfs diff=lfs merge=lfs -text

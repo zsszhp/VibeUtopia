@@ -58,6 +58,10 @@ app.include_router(router, prefix="/api/v1")
 from backend.routes_v3 import router as router_v3
 app.include_router(router_v3, prefix="/api/v3")
 
+# 注册博主多视频知识引擎路由
+from backend.routes_blogger import router as router_blogger
+app.include_router(router_blogger, prefix="/api/v1")
+
 
 # ─── WebSocket端点 ────────────────────────────────────────────────
 

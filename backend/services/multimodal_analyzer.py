@@ -1,13 +1,16 @@
-"""多模态内容理解 - 视频画面+OCR+音频转写风险检测
+"""多模态内容理解 - 视频画面+OCR+音频转写风险检测 + VLM视觉描述
 
 预期准确率收益：+6%
 从只审文字到审画面+审音频，覆盖视频内容的全模态风险。
+VLM视觉描述：为知识图谱构建提供结构化的视频画面语义描述。
 """
 
+import base64
 import logging
+import os
 from typing import Dict, List, Optional
 
-from backend.services.llm_client import call_llm, parse_llm_json
+from backend.services.llm_client import call_llm, call_vlm, parse_llm_json
 
 logger = logging.getLogger(__name__)
 
@@ -297,3 +300,178 @@ def integrate_multimodal_score(
         overall = min(100, overall + 10)
 
     return overall
+
+
+VISUAL_DESCRIPTION_PROMPT = """请详细描述这个视频画面中的内容，用于构建知识图谱。
+
+请从以下角度描述：
+1. 场景：画面发生的地点和环境
+2. 人物：出现的人物及其动作、表情
+3. 物体：画面中的关键物体、产品、标志
+4. 文字：画面中出现的文字内容（标题、字幕、标签等）
+5. 活动：正在进行的活动或事件
+
+请用简洁的中文描述，每项1-2句话。如果某项在画面中不存在，写"无"。"""
+
+SEGMENT_ANALYSIS_PROMPT = """你是一个视频内容分析专家。请综合分析以下视频片段的多模态信息，提取结构化知识。
+
+【视觉描述】
+{visual_description}
+
+【音频转录】
+{asr_text}
+
+【OCR文字】
+{ocr_text}
+
+请提取：
+1. 话题：本片段讨论的主要话题
+2. 关键实体：出现的人名、组织、产品、概念等
+3. 观点：表达的观点或立场
+4. 证据：引用的数据、案例、事实
+5. 情感：整体情感倾向
+
+输出JSON：
+{{
+    "topics": ["话题1", "话题2"],
+    "entities": [
+        {{"name": "实体名", "type": "Person/Organization/Concept/Product/Location", "description": "简述"}}
+    ],
+    "viewpoints": [
+        {{"content": "观点内容", "stance": "positive/negative/neutral", "confidence": 0.8}}
+    ],
+    "evidence": [
+        {{"content": "证据内容", "type": "data/case/fact"}}
+    ],
+    "sentiment": "positive/negative/neutral/mixed",
+    "summary": "片段一句话摘要"
+}}"""
+
+
+class VideoSegmentAnalyzer:
+    """视频片段分析器（VLM驱动，用于知识图谱构建）"""
+
+    async def generate_visual_description(self, frame_path: str) -> str:
+        """用VLM生成单帧画面的自然语言描述
+
+        Args:
+            frame_path: 帧图片路径
+
+        Returns:
+            视觉描述文本
+        """
+        if not os.path.exists(frame_path):
+            return ""
+
+        try:
+            with open(frame_path, "rb") as f:
+                image_data = f.read()
+            image_base64 = base64.b64encode(image_data).decode("utf-8")
+
+            description = await call_vlm(
+                prompt=VISUAL_DESCRIPTION_PROMPT,
+                image_base64=image_base64,
+                system="你是一个视频内容分析专家，擅长描述视频画面中的细节。",
+                task_type="default",
+            )
+            return description.strip()
+        except Exception as e:
+            logger.warning("VLM视觉描述生成失败: %s", e)
+            return ""
+
+    async def generate_visual_description_batch(self, frame_paths: List[str]) -> str:
+        """批量生成多帧画面的合并描述
+
+        对多个关键帧分别生成描述，然后合并为统一描述。
+        为控制成本，最多处理5帧。
+
+        Args:
+            frame_paths: 帧图片路径列表
+
+        Returns:
+            合并后的视觉描述文本
+        """
+        if not frame_paths:
+            return ""
+
+        sampled = frame_paths[:5]
+        descriptions = []
+
+        for fp in sampled:
+            desc = await self.generate_visual_description(fp)
+            if desc:
+                descriptions.append(desc)
+
+        if not descriptions:
+            return ""
+
+        if len(descriptions) == 1:
+            return descriptions[0]
+
+        merge_prompt = f"""请将以下多个视频帧的描述合并为一段连贯的画面描述，去除重复信息：
+
+{chr(10).join(f'帧{i+1}: {d}' for i, d in enumerate(descriptions))}
+
+请输出一段连贯的中文描述，保留所有关键信息。"""
+
+        try:
+            merged = await call_llm(
+                merge_prompt,
+                system="你是一个内容整合专家。",
+                task_type="default",
+            )
+            return merged.strip()
+        except Exception as e:
+            logger.warning("视觉描述合并失败: %s", e)
+            return "\n".join(descriptions)
+
+    async def analyze_segment(
+        self,
+        visual_description: str,
+        asr_text: str = "",
+        ocr_text: str = "",
+    ) -> dict:
+        """综合分析视频片段：视觉描述 + 音频内容 + OCR → 结构化知识
+
+        Args:
+            visual_description: VLM生成的视觉描述
+            asr_text: ASR转录文本
+            ocr_text: OCR提取文本
+
+        Returns:
+            结构化分析结果
+        """
+        prompt = SEGMENT_ANALYSIS_PROMPT.format(
+            visual_description=visual_description or "无视觉信息",
+            asr_text=asr_text or "无音频转录",
+            ocr_text=ocr_text or "无OCR文字",
+        )
+
+        try:
+            response = await call_llm(
+                prompt,
+                system="你是一个视频内容分析专家，擅长从多模态信息中提取结构化知识。",
+                task_type="default",
+            )
+
+            result = parse_llm_json(response, fallback={
+                "topics": [],
+                "entities": [],
+                "viewpoints": [],
+                "evidence": [],
+                "sentiment": "neutral",
+                "summary": "分析失败",
+            })
+
+            return result
+
+        except Exception as e:
+            logger.warning("VideoSegmentAnalyzer: 片段分析失败 %s", e)
+            return {
+                "topics": [],
+                "entities": [],
+                "viewpoints": [],
+                "evidence": [],
+                "sentiment": "neutral",
+                "summary": f"分析失败: {str(e)}",
+            }

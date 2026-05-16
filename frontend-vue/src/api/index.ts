@@ -260,3 +260,32 @@ export const v3Api = {
   decisionAdvise: (taskId: string, riskReport: Record<string, any>) =>
     axios.post(`${V3_BASE}/decision/advise`, { task_id: taskId, risk_report: riskReport }),
 }
+
+export const bloggerApi = {
+  createIndex: (bloggerId: string, videoPaths: string[], platform: string = '') =>
+    axios.post(`${API_BASE}/blogger/index`, { blogger_id: bloggerId, video_paths: videoPaths, platform }),
+
+  getIndexStatus: (bloggerId: string) =>
+    axios.get(`${API_BASE}/blogger/${bloggerId}/status`),
+
+  incrementalIndex: (bloggerId: string, newVideoPaths: string[], platform: string = '') =>
+    axios.post(`${API_BASE}/blogger/incremental`, { blogger_id: bloggerId, new_video_paths: newVideoPaths, platform }),
+
+  deleteIndex: (bloggerId: string) =>
+    axios.delete(`${API_BASE}/blogger/${bloggerId}/index`),
+
+  ask: (bloggerId: string, question: string) =>
+    axios.post(`${API_BASE}/blogger/ask`, { blogger_id: bloggerId, question }),
+
+  search: (bloggerId: string, query: string, topK: number = 10) =>
+    axios.post(`${API_BASE}/blogger/search`, { blogger_id: bloggerId, query, top_k: topK }),
+
+  getProfile: (bloggerId: string) =>
+    axios.get(`${API_BASE}/blogger/${bloggerId}/profile`),
+
+  findContradictions: (bloggerId: string, topic: string = '') =>
+    axios.post(`${API_BASE}/blogger/contradictions`, { blogger_id: bloggerId, topic }),
+
+  getTimeline: (bloggerId: string, topic: string) =>
+    axios.post(`${API_BASE}/blogger/timeline`, { blogger_id: bloggerId, topic }),
+}

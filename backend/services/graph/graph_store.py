@@ -473,6 +473,65 @@ class GraphStore:
 
     # ── 图查询 ────────────────────────────────────────
 
+    def search_relations(self, keyword: str, relation_type: Optional[str] = None,
+                         limit: int = 20) -> List[Dict]:
+        """按关键词搜索关系（Neo4j 不可用时降级）
+
+        在关系的属性和关联实体名称中搜索匹配项。
+        """
+        if self.is_neo4j_available:
+            try:
+                rel_type = f":{relation_type}" if relation_type else ""
+                with self._driver.session() as session:
+                    result = session.run(
+                        f"MATCH (a)-[r{rel_type}]-(b) "
+                        f"WHERE a.name CONTAINS $keyword OR b.name CONTAINS $keyword "
+                        f"RETURN a, r, b LIMIT $limit",
+                        keyword=keyword, limit=limit,
+                    )
+                    records = []
+                    for r in result:
+                        records.append({
+                            "source_name": dict(r["a"]).get("name", ""),
+                            "source": dict(r["a"]),
+                            "relation_type": dict(r["r"]).get("relation_type", ""),
+                            "relation": dict(r["r"]),
+                            "target_name": dict(r["b"]).get("name", ""),
+                            "target": dict(r["b"]),
+                        })
+                    return records
+            except Exception as e:
+                logger.error("Neo4j 搜索关系失败: %s，尝试降级", e)
+                self._handle_neo4j_failure()
+                return self._search_relations_fallback(keyword, relation_type, limit)
+        else:
+            return self._search_relations_fallback(keyword, relation_type, limit)
+
+    def _search_relations_fallback(self, keyword: str, relation_type: Optional[str] = None,
+                                   limit: int = 20) -> List[Dict]:
+        """降级模式：从内存缓存中搜索关系"""
+        results = []
+        keyword_lower = keyword.lower()
+        for rid, rel in self._fallback_relations.items():
+            if relation_type and rel.get("relation_type") != relation_type:
+                continue
+            source_entity = self._fallback_entities.get(rel.get("source_id", ""), {})
+            target_entity = self._fallback_entities.get(rel.get("target_id", ""), {})
+            source_name = source_entity.get("name", "").lower()
+            target_name = target_entity.get("name", "").lower()
+            if keyword_lower in source_name or keyword_lower in target_name:
+                results.append({
+                    "source_name": source_entity.get("name", ""),
+                    "source": source_entity,
+                    "relation_type": rel.get("relation_type", ""),
+                    "relation": rel,
+                    "target_name": target_entity.get("name", ""),
+                    "target": target_entity,
+                })
+                if len(results) >= limit:
+                    break
+        return results
+
     def get_subgraph(self, entity_id: str, depth: int = 2,
                      limit: int = 100) -> Dict[str, List]:
         """获取以某实体为中心的子图（Neo4j 不可用时降级）"""

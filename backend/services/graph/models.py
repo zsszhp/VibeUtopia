@@ -18,6 +18,10 @@ class EntityType(str, Enum):
     PLATFORM = "Platform"
     PRODUCT = "Product"
     SOCIAL_GROUP = "SocialGroup"
+    VIDEO_SEGMENT = "VideoSegment"
+    TOPIC = "Topic"
+    VIEWPOINT = "Viewpoint"
+    EVIDENCE = "Evidence"
 
 
 class RelationType(str, Enum):
@@ -31,6 +35,10 @@ class RelationType(str, Enum):
     RELATED_TO = "RELATED_TO"
     EMPLOYS = "EMPLOYS"
     MENTIONS = "MENTIONS"
+    HOLDS_VIEW = "HOLDS_VIEW"
+    CONTRADICTS = "CONTRADICTS"
+    EVOLVED_FROM = "EVOLVED_FROM"
+    APPEARS_IN = "APPEARS_IN"
 
 
 @dataclass
@@ -85,3 +93,76 @@ class ExtractionResult:
     entities: List[Entity] = field(default_factory=list)
     relations: List[Relation] = field(default_factory=list)
     source_event_id: Optional[str] = None
+
+
+@dataclass
+class VideoSegment:
+    """视频片段"""
+    segment_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    video_path: str = ""
+    blogger_id: str = ""
+    start_time: float = 0.0
+    end_time: float = 0.0
+    frame_paths: List[str] = field(default_factory=list)
+    visual_description: str = ""
+    asr_text: str = ""
+    ocr_text: str = ""
+    combined_text: str = ""
+    embedding: Optional[List[float]] = None
+
+
+@dataclass
+class IndexResult:
+    """博主视频索引结果"""
+    blogger_id: str = ""
+    videos_indexed: int = 0
+    segments_created: int = 0
+    entities_extracted: int = 0
+    relations_extracted: int = 0
+    entities_merged: int = 0
+    duration_seconds: float = 0.0
+    errors: List[str] = field(default_factory=list)
+
+
+@dataclass
+class IndexStatus:
+    """博主索引状态"""
+    blogger_id: str = ""
+    total_videos: int = 0
+    total_segments: int = 0
+    total_entities: int = 0
+    total_relations: int = 0
+    total_duration_hours: float = 0.0
+    indexed_video_paths: List[str] = field(default_factory=list)
+    last_updated: str = ""
+
+
+@dataclass
+class AnswerResult:
+    """博主知识问答结果"""
+    question: str = ""
+    answer: str = ""
+    references: List[Dict[str, Any]] = field(default_factory=list)
+    confidence: float = 0.0
+    retrieval_mode: str = "text"
+
+
+@dataclass
+class BloggerKnowledgeProfile:
+    """博主全知识画像"""
+    blogger_id: str = ""
+    platform: str = ""
+    narrative_style: str = ""
+    expression_style: str = ""
+    vocabulary_profile: Dict[str, Any] = field(default_factory=dict)
+    core_viewpoints: List[Dict[str, Any]] = field(default_factory=list)
+    topic_stances: Dict[str, str] = field(default_factory=dict)
+    contradictions: List[Dict[str, Any]] = field(default_factory=list)
+    primary_topics: List[str] = field(default_factory=list)
+    topic_distribution: Dict[str, float] = field(default_factory=dict)
+    estimated_audience: Dict[str, Any] = field(default_factory=dict)
+    risk_profile: Dict[str, Any] = field(default_factory=dict)
+    total_videos: int = 0
+    total_duration_hours: float = 0.0
+    knowledge_graph_stats: Dict[str, Any] = field(default_factory=dict)
+    last_updated: str = ""

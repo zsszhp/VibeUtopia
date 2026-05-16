@@ -80,6 +80,64 @@
         </div>
       </div>
     </div>
+
+    <!-- 知识引擎面板 -->
+    <div v-if="knowledgeData.primary_topics?.length" class="knowledge-section">
+      <div class="sub-title">知识画像</div>
+
+      <div v-if="knowledgeData.narrative_style" class="knowledge-item">
+        <span class="ki-label">叙事风格</span>
+        <span class="ki-value">{{ knowledgeData.narrative_style }}</span>
+      </div>
+
+      <div v-if="knowledgeData.expression_style" class="knowledge-item">
+        <span class="ki-label">表达风格</span>
+        <span class="ki-value">{{ knowledgeData.expression_style }}</span>
+      </div>
+
+      <div v-if="knowledgeData.primary_topics?.length" class="topics-section">
+        <span class="ki-label">主要话题</span>
+        <div class="topic-tags">
+          <NTag v-for="t in knowledgeData.primary_topics.slice(0, 8)" :key="t" size="tiny" type="info" round>
+            {{ t }}
+          </NTag>
+        </div>
+      </div>
+
+      <div v-if="knowledgeData.core_viewpoints?.length" class="viewpoints-section">
+        <span class="ki-label">核心观点</span>
+        <div v-for="vp in knowledgeData.core_viewpoints.slice(0, 5)" :key="vp.topic" class="viewpoint-item">
+          <span class="vp-topic">{{ vp.topic }}</span>
+          <span class="vp-content">{{ vp.viewpoint }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 知识问答 -->
+    <div class="qa-section">
+      <div class="sub-title">知识问答</div>
+      <div class="qa-input-row">
+        <input
+          v-model="qaQuestion"
+          class="qa-input"
+          placeholder="输入问题，如：这个博主对AI的看法是什么？"
+          @keyup.enter="askQuestion"
+        />
+        <button class="qa-btn" :disabled="qaLoading" @click="askQuestion">
+          {{ qaLoading ? '思考中...' : '提问' }}
+        </button>
+      </div>
+      <div v-if="qaAnswer" class="qa-answer">
+        <div class="qa-answer-text">{{ qaAnswer.answer }}</div>
+        <div v-if="qaAnswer.references?.length" class="qa-refs">
+          <span class="qa-refs-label">引用：</span>
+          <span v-for="(ref, i) in qaAnswer.references.slice(0, 3)" :key="i" class="qa-ref">
+            {{ ref.video }} {{ ref.time }}
+          </span>
+        </div>
+        <NTag v-if="qaAnswer.retrieval_mode" size="tiny" round>{{ qaAnswer.retrieval_mode }}</NTag>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -87,7 +145,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { NTag } from 'naive-ui'
 import * as echarts from 'echarts'
-import { v3Api } from '../api'
+import { v3Api, bloggerApi } from '../api'
 
 const props = defineProps<{
   bloggerId?: string
@@ -101,6 +159,10 @@ let radarChart: echarts.ECharts | null = null
 const profileData = ref<any>({})
 const competitorData = ref<any>({})
 const decisionAdvice = ref<any>(null)
+const knowledgeData = ref<any>({})
+const qaQuestion = ref('')
+const qaAnswer = ref<any>(null)
+const qaLoading = ref(false)
 
 const toleranceType = computed(() => {
   const t = profileData.value.risk_tolerance
@@ -155,6 +217,28 @@ async function fetchProfile() {
 
 async function fetchCompetitor() {
   if (!props.bloggerId) return
+}
+
+async function fetchKnowledgeProfile() {
+  if (!props.bloggerId) return
+  try {
+    const resp = await bloggerApi.getProfile(props.bloggerId)
+    knowledgeData.value = resp.data
+  } catch {}
+}
+
+async function askQuestion() {
+  if (!props.bloggerId || !qaQuestion.value.trim()) return
+  qaLoading.value = true
+  qaAnswer.value = null
+  try {
+    const resp = await bloggerApi.ask(props.bloggerId, qaQuestion.value.trim())
+    qaAnswer.value = resp.data
+  } catch (e: any) {
+    qaAnswer.value = { answer: '问答失败: ' + (e.message || '未知错误'), references: [] }
+  } finally {
+    qaLoading.value = false
+  }
 }
 
 function renderTrendChart() {
@@ -218,6 +302,7 @@ function renderRadarChart() {
 
 onMounted(() => {
   fetchProfile()
+  fetchKnowledgeProfile()
 })
 
 onUnmounted(() => {
@@ -227,6 +312,8 @@ onUnmounted(() => {
 
 watch(() => props.bloggerId, () => {
   fetchProfile()
+  fetchKnowledgeProfile()
+  qaAnswer.value = null
 })
 </script>
 
@@ -400,5 +487,133 @@ watch(() => props.bloggerId, () => {
 .risk-factor {
   font-size: 11px;
   color: #aaa;
+}
+
+.knowledge-section {
+  margin-top: 4px;
+  background: #12121a;
+  border: 1px solid #1e1e2e;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.knowledge-item {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+.ki-label {
+  color: #6366f1;
+  font-weight: 600;
+  min-width: 56px;
+}
+
+.ki-value {
+  color: #ccc;
+  flex: 1;
+}
+
+.topics-section {
+  margin-bottom: 8px;
+}
+
+.topic-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.viewpoints-section {
+  margin-top: 4px;
+}
+
+.viewpoint-item {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+
+.vp-topic {
+  color: #6366f1;
+  font-weight: 600;
+  min-width: 60px;
+}
+
+.vp-content {
+  color: #aaa;
+  flex: 1;
+}
+
+.qa-section {
+  margin-top: 4px;
+}
+
+.qa-input-row {
+  display: flex;
+  gap: 6px;
+}
+
+.qa-input {
+  flex: 1;
+  background: #0a0a0f;
+  border: 1px solid #1e1e2e;
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: #ccc;
+  font-size: 12px;
+  outline: none;
+}
+
+.qa-input:focus {
+  border-color: #6366f1;
+}
+
+.qa-btn {
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.qa-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.qa-answer {
+  margin-top: 8px;
+  background: #12121a;
+  border: 1px solid #1e1e2e;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.qa-answer-text {
+  font-size: 12px;
+  color: #ddd;
+  line-height: 1.6;
+  margin-bottom: 6px;
+}
+
+.qa-refs {
+  font-size: 10px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.qa-refs-label {
+  color: #6366f1;
+}
+
+.qa-ref {
+  margin-right: 8px;
 }
 </style>

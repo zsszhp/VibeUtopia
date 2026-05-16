@@ -79,7 +79,6 @@ Thumbs.db
 
 # 元数据
 metadata.json
-.gitattributes
 
 # Node
 node_modules/
@@ -104,3 +103,14 @@ backend/prompts/versions/
 
 # 临时文件
 .git_commit_msg.txt
+git_status.txt
+
+# 测试产物
+tests/large_scale_test_results/
+
+# 参考项目源码（本地保留，不上传git，分析文档在references/analysis/中）
+references/projects/
+VideoRAG/
+
+# 参考论文PDF（本地保留，不上传git）
+references/papers/
