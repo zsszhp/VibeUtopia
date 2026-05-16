@@ -41,6 +41,8 @@ export interface RiskDimension {
   confidence: number
   suggestion: string
   affected_groups?: string[]
+  dimension_weight?: number
+  risk_score?: number
 }
 
 export interface SignalCorrelation {

@@ -209,9 +209,14 @@ class PersonaGenerationResponse(BaseModel):
     quality_score: float
 
 
-@router.post("/api/v3/generate-persona")
+@router.post("/api/v3/generate-persona", deprecated=True,
+             summary="[DEPRECATED] 生成人生故事驱动的人格，请使用 /api/v1/persona/generate")
 async def generate_persona(req: PersonaGenerationRequest) -> PersonaGenerationResponse:
-    """生成人生故事驱动的人格"""
+    """生成人生故事驱动的人格
+
+    .. deprecated:: v2.0
+        请使用 ``POST /api/v1/persona/generate`` 替代
+    """
     factory = PersonaFactory()
 
     personas = []
@@ -241,7 +246,8 @@ async def generate_persona(req: PersonaGenerationRequest) -> PersonaGenerationRe
     )
 
 
-@router.post("/api/v3/generate-persona-batch")
+@router.post("/api/v3/generate-persona-batch", deprecated=True,
+             summary="[DEPRECATED] 批量生成人格，请使用 /api/v1/persona/generate-batch")
 async def generate_persona_batch(
     platform: str = Form(...),
     count: int = Form(default=10),
@@ -300,9 +306,14 @@ class MemoryRetrieveResponse(BaseModel):
     chromadb_used: bool
 
 
-@router.post("/api/v3/retrieve-memory")
+@router.post("/api/v3/retrieve-memory", deprecated=True,
+             summary="[DEPRECATED] 向量检索 Agent 记忆，请使用 /api/v1/memory/retrieve")
 async def retrieve_memory(req: MemoryRetrieveRequest) -> MemoryRetrieveResponse:
-    """向量检索 Agent 记忆（ChromaDB）"""
+    """向量检索 Agent 记忆（ChromaDB）
+
+    .. deprecated:: v2.0
+        请使用 ``POST /api/v1/memory/retrieve`` 替代
+    """
     store = MemoryStreamStore()
 
     memories = store.retrieve(
@@ -317,13 +328,19 @@ async def retrieve_memory(req: MemoryRetrieveRequest) -> MemoryRetrieveResponse:
     )
 
 
-@router.get("/api/v3/memory-stream-status")
+@router.get("/api/v3/memory-stream-status", deprecated=True,
+            summary="[DEPRECATED] 获取 Memory Stream 状态，请使用 /api/v1/memory/status")
 async def get_memory_stream_status_api():
-    """获取 Memory Stream 状态"""
+    """获取 Memory Stream 状态
+
+    .. deprecated:: v2.0
+        请使用 ``GET /api/v1/memory/status`` 替代
+    """
     return get_memory_stream_status()
 
 
-@router.post("/api/v3/store-memory")
+@router.post("/api/v3/store-memory", deprecated=True,
+             summary="[DEPRECATED] 存储记忆到向量数据库，请使用 /api/v1/memory/store")
 async def store_memory(
     agent_id: str = Form(...),
     content: str = Form(...),

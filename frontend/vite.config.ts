@@ -18,4 +18,19 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // echarts 单独打包，避免主 bundle 过大
+          echarts: ['echarts'],
+          // d3 单独打包
+          d3: ['d3'],
+          // 图表相关组件
+          vendor: ['vue', 'pinia'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 800,
+  },
 })

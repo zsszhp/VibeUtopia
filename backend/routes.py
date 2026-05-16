@@ -275,10 +275,18 @@ async def get_review_result(task_id: str, db: Session = Depends(get_db)):
                 if isinstance(dims_data, dict):
                     for name, data in dims_data.items():
                         if isinstance(data, dict):
+                            # 兼容旧格式 severity (low/medium/high → green/yellow/orange/red)
+                            raw_sev = data.get("severity", "green")
+                            score_val = data.get("score", 0)
+                            sev_map = {"low": "green", "medium": "yellow", "high": "red"}
+                            normalized_sev = sev_map.get(raw_sev, raw_sev)
+                            # 确保是合法值
+                            if normalized_sev not in ("green", "yellow", "orange", "red"):
+                                normalized_sev = "green" if score_val < 26 else ("yellow" if score_val < 51 else ("orange" if score_val < 76 else "red"))
                             dimensions.append({
                                 "name": name,
-                                "score": data.get("score", 0),
-                                "severity": data.get("severity", "low"),
+                                "score": score_val,
+                                "severity": normalized_sev,
                                 "evidence": data.get("evidence", ""),
                                 "evidence_source": data.get("evidence_source", {}),
                                 "confidence": data.get("confidence", 0.8),
@@ -287,7 +295,15 @@ async def get_review_result(task_id: str, db: Session = Depends(get_db)):
                             })
                         elif isinstance(data, (int, float)):
                             score = int(data)
-                            severity = "high" if score >= 60 else ("medium" if score >= 30 else "low")
+                            # 旧格式(仅分数)映射到 4 档 severity
+                            if score >= 76:
+                                severity = "red"
+                            elif score >= 51:
+                                severity = "orange"
+                            elif score >= 26:
+                                severity = "yellow"
+                            else:
+                                severity = "green"
                             dimensions.append({
                                 "name": name,
                                 "score": score,
@@ -396,6 +412,57 @@ async def get_review_result(task_id: str, db: Session = Depends(get_db)):
                 result["confidence_breakdown"] = json.loads(summary.confidence_json)
             except json.JSONDecodeError:
                 pass
+
+        # 仿真数据 (V2+ simulation_data)
+        result["simulation_data"] = None
+        if summary.platform_simulation_json:
+            try:
+                sim_data = json.loads(summary.platform_simulation_json)
+                if sim_data:
+                    result["simulation_data"] = sim_data
+            except json.JSONDecodeError:
+                pass
+
+        # 实体风险链 (V2+ entity_chains)
+        result["entity_chains"] = []
+        try:
+            from backend.models import EntityRiskChainRecord
+            chains = db.query(EntityRiskChainRecord).filter(
+                EntityRiskChainRecord.task_id == task_id
+            ).all()
+            for ch in chains:
+                result["entity_chains"].append({
+                    "id": f"entity_{ch.id}",
+                    "name": ch.entity_name,
+                    "risk_score": ch.total_risk_score,
+                    "risk_level": ch.risk_level,
+                    "dimensions": json.loads(ch.dimension_boosts).keys() if ch.dimension_boosts else [],
+                    "timestamp": ch.created_at.isoformat() if ch.created_at else "",
+                })
+        except Exception:
+            pass
+
+        # 极化数据 (V2+ polarization_data) — 从传播快照聚合
+        result["polarization_data"] = None
+        try:
+            from backend.models import SimulationSummaryRecord
+            sim_summary = db.query(SimulationSummaryRecord).filter(
+                SimulationSummaryRecord.task_id == task_id
+            ).first()
+            if sim_summary and sim_summary.polarization_index is not None:
+                sentiment = json.loads(sim_summary.sentiment_summary) if sim_summary.sentiment_summary else {}
+                result["polarization_data"] = {
+                    "timeline": [{
+                        "time": sim_summary.created_at.isoformat() if sim_summary.created_at else "",
+                        "polarization_index": sim_summary.polarization_index,
+                        "support_count": int(sentiment.get("positive", 0)),
+                        "oppose_count": int(sentiment.get("negative", 0)),
+                        "neutral_count": int(sentiment.get("neutral", 0)),
+                    }],
+                    "thresholds": {"low": 0.3, "medium": 0.6, "high": 0.8},
+                }
+        except Exception:
+            pass
 
     elif task.status == "failed":
         result["error"] = task.error if hasattr(task, 'error') and task.error else "分析失败"

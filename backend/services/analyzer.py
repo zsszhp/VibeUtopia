@@ -497,15 +497,53 @@ async def run_analysis(task_id: str, text: str):
         await _broadcast_step(task_id, "report", 0.92, "正在保存分析结果...")
 
         # 6. 存储结果
+        # severity 映射：支持 4 档(green/yellow/orange/red) 和兼容旧 3 档(low/medium/high)
+        def _normalize_severity(sev: str, score: int) -> str:
+            """统一 severity 为 4 档：green/yellow/orange/red"""
+            sev = (sev or "").lower().strip()
+            # 已经是 4 档
+            if sev in ("green", "yellow", "orange", "red"):
+                return sev
+            # 旧 3 档映射
+            if sev == "low":
+                return "green"
+            if sev == "medium":
+                return "yellow" if score < 60 else "orange"
+            if sev == "high":
+                return "red"
+            # 按分数兜底
+            if score >= 76:
+                return "red"
+            if score >= 51:
+                return "orange"
+            if score >= 26:
+                return "yellow"
+            return "green"
+
+        def _score_from_severity(severity: str) -> int:
+            """severity 对应的风险分数中值（用于 risk_score 数值列）"""
+            return {"green": 10, "yellow": 35, "orange": 60, "red": 85}.get(severity, 0)
+
         for rs in risk_sentences:
+            raw_severity = rs.get("severity", "green")
+            # 从 dimension 找对应分数
+            dim_score = 0
+            rs_dim = rs.get("dimension", "")
+            for d in dimensions:
+                if d.get("name") == rs_dim:
+                    dim_score = d.get("score", 0)
+                    break
+            normalized = _normalize_severity(raw_severity, dim_score)
+            risk_score_val = _score_from_severity(normalized)
             db.add(RiskItem(
                 task_id=task_id,
                 sentence=rs.get("sentence", ""),
                 dimension=rs.get("dimension", ""),
-                severity=rs.get("severity", "low"),
+                severity=normalized,
                 evidence=rs.get("evidence", ""),
                 affected_groups=",".join(rs.get("affected_groups", [])) if rs.get("affected_groups") else None,
                 dimension_weight=rs.get("dimension_weight"),
+                risk_score=float(risk_score_val),
             ))
 
         # 保存信号关联结果
@@ -557,9 +595,10 @@ async def run_analysis(task_id: str, text: str):
         dimensions_dict = {}
         for d in dimensions:
             dim_name = d.get("name", "")
+            dim_severity = _normalize_severity(d.get("severity", "green"), d.get("score", 0))
             dimensions_dict[dim_name] = {
                 "score": d.get("score", 0),
-                "severity": d.get("severity", "low"),
+                "severity": dim_severity,
                 "evidence": d.get("evidence", ""),
                 "evidence_source": d.get("evidence_source", {}),
                 "confidence": d.get("confidence", 0.8),
