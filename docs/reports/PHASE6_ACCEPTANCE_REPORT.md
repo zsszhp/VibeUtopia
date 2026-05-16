@@ -43,17 +43,17 @@
 
 | 文件 | 说明 |
 |------|------|
-| `frontend-vue/src/components/SignalPanel.vue` | 信号采集面板 |
-| `frontend-vue/src/components/KnowledgeGraph.vue` | 知识图谱可视化 |
-| `frontend-vue/src/components/BloggerProfile.vue` | 博主画像组件 |
-| `frontend-vue/src/components/CounterfactualPanel.vue` | 反事实仿真面板 |
+| `frontend/src/components/SignalPanel.vue` | 信号采集面板 |
+| `frontend/src/components/KnowledgeGraph.vue` | 知识图谱可视化 |
+| `frontend/src/components/BloggerProfile.vue` | 博主画像组件 |
+| `frontend/src/components/CounterfactualPanel.vue` | 反事实仿真面板 |
 
 ### 前端修改组件
 
 | 文件 | 变更 |
 |------|------|
-| `frontend-vue/src/api/index.ts` | 新增6类API方法 |
-| `frontend-vue/src/components/RightPanel.vue` | 集成扩展功能区域 |
+| `frontend/src/api/index.ts` | 新增6类API方法 |
+| `frontend/src/components/RightPanel.vue` | 集成扩展功能区域 |
 
 ---
 

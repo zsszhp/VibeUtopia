@@ -162,7 +162,7 @@ pip install -r requirements.txt
 ### 4. 安装前端依赖
 
 ```bash
-cd frontend-vue
+cd frontend
 npm install
 cd ..
 ```
@@ -183,7 +183,7 @@ conda activate vibeutopia
 python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 
 # 终端2 - 启动 Vue3 前端
-cd frontend-vue
+cd frontend
 npm run dev
 ```
 
@@ -355,7 +355,7 @@ VibeUtopia/
 │       ├── rewriter.py             # 安全改写
 │       ├── video_extractor.py      # 视频文案提取
 │       └── ...                     # V2 新增服务
-├── frontend-vue/                   # Vue3 + Naive UI 前端
+├── frontend/                   # Vue3 + Naive UI 前端
 │   ├── src/
 │   │   ├── views/                  # 页面组件
 │   │   ├── components/             # 通用组件

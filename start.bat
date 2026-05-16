@@ -34,7 +34,7 @@ timeout /t 3 /nobreak >nul
 
 :: Start Vue3 frontend
 echo [3/3] Starting Vue3 frontend (Vite on port 3000)...
-start "VibeUtopia-Vue3" cmd /k "cd /d f:\project\my\VibeUtopia\frontend-vue && npm run dev"
+start "VibeUtopia-Vue3" cmd /k "cd /d ""%~dp0frontend"" && npm run dev"
 
 echo.
 echo ========================================

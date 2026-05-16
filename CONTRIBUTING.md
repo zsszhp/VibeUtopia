@@ -97,7 +97,7 @@ python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 
 ```bash
 # 进入前端目录
-cd frontend-vue
+cd frontend
 
 # 安装依赖
 npm install

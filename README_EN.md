@@ -161,7 +161,7 @@ pip install -r requirements.txt
 ### 4. Install Frontend Dependencies
 
 ```bash
-cd frontend-vue
+cd frontend
 npm install
 cd ..
 ```
@@ -182,7 +182,7 @@ conda activate vibeutopia
 python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 
 # Terminal 2 - Vue3 Frontend
-cd frontend-vue
+cd frontend
 npm run dev
 ```
 
@@ -354,7 +354,7 @@ VibeUtopia/
 │       ├── rewriter.py             # Safe rewriting
 │       ├── video_extractor.py      # Video transcript extraction
 │       └── ...                     # V2 additional services
-├── frontend-vue/                   # Vue3 + Naive UI Frontend
+├── frontend/                   # Vue3 + Naive UI Frontend
 │   ├── src/
 │   │   ├── views/                  # Page components
 │   │   ├── components/             # Shared components

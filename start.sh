@@ -64,7 +64,7 @@ echo ""
 
 # 启动前端
 echo "[3/4] 启动前端服务..."
-cd frontend-vue
+cd frontend
 
 if [ ! -d node_modules ]; then
     echo "⏳ 安装前端依赖（首次约 2-5 分钟）..."
