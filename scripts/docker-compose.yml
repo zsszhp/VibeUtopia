@@ -1,0 +1,40 @@
+version: '3.8'
+services:
+  neo4j:
+    image: neo4j:5-community
+    container_name: vibeutopia-neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/vibeutopia2024
+      NEO4J_PLUGINS: '["apoc"]'
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: vibeutopia-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: vibeutopia
+      MYSQL_USER: vibe_user
+      MYSQL_PASSWORD: vibe_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uvibe_user", "-pvibe_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  mysql_data:

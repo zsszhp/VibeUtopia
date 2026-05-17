@@ -57,7 +57,13 @@
       "Bash(git blame *)",
       "Bash(git reflog *)",
       "Bash(git config *)",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2, ensure_ascii=False\\)\\)\")"
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2, ensure_ascii=False\\)\\)\")",
+      "Read(//home/z/**)",
+      "Bash(echo 'export HF_HOME=/var/lib/models/huggingface')",
+      "Bash(echo 'export PATH=$HOME/.local/bin:$PATH')",
+      "WebSearch",
+      "WebFetch(domain:ollama.com)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

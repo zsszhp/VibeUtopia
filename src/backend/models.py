@@ -84,28 +84,28 @@ class AnalysisSummary(Base):
 class SignalRecord(Base):
     __tablename__ = "signal_records"
 
-    signal_id = Column(String, primary_key=True)
-    source_platform = Column(String, index=True)
-    title = Column(String, index=True)
-    url = Column(String, nullable=True)
+    signal_id = Column(String(64), primary_key=True)
+    source_platform = Column(String(50), index=True)
+    title = Column(String(500), index=True)
+    url = Column(String(1000), nullable=True)
     rank = Column(Integer, nullable=True)
     rank_timeline = Column(Text, default="[]")
     first_seen = Column(DateTime, default=utcnow)
     last_seen = Column(DateTime, default=utcnow)
     appearance_count = Column(Integer, default=1)
     is_new = Column(Boolean, default=False)
-    signal_type = Column(String, default="hotlist")
-    category = Column(String, nullable=True)
+    signal_type = Column(String(30), default="hotlist")
+    category = Column(String(100), nullable=True)
     raw_data = Column(Text, nullable=True)
 
 
 class SeedEventRecord(Base):
     __tablename__ = "seed_events"
 
-    event_id = Column(String, primary_key=True)
-    title = Column(String, index=True)
+    event_id = Column(String(64), primary_key=True)
+    title = Column(String(500), index=True)
     description = Column(Text)
-    category = Column(String)
+    category = Column(String(100))
     signal_strength = Column(Float, default=0.0)
     source_platforms = Column(Text, default="[]")
     source_urls = Column(Text, default="[]")
@@ -116,19 +116,19 @@ class SeedEventRecord(Base):
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow)
     ttl = Column(Integer, default=72)
-    status = Column(String, default="active")
-    crawl_depth = Column(String, default="none")
+    status = Column(String(20), default="active")
+    crawl_depth = Column(String(20), default="none")
 
 
 class AgentRecord(Base):
     __tablename__ = "agent_records"
 
-    agent_id = Column(String, primary_key=True)
-    platform = Column(String, index=True)
-    archetype_base = Column(String)
+    agent_id = Column(String(64), primary_key=True)
+    platform = Column(String(50), index=True)
+    archetype_base = Column(String(50))
     persona_json = Column(Text)
     quality_score = Column(Float, default=0.0)
-    status = Column(String, default="active")
+    status = Column(String(20), default="active")
     version = Column(Integer, default=1)
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow)
@@ -138,23 +138,23 @@ class SocialRelation(Base):
     __tablename__ = "social_relations"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    agent_id_a = Column(String, index=True)
-    agent_id_b = Column(String, index=True)
-    relation_type = Column(String)
+    agent_id_a = Column(String(64), index=True)
+    agent_id_b = Column(String(64), index=True)
+    relation_type = Column(String(30))
     weight = Column(Float, default=1.0)
-    platform = Column(String, nullable=True)
+    platform = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=utcnow)
 
 
 class AgentMemory(Base):
     __tablename__ = "agent_memories"
 
-    memory_id = Column(String, primary_key=True)
-    agent_id = Column(String, index=True)
-    memory_type = Column(String)
+    memory_id = Column(String(64), primary_key=True)
+    agent_id = Column(String(64), index=True)
+    memory_type = Column(String(30))
     content = Column(Text)
     weight = Column(Float, default=1.0)
-    source_task_id = Column(String, nullable=True)
+    source_task_id = Column(String(36), nullable=True)
     created_at = Column(DateTime, default=utcnow)
 
 
@@ -162,15 +162,15 @@ class SimulationRecord(Base):
     __tablename__ = "simulation_records"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    sim_id = Column(String, index=True)
+    sim_id = Column(String(64), index=True)
     tick = Column(Integer, default=0)
-    sim_time = Column(String)
-    agent_id = Column(String, index=True)
-    agent_tier = Column(String)
-    platform = Column(String)
-    action_type = Column(String)
+    sim_time = Column(String(50))
+    agent_id = Column(String(64), index=True)
+    agent_tier = Column(String(20))
+    platform = Column(String(50))
+    action_type = Column(String(30))
     content = Column(Text, nullable=True)
-    target_id = Column(String, nullable=True)
+    target_id = Column(String(64), nullable=True)
     metadata_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utcnow)
 
@@ -178,8 +178,8 @@ class SimulationRecord(Base):
 class SimulationStatus(Base):
     __tablename__ = "simulation_statuses"
 
-    sim_id = Column(String, primary_key=True)
-    status = Column(String, default="created")
+    sim_id = Column(String(64), primary_key=True)
+    status = Column(String(20), default="created")
     topic = Column(Text)
     total_ticks = Column(Integer, default=0)
     total_agents = Column(Integer, default=0)
@@ -194,9 +194,9 @@ class PropagationSnapshot(Base):
     __tablename__ = "propagation_snapshots"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    simulation_id = Column(String, index=True)
+    simulation_id = Column(String(64), index=True)
     tick = Column(Integer)
-    stage = Column(String)                     # seed/primary/community/polarization/mainstream/fading
+    stage = Column(String(20))                 # seed/primary/community/polarization/mainstream/fading
     propagation_kinetic = Column(Float, default=0.0)
     polarization_index = Column(Float, default=0.0)
     reach_count = Column(Integer, default=0)
@@ -212,12 +212,12 @@ class PropagationEdge(Base):
     __tablename__ = "propagation_edges"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    simulation_id = Column(String, index=True)
-    source_agent_id = Column(String, index=True)
-    target_agent_id = Column(String, index=True)
-    content_id = Column(String, index=True)
-    action_type = Column(String)
-    platform = Column(String)
+    simulation_id = Column(String(64), index=True)
+    source_agent_id = Column(String(64), index=True)
+    target_agent_id = Column(String(64), index=True)
+    content_id = Column(String(64), index=True)
+    action_type = Column(String(30))
+    platform = Column(String(50))
     tick = Column(Integer)
     influence_score = Column(Float, default=0.0)
     created_at = Column(DateTime, default=utcnow)
@@ -228,14 +228,14 @@ class V2AnalysisResult(Base):
     __tablename__ = "v2_analysis_results"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    task_id = Column(String, ForeignKey("tasks.id"), unique=True)
-    mode = Column(String, default="quick")             # quick / deep
+    task_id = Column(String(36), ForeignKey("tasks.id"), unique=True)
+    mode = Column(String(20), default="quick")         # quick / deep
     mvp_score = Column(Integer, default=0)
     v2_score = Column(Integer, default=0)
     signal_matches = Column(Text, default="[]")         # JSON: 热点关联结果
     entity_risk_chains = Column(Text, default="[]")     # JSON: 实体风险链
     dynamic_weights = Column(Text, default="{}")        # JSON: 动态权重
-    simulation_id = Column(String, default="")          # 关联仿真ID
+    simulation_id = Column(String(64), default="")          # 关联仿真ID
     simulation_summary = Column(Text, default="{}")     # JSON: 仿真摘要
     confidence = Column(Float, default=0.0)             # 可信度
     confidence_sources = Column(Text, default="{}")     # JSON: 可信度来源
@@ -248,8 +248,8 @@ class BacktestRecord(Base):
     __tablename__ = "backtest_records"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    case_id = Column(String, index=True)
-    title = Column(String)
+    case_id = Column(String(64), index=True)
+    title = Column(String(500))
     seed_content = Column(Text)
     actual_outcome = Column(Text, default="{}")         # JSON: 实际结果
     mvp_prediction = Column(Text, default="{}")         # JSON: MVP预测
@@ -263,7 +263,7 @@ class ConsistencyRecord(Base):
     __tablename__ = "consistency_records"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    content_hash = Column(String, index=True)
+    content_hash = Column(String(64), index=True)
     run_count = Column(Integer, default=3)
     direction_consistency = Column(Float, default=0.0)
     platform_consistency = Column(Float, default=0.0)
@@ -278,14 +278,14 @@ class TrendPredictionRecord(Base):
     __tablename__ = "trend_predictions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    prediction_id = Column(String, index=True)
-    task_id = Column(String, nullable=True)
-    pattern_id = Column(String, default="")
-    pattern_name = Column(String, default="")
+    prediction_id = Column(String(64), index=True)
+    task_id = Column(String(36), nullable=True)
+    pattern_id = Column(String(64), default="")
+    pattern_name = Column(String(200), default="")
     pattern_confidence = Column(Float, default=0.0)
     predictions_json = Column(Text, default="[]")       # JSON: 短/中/长预测
-    risk_level = Column(String, default="green")
-    decision_action = Column(String, default="")
+    risk_level = Column(String(20), default="green")
+    decision_action = Column(String(200), default="")
     summary = Column(Text, default="")
     created_at = Column(DateTime, default=utcnow)
 
@@ -295,9 +295,9 @@ class ReportRecord(Base):
     __tablename__ = "report_records"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    report_id = Column(String, index=True)
-    report_type = Column(String)                        # risk/simulation/trend/decision
-    title = Column(String)
+    report_id = Column(String(64), index=True)
+    report_type = Column(String(30))                        # risk/simulation/trend/decision
+    title = Column(String(500))
     content = Column(Text)
     summary = Column(Text, default="")
     metadata_json = Column(Text, default="{}")
@@ -309,26 +309,26 @@ class VideoAnalysisRecord(Base):
     __tablename__ = "video_analysis_records"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    task_id = Column(String, index=True)
-    video_url = Column(String, default="")
-    video_path = Column(String, default="")
-    keyframe_method = Column(String, default="")            # scenedetect/ffmpeg/opencv
+    task_id = Column(String(36), index=True)
+    video_url = Column(String(1000), default="")
+    video_path = Column(String(1000), default="")
+    keyframe_method = Column(String(30), default="")            # scenedetect/ffmpeg/opencv
     keyframe_count = Column(Integer, default=0)
-    keyframe_dir = Column(String, default="")               # 关键帧输出目录
-    ocr_engine = Column(String, default="")                 # paddleocr/easyocr
+    keyframe_dir = Column(String(500), default="")               # 关键帧输出目录
+    ocr_engine = Column(String(30), default="")                 # paddleocr/easyocr
     ocr_text = Column(Text, default="")                     # OCR合并文字
-    frame_risk_level = Column(String, default="safe")       # 画面综合风险等级
+    frame_risk_level = Column(String(20), default="safe")       # 画面综合风险等级
     frame_risk_details = Column(Text, default="[]")         # JSON: 各帧风险
-    audio_engine = Column(String, default="")               # faster-whisper/openai-whisper
+    audio_engine = Column(String(30), default="")               # faster-whisper/openai-whisper
     audio_text = Column(Text, default="")                   # 音频转写文字
-    audio_language = Column(String, default="")
+    audio_language = Column(String(20), default="")
     audio_sentiment = Column(Text, default="{}")            # JSON: 情感分析
     cross_modal_risks = Column(Text, default="[]")          # JSON: 交叉风险
-    overall_risk_level = Column(String, default="safe")     # 综合风险等级
+    overall_risk_level = Column(String(20), default="safe")     # 综合风险等级
     overall_risk_score = Column(Float, default=0.0)         # 综合风险分数
     risk_breakdown = Column(Text, default="{}")             # JSON: 分模态风险
     analysis_time = Column(Float, default=0.0)              # 分析耗时(秒)
-    status = Column(String, default="processing")           # processing/completed/failed
+    status = Column(String(20), default="processing")           # processing/completed/failed
     error = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utcnow)
 
@@ -338,15 +338,15 @@ class FrameRecord(Base):
     __tablename__ = "frame_records"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    task_id = Column(String, index=True)
+    task_id = Column(String(36), index=True)
     frame_index = Column(Integer, default=0)
     timestamp = Column(Float, default=0.0)
-    file_path = Column(String)
-    method = Column(String, default="")                     # scenedetect/interval/opencv
+    file_path = Column(String(1000))
+    method = Column(String(30), default="")                     # scenedetect/interval/opencv
     scene_index = Column(Integer, default=-1)
     ocr_text = Column(Text, default="")                     # 该帧OCR文字
     ocr_items = Column(Text, default="[]")                  # JSON: OCR详细结果
-    risk_level = Column(String, default="safe")             # 该帧风险等级
+    risk_level = Column(String(20), default="safe")             # 该帧风险等级
     risk_details = Column(Text, default="[]")               # JSON: 风险详情
     created_at = Column(DateTime, default=utcnow)
 
@@ -356,9 +356,9 @@ class BloggerProfileRecord(Base):
     __tablename__ = "blogger_profiles"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    blogger_id = Column(String, index=True, unique=True)
-    name = Column(String)
-    platform = Column(String, default="")
+    blogger_id = Column(String(64), index=True, unique=True)
+    name = Column(String(200))
+    platform = Column(String(50), default="")
     content_count = Column(Integer, default=0)
     vocabulary_json = Column(Text, default="{}")            # JSON: 词汇特征
     expression_json = Column(Text, default="{}")            # JSON: 表达风格
@@ -377,8 +377,8 @@ class CompetitorCompareRecord(Base):
     __tablename__ = "competitor_compares"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    blogger_id = Column(String, index=True)
-    competitor_id = Column(String, index=True)
+    blogger_id = Column(String(64), index=True)
+    competitor_id = Column(String(64), index=True)
     style_comparisons = Column(Text, default="[]")          # JSON: 风格对比
     content_gaps = Column(Text, default="[]")               # JSON: 内容缺口
     suggestions = Column(Text, default="[]")                # JSON: 差异化建议
@@ -391,12 +391,12 @@ class HotspotCorrelationRecord(Base):
     __tablename__ = "hotspot_correlations"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    task_id = Column(String, index=True)
-    signal_id = Column(String, index=True)
-    signal_title = Column(String)
-    signal_platform = Column(String)
+    task_id = Column(String(36), index=True)
+    signal_id = Column(String(64), index=True)
+    signal_title = Column(String(500))
+    signal_platform = Column(String(50))
     correlation_score = Column(Float, default=0.0)
-    correlation_type = Column(String, default="keyword")
+    correlation_type = Column(String(30), default="keyword")
     risk_boost = Column(Float, default=0.0)
     created_at = Column(DateTime, default=utcnow)
 
@@ -406,10 +406,10 @@ class EntityRiskChainRecord(Base):
     __tablename__ = "entity_risk_chains"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    task_id = Column(String, index=True)
-    entity_name = Column(String, index=True)
-    entity_type = Column(String)
-    risk_level = Column(String, default="safe")
+    task_id = Column(String(36), index=True)
+    entity_name = Column(String(200), index=True)
+    entity_type = Column(String(50))
+    risk_level = Column(String(20), default="safe")
     chain_path = Column(Text, default="[]")
     total_risk_score = Column(Float, default=0.0)
     dimension_boosts = Column(Text, default="{}")
@@ -421,11 +421,11 @@ class SimulationSummaryRecord(Base):
     __tablename__ = "simulation_summaries"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    task_id = Column(String, index=True)
-    sim_id = Column(String, index=True)
+    task_id = Column(String(36), index=True)
+    sim_id = Column(String(64), index=True)
     total_agents = Column(Integer, default=0)
     total_ticks = Column(Integer, default=0)
-    final_stage = Column(String, default="")
+    final_stage = Column(String(30), default="")
     polarization_index = Column(Float, default=0.0)
     reach_count = Column(Integer, default=0)
     sentiment_summary = Column(Text, default="{}")
@@ -439,8 +439,8 @@ class BacktestComparisonRecord(Base):
     __tablename__ = "backtest_comparisons"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    task_id = Column(String, index=True)
-    case_id = Column(String, index=True)
+    task_id = Column(String(36), index=True)
+    case_id = Column(String(64), index=True)
     mvp_prediction = Column(Text, default="{}")
     v2_prediction = Column(Text, default="{}")
     actual_outcome = Column(Text, default="{}")

@@ -126,3 +126,12 @@ tests/*.log
 references/projects/
 references/papers/
 VideoRAG/
+
+# === 规范新增 ===
+venv/
+.env
+data/chroma_memories/
+models
+chroma_data
+__pycache__/
+*.pyc

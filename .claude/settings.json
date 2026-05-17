@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(//opt/**)",
+      "Read(//usr/local/**)",
+      "Read(//sys/module/**)",
+      "Read(//var/lib/**)",
+      "Read(//etc/**)"
+    ],
+    "deny": []
+  }
+}
