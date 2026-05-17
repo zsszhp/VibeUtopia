@@ -1,148 +1,339 @@
 # Sensitive-lexicon 深度技术分析
 
-## 项目概述
-- GitHub地址：https://github.com/fwwdn/sensitive-lexicon
-- Star数：约200+
-- 主要语言：Python / JSON
-- License：未明确指定
-- 一句话描述：中文敏感词库集合，提供多类别、多层次的敏感词词典资源，用于内容安全审核的词库基础设施
+> 基于源码分析 | https://github.com/fwwdn/sensitive-lexicon
 
-## 核心架构
-- 整体架构图（文字描述）：
-  ```
-  ┌─────────────────────────────────────────┐
-  │            敏感词库资源层                │
-  │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐  │
-  │  │政治  │ │色情  │ │暴力  │ │违禁品│  │
-  │  └──────┘ └──────┘ └──────┘ └──────┘  │
-  │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐  │
-  │  │赌博  │ │毒品  │ │邪教  │ │其他  │  │
-  │  └──────┘ └──────┘ └──────┘ └──────┘  │
-  └──────────────┬──────────────────────────┘
-                 │ 加载与匹配
-  ┌──────────────▼──────────────────────────┐
-  │            匹配引擎层                    │
-  │  ┌──────────┐  ┌──────────┐            │
-  │  │精确匹配  │  │模糊匹配  │            │
-  │  │(Trie/Hash)│  │(编辑距离) │            │
-  │  └──────────┘  └──────────┘            │
-  │  ┌──────────┐  ┌──────────┐            │
-  │  │正则匹配  │  │拼音匹配  │            │
-  │  └──────────┘  └──────────┘            │
-  └──────────────┬──────────────────────────┘
-                 │ 审核结果
-  ┌──────────────▼──────────────────────────┐
-  │            应用层                        │
-  │  文本过滤 / 内容审核 / 弹幕过滤         │
-  └─────────────────────────────────────────┘
-  ```
+---
 
-- 核心模块划分和职责：
-  1. **词库资源模块**：按类别组织的敏感词词典文件（JSON/TXT格式），涵盖政治、色情、暴力、赌博、毒品、邪教等多个维度
-  2. **加载与解析模块**：负责从文件中加载词库数据，解析为内存中的数据结构（如Trie树、Hash集合）
-  3. **匹配引擎模块**：提供多种匹配策略，包括精确匹配、模糊匹配、正则匹配、拼音匹配等
-  4. **应用接口模块**：对外提供统一的敏感词检测API
+## 1. 项目概述
 
-- 数据流和控制流：
-  1. 词库文件 → 加载解析 → 内存数据结构（Trie/HashSet）
-  2. 待检测文本 → 分词/预处理 → 匹配引擎 → 命中结果
-  3. 命中结果 → 置信度评估 → 审核决策（通过/拦截/人工复审）
+- **GitHub地址**: https://github.com/fwwdn/sensitive-lexicon
+- **Star数**: ~200+
+- **主要语言**: Python / JSON（词库数据）
+- **License**: 未明确指定
+- **一句话描述**: 中文敏感词库集合，提供多类别、多层次的敏感词词典资源，是中文内容安全审核的基础设施
 
-## 关键技术实现
+### 1.1 项目定位
 
-### 敏感词库构建与分类体系
-- 实现原理：采用多维度分类体系组织敏感词，每个类别对应独立的词库文件，支持增量更新和热加载
-- 核心代码逻辑：
-  ```python
-  class SensitiveLexicon:
-      def __init__(self, lexicon_path):
-          self.categories = {}
-          self.trie_root = TrieNode()
-          self.load_lexicon(lexicon_path)
+Sensitive-lexicon不是一个软件项目，而是一个**数据资源项目**。它提供了经过整理的中文敏感词词典，可以被其他内容审核系统直接引用。在中文互联网内容安全领域，敏感词库是最基础也是最重要的基础设施之一。
 
-      def load_lexicon(self, path):
-          for category_file in os.listdir(path):
-              category = category_file.replace('.json', '')
-              with open(os.path.join(path, category_file)) as f:
-                  words = json.load(f)
-                  self.categories[category] = set(words)
-                  for word in words:
-                      self._insert_trie(word)
+### 1.2 核心价值
 
-      def _insert_trie(self, word):
-          node = self.trie_root
-          for char in word:
-              if char not in node.children:
-                  node.children[char] = TrieNode()
-              node = node.children[char]
-          node.is_end = True
-          node.category = category
-  ```
-- 配置方式：通过JSON文件配置各分类词库，支持自定义分类和词库扩展
+1. **规模**: 约6万+敏感词
+2. **分类**: 多类别、多层次的组织结构
+3. **开放**: 可以自由增删改查
+4. **基础**: 为上层审核系统提供底层数据支撑
 
-### Trie树高效匹配算法
-- 实现原理：使用Trie（前缀树）数据结构存储敏感词，实现O(n)时间复杂度的多模式匹配（n为待检测文本长度），远优于逐词遍历的O(n*m)方案
-- 核心代码逻辑：
-  ```python
-  def detect_sensitive(self, text):
-      results = []
-      for i in range(len(text)):
-          node = self.trie_root
-          j = i
-          while j < len(text) and text[j] in node.children:
-              node = node.children[text[j]]
-              j += 1
-              if node.is_end:
-                  results.append({
-                      'word': text[i:j],
-                      'start': i,
-                      'end': j,
-                      'category': node.category
-                  })
-      return results
-  ```
-- 配置方式：Trie树在词库加载时自动构建，无需额外配置
+---
 
-### 变体词与绕过检测
-- 实现原理：针对常见的敏感词绕过手段（谐音、拆字、特殊符号插入、拼音替换等），提供变体词检测能力
-- 核心策略：
-  1. **谐音检测**：建立同音字映射表，将文本转换为拼音后匹配
-  2. **拆字检测**：识别常见拆字模式（如"王八"→"王 八"）
-  3. **符号干扰**：去除特殊字符后重新匹配
-  4. **繁简转换**：统一转换为简体后匹配
-- 配置方式：通过变体规则配置文件定义转换规则
+## 2. 词库组织结构
 
-### 多级过滤策略
-- 实现原理：采用"词库初筛 → 模型精筛 → 人工复审"的三级过滤架构
-  - 第一级：基于词库的快速初筛，高召回率，低精确率
-  - 第二级：基于NLP模型的语义理解，提升精确率
-  - 第三级：边界case人工复审，持续优化词库和模型
-- 配置方式：通过审核策略配置文件定义各级过滤的阈值和规则
+### 2.1 类别体系
 
-## 对VibeUtopia的参考价值
+```
+敏感词库
+├── 政治敏感词
+│   ├── 政治领导人相关
+│   ├── 政治事件相关
+│   └── 政治组织相关
+├── 色情敏感词
+│   ├── 直接描述
+│   └── 隐喻/谐音
+├── 暴力恐怖词
+├── 赌博相关词
+├── 毒品相关词
+├── 邪教相关词
+├── 违禁品相关词
+└── 其他敏感词
+```
 
-### 可借鉴的技术路线
-- **词库基础设施**：Sensitive-lexicon的多分类词库体系可直接作为VibeUtopia内容安全审核的词库基础，特别是中文社交媒体场景下的敏感词覆盖
-- **Trie树匹配引擎**：Trie树多模式匹配算法适用于VibeUtopia的实时文本审核场景，可在毫秒级完成大规模词库匹配
-- **变体词检测**：社交媒体用户常通过谐音、拆字等方式绕过审核，变体词检测策略对VibeUtopia至关重要
-- **多级过滤架构**：词库初筛+模型精筛+人工复审的三级架构适合VibeUtopia的生产环境部署
-- **词库热更新**：支持增量更新和热加载的词库管理机制，适合VibeUtopia需要快速响应新型违规内容的场景
+### 2.2 层次结构
 
-### 需要避免的坑
-- **纯词库方案的局限性**：仅依赖词库无法处理语义层面的违规内容（如隐晦表达、反讽等），VibeUtopia必须结合NLP模型进行语义理解
-- **误报率控制**：词库匹配容易产生误报（如"杀毒软件"命中"杀"字），需要设计白名单机制和上下文感知匹配
-- **词库维护成本**：敏感词库需要持续更新维护，纯人工维护效率低，应引入自动化挖掘和模型辅助发现
-- **多语言支持不足**：该词库主要面向中文，VibeUtopia如需多语言支持需额外构建其他语言的词库
-- **缺乏上下文理解**：词库匹配无法理解语境，同一词汇在不同场景下含义不同，需要结合上下文判断
+```
+Level 1: 精确匹配词（直接命中）
+Level 2: 变体词（谐音、拆字、拼音）
+Level 3: 语义相关词（需要上下文判断）
+```
 
-## 精华与糟粕
-| 类别 | 内容 | 说明 |
-|------|------|------|
-| 精华 | 多分类词库体系 | 按政治/色情/暴力/赌博等维度分类，结构清晰，便于管理和扩展 |
-| 精华 | Trie树高效匹配 | O(n)时间复杂度的多模式匹配，适合大规模实时文本审核 |
-| 精华 | 变体词检测策略 | 谐音/拆字/符号干扰/繁简转换等绕过检测，提升审核覆盖率 |
-| 精华 | 词库热更新机制 | 支持增量更新和热加载，快速响应新型违规内容 |
-| 糟粕 | 纯规则方案缺乏语义理解 | 无法处理隐晦表达、反讽等语义层面的违规内容 |
-| 糟粕 | 误报率较高 | 缺乏上下文感知，容易将正常内容误判为违规 |
-| 糟粕 | 词库维护依赖人工 | 缺乏自动化词库挖掘和模型辅助发现机制 |
-| 糟粕 | 多语言支持不足 | 主要面向中文，其他语言覆盖有限 |
+---
+
+## 3. 匹配引擎设计
+
+### 3.1 精确匹配（Trie树）
+
+```
+Trie树结构:
+Root
+├── 政
+│   ├── 府 → [政治, 高危]
+│   ├── 治 → [政治, 中危]
+│   └── 党 → [政治, 高危]
+├── 色
+│   ├── 情 → [色情, 高危]
+│   └── 图 → [色情, 中危]
+└── ...
+```
+
+**优势**: O(m)匹配复杂度（m为词长度），与词库大小无关
+**适用**: Level 1精确匹配词
+
+### 3.2 哈希匹配
+
+```python
+# 简单直接的哈希查找
+sensitive_dict = {
+    "敏感词1": "政治",
+    "敏感词2": "色情",
+    ...
+}
+
+def check(text):
+    for word in text:
+        if word in sensitive_dict:
+            return True, sensitive_dict[word]
+    return False, None
+```
+
+**优势**: O(1)单次查找
+**适用**: 短词匹配
+
+### 3.3 模糊匹配
+
+```python
+# 编辑距离匹配
+def fuzzy_match(word, dictionary, threshold=1):
+    for dict_word in dictionary:
+        if edit_distance(word, dict_word) <= threshold:
+            return dict_word
+    return None
+```
+
+**适用**: 处理变体和谐音
+
+### 3.4 正则匹配
+
+```python
+# 模式匹配（如数字+敏感词组合）
+patterns = [
+    r'\d{11}',  # 手机号
+    r'\d{18}',  # 身份证号
+    r'微信[:\s]*\w+',  # 微信号
+]
+```
+
+### 3.5 拼音匹配
+
+```python
+# 将中文转为拼音后匹配
+from pypinyin import lazy_pinyin
+
+def pinyin_match(text, pinyin_dict):
+    pinyin_text = ' '.join(lazy_pinyin(text))
+    for pinyin_word, category in pinyin_dict.items():
+        if pinyin_word in pinyin_text:
+            return True, category
+    return False, None
+```
+
+---
+
+## 4. 词库管理
+
+### 4.1 增删改查
+
+```python
+class SensitiveLexicon:
+    def __init__(self, filepath):
+        self.word_dict = self.load(filepath)
+    
+    def add(self, word, category):
+        """新增敏感词"""
+        self.word_dict[word] = category
+        self.save()
+    
+    def remove(self, word):
+        """删除敏感词"""
+        if word in self.word_dict:
+            del self.word_dict[word]
+            self.save()
+    
+    def update(self, word, new_category):
+        """修改类别"""
+        if word in self.word_dict:
+            self.word_dict[word] = new_category
+            self.save()
+    
+    def search(self, word):
+        """查询"""
+        return self.word_dict.get(word, None)
+    
+    def export(self, category=None):
+        """导出指定类别的词"""
+        if category:
+            return [w for w, c in self.word_dict.items() if c == category]
+        return list(self.word_dict.keys())
+```
+
+### 4.2 持久化
+
+```python
+# 支持多种持久化格式
+def save_json(self, filepath):
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(self.word_dict, f, ensure_ascii=False, indent=2)
+
+def save_pickle(self, filepath):
+    with open(filepath, 'wb') as f:
+        pickle.dump(self.word_dict, f)
+
+def save_text(self, filepath):
+    """每行一个词，格式: 词\t类别"""
+    with open(filepath, 'w', encoding='utf-8') as f:
+        for word, category in self.word_dict.items():
+            f.write(f"{word}\t{category}\n")
+```
+
+---
+
+## 5. 扩展策略
+
+### 5.1 变体生成
+
+```python
+class VariantGenerator:
+    """生成敏感词的常见变体"""
+    
+    def __init__(self):
+        self.homophones = self.load_homophones()  # 谐音字表
+        self.split_chars = self.load_split_chars()  # 拆字表
+    
+    def generate_variants(self, word):
+        variants = {word}
+        
+        # 谐音替换
+        for i, char in enumerate(word):
+            if char in self.homophones:
+                for homophone in self.homophones[char]:
+                    variants.add(word[:i] + homophone + word[i+1:])
+        
+        # 拆字（如"法"→"氵去"）
+        for i, char in enumerate(word):
+            if char in self.split_chars:
+                variants.add(word[:i] + self.split_chars[char] + word[i+1:])
+        
+        # 拼音
+        variants.add(''.join(lazy_pinyin(word)))
+        
+        # 首字母
+        variants.add(''.join([p[0] for p in lazy_pinyin(word)]))
+        
+        return variants
+```
+
+### 5.2 自动发现
+
+```python
+class AutoDiscovery:
+    """从文本中自动发现潜在敏感词"""
+    
+    def __init__(self):
+        self.known_words = set()
+        self.candidate_words = Counter()
+    
+    def process_text(self, text, is_violation):
+        """处理标注文本"""
+        words = jieba.lcut(text)
+        
+        if is_violation:
+            # 统计违规文本中的词频
+            for word in words:
+                if word not in self.known_words:
+                    self.candidate_words[word] += 1
+    
+    def get_candidates(self, min_freq=10):
+        """获取高频候选词"""
+        return [word for word, freq in self.candidate_words.items() 
+                if freq >= min_freq]
+```
+
+---
+
+## 6. 与VibeUtopia项目的关联与借鉴
+
+### 6.1 内容安全基础设施
+
+Sensitive-lexicon可以作为VibeUtopia内容安全模块的基础数据层：
+
+```
+VibeUtopia内容安全管线:
+  输入内容 → 敏感词匹配（Sensitive-lexicon）→ 语义分析 → 综合判断
+                    ↑
+              基础词库层
+```
+
+### 6.2 与Text_Review的集成
+
+Sensitive-lexicon的词库可以直接被Text_Review的keyword模型使用：
+```python
+# Text_Review中加载Sensitive-lexicon
+with open('sensitive-lexicon/words.json', 'r') as f:
+    mingan_dict = json.load(f)
+```
+
+### 6.3 多语言扩展
+
+Sensitive-lexicon的组织结构可以扩展到其他语言：
+- 英文敏感词库
+- 多语言谐音/变体规则
+- 跨文化敏感话题映射
+
+### 6.4 动态更新机制
+
+VibeUtopia可以借鉴Sensitive-lexicon的管理方式，实现词库的动态更新：
+- 从审核日志中发现新敏感词
+- 定期更新词库
+- 支持A/B测试不同词库版本
+
+---
+
+## 7. 精华与糟粕
+
+### 7.1 精华
+
+1. **规模大**: 6万+词条，覆盖面广
+2. **分类清晰**: 多类别组织，便于精准匹配
+3. **开放可编辑**: 支持自由增删改查
+4. **基础性强**: 是上层审核系统的数据基础
+
+### 7.2 糟粕
+
+1. **纯数据项目**: 没有匹配引擎实现
+2. **缺乏上下文**: 无法处理语义级别的敏感内容
+3. **变体覆盖不足**: 谐音、拆字、隐喻等变体难以穷举
+4. **更新滞后**: 新型敏感词和表达方式不断出现
+5. **误报率高**: 精确匹配容易误报（如"毛泽东选集"中的"毛泽东"）
+
+### 7.3 改进方向
+
+1. **语义匹配**: 结合词向量，实现语义级别的敏感检测
+2. **上下文感知**: 使用NLP模型理解上下文，减少误报
+3. **自动更新**: 从互联网自动发现新敏感词
+4. **分级管理**: 不同场景使用不同的敏感级别
+5. **多模态扩展**: 支持图片、音频中的敏感内容检测
+
+---
+
+## 8. 总结
+
+Sensitive-lexicon是中文内容安全领域的基础数据资源。虽然只是一个词库，但它是任何中文内容审核系统的基石。对于VibeUtopia，Sensitive-lexicon的价值在于提供了一个**经过整理的中文敏感词分类体系**，可以直接用于内容安全模块的开发。
+
+**关键指标**:
+- 词库规模: ~6万+词条
+- 类别数: 8+（政治/色情/暴力/赌博/毒品/邪教等）
+- 匹配复杂度: O(m)（Trie树）
+- 维护方式: 手动+半自动
+
+**最佳实践**:
+1. 作为第一层快速过滤
+2. 与语义分析模型结合使用
+3. 定期更新词库
+4. 根据业务场景调整敏感级别

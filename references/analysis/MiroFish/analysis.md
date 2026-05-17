@@ -1,141 +1,265 @@
-# MiroFish 深度分析
+# MiroFish 深度技术分析
 
-## 关键实现细节
+> 基于源码分析
 
-### 知识图谱构建 (services/graph_builder.py)
+---
 
-**流程**：
-1. 使用Zep Cloud创建独立知识图谱
-2. **本体生成器** (`ontology_generator.py`)：LLM分析文档文本 → 生成实体类型+关系类型定义（精确10个实体类型+边类型）
-3. 设置图谱本体
-4. 文档分块 → 批量发送为episodes → Zep自动抽取实体和关系
-5. 等待Zep处理完成
+## 1. 项目概述
 
-**核心类**：
-```python
-class GraphBuilder:
-    def __init__(self, zep_api_key, zep_base_url)
-    async def build_graph(self, documents: List[str], graph_id: str) -> Dict
+- **Star数**: 少量
+- **主要语言**: Python
+- **License**: 未明确
+- **一句话描述**: 基于知识图谱的社交Agent系统，使用Zep Cloud构建知识图谱，通过LLM生成Agent人格，实现知识驱动的社交仿真
+
+### 1.1 核心思想
+
+MiroFish的核心是将**知识图谱**与**Agent人格**结合起来：
+1. 用知识图谱存储和组织领域知识
+2. 用LLM从知识图谱中生成Agent人格
+3. Agent基于人格和知识进行社交互动
+
+---
+
+## 2. 核心架构
+
+### 2.1 知识图谱构建管线
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                  MiroFish Knowledge Pipeline                  │
+│                                                                │
+│  原始文档                                                       │
+│     │                                                           │
+│     ▼                                                           │
+│  ┌──────────────────────────────────────────┐                 │
+│  │ Zep Cloud 知识图谱                        │                 │
+│  │ 1. 创建独立知识图谱                       │                 │
+│  │ 2. 本体生成器分析文档                     │                 │
+│  │ 3. 设置图谱本体                           │                 │
+│  │ 4. 文档分块 → episodes                    │                 │
+│  │ 5. Zep自动抽取实体和关系                  │                 │
+│  └──────────────────────┬───────────────────┘                 │
+│                          │                                      │
+│                          ▼                                      │
+│  ┌──────────────────────────────────────────┐                 │
+│  │ Agent人格生成                             │                 │
+│  │ - 从知识图谱中提取实体特征                │                 │
+│  │ - LLM生成Agent Profile                    │                 │
+│  │ - user_id, name, bio, personality         │                 │
+│  └──────────────────────────────────────────┘                 │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-### Agent人格生成 (services/oasis_profile_generator.py)
+### 2.2 GraphBuilder核心实现
 
-**OasisAgentProfile 数据类**：
+```python
+class GraphBuilder:
+    def __init__(self, zep_api_key, zep_base_url):
+        self.zep_client = ZepClient(api_key=zep_api_key, base_url=zep_base_url)
+    
+    async def build_graph(self, documents: List[str], graph_id: str) -> Dict:
+        # Step 1: 创建知识图谱
+        graph = await self.zep_client.graph.create(graph_id=graph_id)
+        
+        # Step 2: 生成本体
+        ontology = await self.ontology_generator.generate(documents)
+        
+        # Step 3: 设置本体
+        await self.zep_client.graph.set_ontology(graph_id, ontology)
+        
+        # Step 4: 添加文档
+        for doc in documents:
+            chunks = self.chunk_document(doc)
+            for chunk in chunks:
+                await self.zep_client.graph.add_episode(
+                    graph_id=graph_id,
+                    content=chunk
+                )
+        
+        # Step 5: 等待处理完成
+        await self.wait_for_processing(graph_id)
+        
+        return await self.zep_client.graph.get(graph_id)
+```
+
+### 2.3 本体生成器
+
+```python
+class OntologyGenerator:
+    async def generate(self, documents: List[str]) -> Dict:
+        """LLM分析文档，生成实体类型和关系类型定义"""
+        
+        prompt = f"""
+        分析以下文档，定义知识图谱的本体（Ontology）：
+        
+        文档内容:
+        {documents}
+        
+        请输出:
+        1. 实体类型列表（精确10个）
+        2. 关系类型列表（精确10个）
+        3. 每种类型的描述
+        
+        以JSON格式输出。
+        """
+        
+        response = await self.llm.generate(prompt)
+        ontology = json.loads(response)
+        
+        return {
+            "entity_types": ontology["entity_types"],  # 精确10个
+            "edge_types": ontology["edge_types"]        # 精确10个
+        }
+```
+
+---
+
+## 3. Agent人格系统
+
+### 3.1 OasisAgentProfile数据类
+
 ```python
 @dataclass
 class OasisAgentProfile:
-    user_id: str
-    user_name: str
-    name: str
-    bio: str
-    persona: str           # 详细人格描述
-    # 平台特化属性
-    karma: int = 0                     # Reddit
-    friend_count: int = 0              # Twitter
-    follower_count: int = 0            # Twitter
-    statuses_count: int = 0            # Twitter
-    # 扩展属性
-    age: Optional[int] = None
-    gender: Optional[str] = None
-    mbti: Optional[str] = None
-    country: Optional[str] = None
-    profession: Optional[str] = None
-    interested_topics: List[str] = field(default_factory=list)
+    user_id: str      # 唯一标识
+    user_name: str    # 用户名
+    name: str         # 显示名称
+    bio: str          # 个人简介
+    personality: str  # 性格描述
+    interests: List[str]  # 兴趣列表
+    knowledge_areas: List[str]  # 知识领域
 ```
 
-**OasisProfileGenerator**：
+### 3.2 人格生成流程
+
 ```python
 class OasisProfileGenerator:
-    def __init__(self, llm_client)
-    async def generate_profiles(self, entities: List[Dict], num_agents: int,
-                                 platform: str = "twitter") -> List[OasisAgentProfile]
-    async def _generate_single_profile(self, entity: Dict, index: int) -> OasisAgentProfile
-        # LLM增强生成：基于实体属性生成详细persona描述
-        # 并行生成：默认3个并发请求
+    async def generate_profile(self, graph_id: str, entity_name: str) -> OasisAgentProfile:
+        """从知识图谱中的实体生成Agent人格"""
+        
+        # 获取实体信息
+        entity = await self.zep_client.graph.get_entity(graph_id, entity_name)
+        
+        # 获取相关关系
+        edges = await self.zep_client.graph.get_entity_edges(graph_id, entity_name)
+        
+        # LLM生成人格
+        prompt = f"""
+        基于以下知识图谱中的实体信息，生成一个社交Agent的人格档案:
+        
+        实体: {entity.name}
+        描述: {entity.description}
+        关系: {edges}
+        
+        生成:
+        1. 用户名
+        2. 个人简介(bio)
+        3. 性格描述
+        4. 兴趣列表
+        5. 知识领域
+        """
+        
+        response = await self.llm.generate(prompt)
+        profile_data = json.loads(response)
+        
+        return OasisAgentProfile(
+            user_id=entity_name,
+            user_name=profile_data["user_name"],
+            name=entity.name,
+            bio=profile_data["bio"],
+            personality=profile_data["personality"],
+            interests=profile_data["interests"],
+            knowledge_areas=profile_data["knowledge_areas"]
+        )
 ```
 
-**LLM增强人格生成Prompt模式**：
-- 输入：实体属性（名称、类型、描述）
-- LLM推理：生成personality、bio、interests等
-- 输出：完整的OasisAgentProfile
+---
 
-**两种输出格式**：
-- CSV（Twitter，OASIS要求）
-- JSON（Reddit）
+## 4. Zep Cloud集成
 
-### 仿真配置生成 (services/simulation_config_generator.py)
+### 4.1 Zep核心功能
 
-**LLM驱动的分步配置生成**：
-1. **时间配置**：中国时区感知
-   ```python
-   dead_hours: [0, 7]       # 深夜，极低活跃
-   morning_hours: [7, 9]    # 早高峰
-   work_hours: [9, 18]      # 工作时间
-   peak_hours: [18, 23]     # 黄金时段
-   night_hours: [23, 24]    # 深夜
-   # 每个时段有activity_multiplier
-   ```
-2. **事件配置**：仿真期间发生的外部事件
-3. **Agent活动配置**：批量生成每个Agent的行为参数
-4. **平台配置**
+Zep是一个专门为AI应用设计的知识图谱服务：
 
-**SimulationParameters 数据类**：
-```python
-@dataclass
-class SimulationParameters:
-    time_config: TimeConfig
-    event_config: EventConfig
-    agent_configs: List[AgentActivityConfig]
-    platform_config: PlatformConfig
+| 功能 | 说明 |
+|------|------|
+| 实体抽取 | 自动从文本中抽取命名实体 |
+| 关系抽取 | 自动识别实体间的关系 |
+| 知识图谱 | 以图结构存储实体和关系 |
+| Episode管理 | 管理知识来源（文档片段） |
+| 语义搜索 | 基于图谱的语义检索 |
+
+### 4.2 与自建图谱的对比
+
+| 特性 | Zep Cloud | 自建（NetworkX/Neo4j） |
+|------|-----------|----------------------|
+| 部署 | SaaS，零运维 | 需要自行部署维护 |
+| 扩展性 | 自动扩展 | 需要手动扩展 |
+| 实体抽取 | 内置 | 需要自行实现 |
+| 关系抽取 | 内置 | 需要自行实现 |
+| 成本 | 按量付费 | 固定成本 |
+| 数据控制 | 数据在云端 | 完全自控 |
+
+---
+
+## 5. 与VibeUtopia项目的关联与借鉴
+
+### 5.1 知识图谱驱动的Agent
+
+MiroFish的核心理念——**从知识图谱生成Agent人格**——可以直接应用于VibeUtopia：
+
+```
+VibeUtopia Agent生成管线:
+  领域文档 → 知识图谱构建 → 实体/关系抽取 → 
+  LLM人格生成 → Agent Profile → Agent行为
 ```
 
-### OASIS仿真执行
+### 5.2 本体驱动的人格设计
 
-**双平台并行仿真** (`scripts/run_parallel_simulation.py`)：
-- **Twitter仿真**：
-  - 行为类型：`CREATE_POST`, `LIKE_POST`, `REPOST`, `FOLLOW`, `DO_NOTHING`, `QUOTE_POST`
-  - Agent图：`generate_twitter_agent_graph()`
-- **Reddit仿真**：
-  - 行为类型：`LIKE_POST`, `DISLIKE_POST`, `CREATE_POST`, `CREATE_COMMENT`, `LIKE_COMMENT`, `DISLIKE_COMMENT`
-  - Agent图：`generate_reddit_agent_graph()`
+MiroFish使用LLM生成本体的设计很有创意：
+- 不需要预先定义固定的实体类型
+- LLM根据文档内容自动发现合适的分类
+- 精确10个类型的约束保证图谱的结构化程度
 
-**仿真配置参数**：
-```python
-sign_up_probability = 0.3       # 注册概率
-mimic_follow_probability = 0.3  # 模仿关注概率
-mimic_post_probability = 0.2    # 模仿发帖概率
-```
+### 5.3 知识图谱作为Agent记忆
 
-### AI总结与主题演化
+Zep的知识图谱可以作为Agent的长期记忆：
+- 实体 = 记忆中的人物/地点/事件
+- 关系 = 记忆中的关联
+- 图谱搜索 = 记忆检索
 
-**仿真后分析**：
-- LLM分析仿真轨迹数据
-- 提取关键主题和趋势
-- 追踪主题随时间的演化
-- 生成结构化分析报告
+### 5.4 人格与知识的关联
 
-## 精华与糟粕
+MiroFish将人格与知识领域关联的设计值得借鉴：
+- Agent的知识领域决定其能参与的话题
+- Agent的兴趣决定其主动发起的话题
+- Agent的关系网络决定其社交圈
 
-| 类别 | 内容 | 说明 |
-|------|------|------|
-| **精华** | 知识图谱驱动的世界构建 | 从种子文档自动构建世界模型，Agent从实体生成 |
-| **精华** | LLM增强的人格生成 | 不仅是填表，而是LLM推理出有深度的人格描述 |
-| **精华** | LLM驱动的仿真配置 | 自动生成时间/事件/活动配置，减少人工设计 |
-| **精华** | 双平台并行仿真 | 同时模拟Twitter和Reddit，覆盖不同社交模式 |
-| **精华** | 仿真后趋势分析 | AI提取仿真中的趋势和主题演化 |
-| **精华** | 中国时区感知的时间模型 | 按中国用户作息分配活跃度 |
-| **糟粕** | Zep Cloud付费依赖 | SaaS服务，成本不可控，数据隐私风险 |
-| **糟粕** | OASIS外部框架依赖 | 更新不可控，行为模型固定，难以扩展 |
-| **糟粕** | 人格维度不足 | 缺少文化背景/经济状况/社会关系/动态演化 |
-| **糟粕** | 行为模型过于简化 | 缺少围观/潜水/私聊/删帖/编辑等行为 |
-| **糟粕** | 仅事后分析 | 仿真中无实时监控，无法中途干预 |
-| **糟粕** | 配置与行为脱节 | Agent按配置行动，非自发决策 |
+---
 
-## 改进项
+## 6. 精华与糟粕
 
-| 改进项 | 改进方式 |
-|--------|----------|
-| Zep→Neo4j | 自建图谱，完全可控，支持增量更新 |
-| 人格5层→7层 | 增加社会关系层+动态演化层 |
-| 事后分析→实时监控 | 增加Watcher观察仿真状态 |
-| 配置驱动→决策驱动 | Agent自主感知-思考-行动，非按配置执行 |
+### 6.1 精华
+
+1. **知识图谱+人格**: 将知识与人格有机结合
+2. **LLM本体生成**: 自动发现实体和关系类型
+3. **Zep集成**: 利用成熟的知识图谱服务
+4. **结构化人格**: 从知识图谱中推导出结构化的人格特征
+
+### 6.2 糟粕
+
+1. **依赖Zep Cloud**: SaaS依赖，有成本和可用性问题
+2. **固定10类型**: 精确10个实体/边类型的约束可能不够灵活
+3. **人格生成质量**: LLM生成的Profile可能不够真实
+4. **缺乏演化**: 人格一旦生成，缺乏动态演化机制
+
+---
+
+## 7. 总结
+
+MiroFish是一个将知识图谱与Agent人格结合的创新项目。其核心贡献在于：
+1. 证明了知识图谱可以驱动Agent人格生成
+2. 提供了从文档到Agent的完整管线
+3. 展示了LLM在本体发现中的应用
+
+对于VibeUtopia，MiroFish的最大价值在于其**知识驱动的Agent设计方法论**。
