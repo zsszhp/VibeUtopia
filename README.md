@@ -135,6 +135,14 @@ git clone https://github.com/zsszhp/VibeUtopia.git
 cd VibeUtopia
 ```
 
+### 1.5 一键环境配置（推荐新机器使用）
+
+```bash
+bash setup.sh
+```
+
+脚本将自动完成：检查 Python、创建虚拟环境、安装依赖、检查 Docker、启动数据库、配置 .env。
+
 ### 2. 配置环境变量
 
 ```bash
@@ -357,7 +365,7 @@ VibeUtopia/
 │       ├── rewriter.py             # 安全改写
 │       ├── video_extractor.py      # 视频文案提取
 │       └── ...                     # V2 新增服务
-├── frontend/                   # Vue3 + Naive UI 前端
+├── frontend/                       # Vue3 + Naive UI 前端
 │   ├── src/
 │   │   ├── views/                  # 页面组件
 │   │   ├── components/             # 通用组件
@@ -366,9 +374,15 @@ VibeUtopia/
 │   │   └── router/                 # 路由配置
 │   └── package.json
 ├── docs/                           # 设计文档
-├── test/                           # 测试脚本与用例
-├── cases/                          # 测试案例库
+│   └── guides/                     # 开发指南
+├── tests/                          # 测试脚本与用例
+├── data/                           # 运行时数据（本地生成，不上传git）
+├── references/                     # 参考资源
+│   ├── analysis/                   # 22个参考项目深度技术分析
+│   ├── projects/                   # 开源项目源码（本地保留）
+│   └── papers/                     # PDF论文（本地保留）
 ├── docker-compose.yml              # 基础设施编排
+├── setup.sh                        # 一键环境配置脚本
 ├── .env.example                    # 环境变量模板
 ├── requirements.txt                # Python 依赖
 ├── LICENSE                         # AGPL-3.0
