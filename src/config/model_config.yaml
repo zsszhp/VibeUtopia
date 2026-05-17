@@ -163,6 +163,12 @@ providers:
     api_key_env: "OLLAMA_API_KEY"
     base_url: "http://localhost:11434/v1"
     models:
+      # 已有模型 - 可立即使用
+      - id: "qwopus9b"
+        tier: standard
+        vision: false
+        text: true
+        priority: 0
       # Phase 1: 文本主力 - Qwen3.6-9B (Q6_K ~9.5GB VRAM)
       - id: "qwen3.6:9b"
         tier: advanced
