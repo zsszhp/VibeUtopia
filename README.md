@@ -58,11 +58,13 @@
 - ✅ 信号采集面板（热榜 + 事件检测 + 调度器控制）
 - ✅ 知识图谱可视化（D3.js力导向图 + 实体查询 + 路径搜索）
 
-### V3（规划中）
+### V3（部分完成）
 
-- 更多平台支持（微博、Twitter 等 25+ 平台）
-- 本地模型部署（Ollama / vLLM 集成）
-- 多语言内容风控
+| 子版本 | 内容 | 状态 |
+|--------|------|------|
+| V3.1 | 扩展平台覆盖至 28 个 | ✅ 已完成 |
+| V3.2 | 本地模型部署（Ollama / vLLM 架构） | ✅ 已完成 |
+| V3.3 | 多语言内容风控 | ⏸ 暂缓 |
 
 ---
 
@@ -105,7 +107,7 @@ VibeUtopia 采用五层架构设计：
 | **数据库** | SQLite (MVP) / MySQL (V2) | 关系型存储 |
 | **图数据库** | Neo4j 5 | 知识图谱 + 社会关系网络 |
 | **向量数据库** | ChromaDB | Agent 记忆存储 (Memory Stream) |
-| **LLM 接入** | httpx + LiteLLM | 支持 DeepSeek / 阿里云百炼 / 智谱 / 硅基流动 / LongCat 等多模型路由 |
+| **LLM 接入** | httpx + LiteLLM | 支持 DeepSeek / 阿里云百炼 / 智谱 / 硅基流动 / LongCat / Ollama / vLLM 等多模型路由 |
 | **前端框架** | Vue 3 + TypeScript | 组合式 API |
 | **UI 组件** | Naive UI | 暗色主题组件库 |
 | **可视化** | ECharts + D3.js | 图表 + 知识图谱可视化 |
@@ -388,7 +390,8 @@ VibeUtopia/
 | 世界构建+仿真 | V2.R5 | ✅ 已完成 | 知识图谱+人格工厂+仿真引擎+传播动力学 |
 | 博主服务 | V2.R6 | ✅ 已完成 | 博主画像+选题推荐+竞品对标 |
 | 大规模仿真+决策 | V2+ | ✅ 已完成 | 1000+Agent+反事实仿真+决策辅助+社会演化 |
-| 更多平台+本地模型 | V3 | 🔜 规划中 | 25+平台 + Ollama/vLLM + 多语言风控 |
+| 更多平台+本地模型 | V3.1-V3.2 | ✅ 已完成 | 28平台 + Ollama/vLLM架构 |
+| 多语言内容风控 | V3.3 | ⏸ 暂缓 | 多语言支持 |
 
 ---
 
@@ -411,6 +414,7 @@ VibeUtopia 的架构设计受到了以下优秀开源项目的启发，详见 [�
 - [TrendRadar](https://github.com/sansan0/TrendRadar) — 多平台热搜聚合
 - [DeepSearchAgent-Demo](https://github.com/666ghj/DeepSearchAgent-Demo) — 迭代搜索策略
 - [ex-skill](https://github.com/perkfly/ex-skill) — 多层人格结构
+- [VideoRAG](https://github.com/HKUDS/VideoRAG) — 视频大模型检索增强生成
 - [VideoRAG](https://github.com/HKUDS/VideoRAG) — 视频大模型检索增强生成
 
 ---

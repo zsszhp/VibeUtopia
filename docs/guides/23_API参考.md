@@ -1,6 +1,6 @@
 # VibeUtopia API 参考文档
 
-> 版本：v1.0.0 | 基础路径：`http://localhost:8000`
+> 版本：v3.2.0 | 基础路径：`http://localhost:8000`
 
 ## 目录
 

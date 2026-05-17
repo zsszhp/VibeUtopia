@@ -4,7 +4,10 @@
       "Bash(git commit *)",
       "Bash(git push *)",
       "Bash(git add *)",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(git pull *)",
+      "Bash(dir *)",
+      "Bash(cmd *)"
     ]
   }
 }

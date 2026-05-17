@@ -57,11 +57,13 @@ English | [中文](README.md)
 - ✅ Signal collection panel (hotlist + event detection + scheduler control)
 - ✅ Knowledge graph visualization (D3.js force-directed graph + entity query + path search)
 
-### V3 (Planned)
+### V3 (Partially Complete)
 
-- More platform support (Weibo, Twitter, etc. 25+ platforms)
-- Local model deployment (Ollama / vLLM integration)
-- Multi-language content risk control
+| Sub-version | Content | Status |
+|-------------|---------|--------|
+| V3.1 | Extended platform coverage to 28 | ✅ Done |
+| V3.2 | Local model deployment (Ollama / vLLM architecture) | ✅ Done |
+| V3.3 | Multi-language content risk control | ⏸ Paused |
 
 ---
 
@@ -104,7 +106,7 @@ VibeUtopia employs a five-layer architecture:
 | **Database** | SQLite (MVP) / MySQL (V2) | Relational storage |
 | **Graph Database** | Neo4j 5 | Knowledge graph + social network |
 | **Vector Database** | ChromaDB | Agent memory storage (Memory Stream) |
-| **LLM Integration** | httpx + LiteLLM | Supports DeepSeek / Alibaba Cloud / Zhipu / SiliconFlow / LongCat multi-model routing |
+| **LLM Integration** | httpx + LiteLLM | Supports DeepSeek / Alibaba Cloud / Zhipu / SiliconFlow / LongCat / Ollama / vLLM multi-model routing |
 | **Frontend Framework** | Vue 3 + TypeScript | Composition API |
 | **UI Components** | Naive UI | Dark theme component library |
 | **Visualization** | ECharts + D3.js | Charts + knowledge graph visualization |
@@ -387,7 +389,8 @@ VibeUtopia/
 | World Building + Simulation | V2.R5 | ✅ Done | Knowledge graph + persona factory + simulation engine + propagation |
 | Blogger Services | V2.R6 | ✅ Done | Blogger profiling + topic recommendation + competitor analysis |
 | Large-Scale Sim + Decision | V2+ | ✅ Done | 1000+ Agents + counterfactual sim + decision support + social evolution |
-| More Platforms + Local Models | V3 | 🔜 Planned | 25+ platforms + Ollama/vLLM + multi-language |
+| More Platforms + Local Models | V3.1-V3.2 | ✅ Done | 28 platforms + Ollama/vLLM architecture |
+| Multi-language Risk Control | V3.3 | ⏸ Paused | Multi-language support |
 
 ---
 
@@ -410,6 +413,7 @@ VibeUtopia's architecture was inspired by these excellent open-source projects. 
 - [TrendRadar](https://github.com/sansan0/TrendRadar) — Multi-platform hot search aggregation
 - [DeepSearchAgent-Demo](https://github.com/666ghj/DeepSearchAgent-Demo) — Iterative search strategy
 - [ex-skill](https://github.com/perkfly/ex-skill) — Multi-layer persona structure
+- [VideoRAG](https://github.com/HKUDS/VideoRAG) — Video LLM retrieval-augmented generation
 
 ---
 
