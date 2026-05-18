@@ -282,3 +282,24 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
   - **参考论文索引更新**: `references/参考论文与开源项目.md` 新增"四-B、细粒度视频理解"章节
   - **文档索引更新**: `docs/00_文档索引与阅读指引.md` 新增30号文档
   - **状态**: 蓝图已写入，等待用户确认后开始实施
+
+### V3.4 细粒度视频理解实施（2026-05-18）
+- Date: 2026-05-18
+- Context: 用户确认蓝图后开始实施V3.4
+- Category: 代码结构
+- Instructions:
+  - **实施状态**: ✅ 核心模块已实现
+  - **已实现模块** (`src/backend/services/fine_grained/`):
+    - `dense_frame_scanner.py`: 密集帧扫描器——1fps全量抽帧+多尺度帧差异评分（借鉴ActionFormer）
+    - `region_amplifier.py`: 区域放大分析器——文字/地图/代码/符号四类区域检测+动态裁切放大（借鉴InternVL）
+    - `map_auditor.py`: 地图完整性审核器——VLM+地理知识库比对（台湾/南海诸岛等5个必须区域）
+    - `code_tracer.py`: 代码溯源检测器——VLM分析+30个已知开源项目库+GitHub Search API
+    - `symbol_detector.py`: 敏感符号检测器——VLM全帧扫描+5类敏感符号分类
+    - `pipeline.py`: 细粒度管线主入口——整合5个模块+结果融合+风险升级
+    - `__init__.py`: 模块导出
+  - **设计优化**: 根据InternVL/ActionFormer/GOT-OCR2.0参考项目优化了3个关键设计
+    - 多尺度帧差异评分（借鉴ActionFormer的regression_range）
+    - 动态裁切+缩略图策略（借鉴InternVL的dynamic_preprocess）
+    - 区域级OCR双策略（借鉴GOT-OCR2.0的bbox prompt+动态裁切）
+  - **验证**: 导入和初始化测试通过
+  - **待完成**: 时序异常检测(P2)、超分辨率增强(P2)、集成测试、验收测试
