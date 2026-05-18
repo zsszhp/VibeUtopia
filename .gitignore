@@ -97,9 +97,8 @@ data/test_chroma_memories/
 data/ab_test_cases.json
 data/*_report.json
 
-# ChromaDB 运行时数据（应由程序自动创建）
-data/chroma_memories/*.bin
-data/chroma_memories/*.sqlite3
+# ChromaDB 运行时数据
+data/chroma_memories/
 data/chroma/
 data/vibeutopia.db
 
@@ -108,6 +107,9 @@ data/backtest/cases.json
 data/events/trigger_events_db.json
 data/signal_collection.log
 data/t7_enhancement.log
+
+# 检查点数据（断点续传运行时产物）
+data/checkpoints/
 
 # Prompt AB测试产物
 backend/prompts/ab_tests/
@@ -118,32 +120,21 @@ backend/prompts/versions/
 git_status.txt
 
 # 测试产物
+tests/logs/
 tests/large_scale_test_results/
-tests/logs/*.log
-tests/*.log
 
 # 参考资源（本地保留，不上传git，分析文档在references/analysis/中）
 references/projects/
 references/papers/
 VideoRAG/
 
-# === 规范新增 ===
-venv/
-.env
-data/chroma_memories/
+# 本地模型文件
 models
 chroma_data
-__pycache__/
-*.pyc
 
-# 重复的运行时数据（src/data/ 下不应有运行时文件）
+# src/data 下的运行时文件
 src/data/vibeutopia.db
 src/data/chroma_memories/
-
-# 测试日志和结果（已在上方定义，补充确认）
-tests/logs/
-tests/large_scale_test_results/
-tests/*.log
 
 # Git LFS 日志
 .git/lfs/logs/
@@ -151,6 +142,22 @@ tests/*.log
 # node_modules 构建日志
 src/frontend/node_modules/**/*.log
 
-# 临时检查文件
+# 临时检查/调试脚本（不应提交到仓库）
 check_env.py
 check_env2.py
+check_backend.py
+check_remote.py
+check_result.py
+diagnose.py
+full_test.py
+quick_test.py
+run_tests.py
+test_cases.py
+do_git.py
+do_git2.py
+gh_push.py
+git_check.py
+git_do.py
+git_push.py
+push_to_github.py
+do_commit.ps1
