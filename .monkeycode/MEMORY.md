@@ -259,3 +259,26 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
     - 完成前 → `verification-before-completion`
     - 修改后 → `simplify`
   - **记忆文件**: `.monkeycode/MEMORY.md`（多人协作）+ `~/.claude/projects/.../memory/`（Claude 持久化）
+
+### V3.4 细粒度视频理解规划（2026-05-18）
+- Date: 2026-05-18
+- Context: 用户要求研究视频细粒度理解技术可行性，解决"几帧定生死"的风控盲区
+- Category: 代码结构 | 环境配置
+- Instructions:
+  - **核心问题**: 现有视频理解管线对短暂画面（十几帧）和小区域细节检测能力不足
+    - 典型案例1: 博主放地图缺失台湾，地图仅出现几帧，仅占画面一小部分
+    - 典型案例2: 何同学展示代码文件夹仅几帧，被观众发现是GitHub开源项目
+  - **技术可行性结论**: 可行，需"密集采样+区域放大+专项检测器"三管齐下
+    - 短暂画面漏检: ✅ 可行（密集帧扫描1fps+帧差异异常检测）
+    - 小区域细节丢失: ✅ 可行（区域检测+裁剪放大4-5x+细粒度OCR/VLM）
+    - 地图完整性审核: ✅ 可行（VLM+地理知识库比对）
+    - 代码/文件夹溯源: ⚠️ 部分可行（OCR+GitHub Search API，受OCR准确率限制）
+    - 敏感符号检测: ✅ 可行（YOLOv8区域检测+VLM细审）
+  - **新增设计文档**: `docs/design/30_细粒度视频理解设计.md`
+  - **蓝图更新**: `docs/design/04_V2深化路线图.md` 新增 V3.4 阶段（📋 规划中）
+  - **Go/No-Go**: 短暂画面检出率≥85%，地图审核召回率≥90%，增量耗时≤30秒/10分钟视频
+  - **已下载论文19篇**: references/papers/（video-understanding/6篇、fine-grained-detection/7篇、video-ocr/6篇）
+  - **已克隆项目5个**: references/projects/（video-fine-grained/3个、video-content-audit/2个）
+  - **参考论文索引更新**: `references/参考论文与开源项目.md` 新增"四-B、细粒度视频理解"章节
+  - **文档索引更新**: `docs/00_文档索引与阅读指引.md` 新增30号文档
+  - **状态**: 蓝图已写入，等待用户确认后开始实施
