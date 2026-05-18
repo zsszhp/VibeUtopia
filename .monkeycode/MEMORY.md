@@ -303,3 +303,21 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
     - 区域级OCR双策略（借鉴GOT-OCR2.0的bbox prompt+动态裁切）
   - **验证**: 导入和初始化测试通过
   - **待完成**: 时序异常检测(P2)、超分辨率增强(P2)、集成测试、验收测试
+
+### V3.4 细粒度视频理解完善与测试（2026-05-18）
+- Date: 2026-05-18
+- Context: 用户要求完成所有待完善项并拉起前后端测试
+- Category: 代码结构 | 环境配置
+- Instructions:
+  - **完善状态**: ✅ 全部核心模块已实现并集成
+  - **新增模块**: `temporal_anomaly.py` 时序异常检测器
+  - **集成完成**:
+    - `enhanced_analyzer.py` 新增 Phase 2.7 细粒度视频理解增强
+    - `routes_v3.py` 新增API端点: GET `/api/v3/fine-grained/status` + POST `/api/v3/fine-grained/analyze`
+    - `pipeline.py` 整合6个模块（密集帧扫描+区域放大+地图审核+代码溯源+敏感符号+时序异常）
+  - **测试结果**:
+    - 后端启动成功: http://localhost:8000 (uvicorn + FastAPI)
+    - 前端启动成功: http://localhost:3000 (Vite + Vue3)
+    - API测试通过: `/api/v3/fine-grained/status` 返回6个模块全部可用
+    - OpenCV/FFmpeg均可用，5个必须区域已配置，30个已知开源项目已配置
+  - **Git备份**: gitee推送成功

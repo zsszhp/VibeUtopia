@@ -1201,7 +1201,7 @@ class FineGrainedStatusResponse(BaseModel):
     config: Dict[str, Any]
 
 
-@router.get("/api/v3/fine-grained/status")
+@router.get("/fine-grained/status")
 async def get_fine_grained_status():
     """获取细粒度视频理解管线状态"""
     from backend.services.fine_grained import FineGrainedPipeline
@@ -1210,7 +1210,7 @@ async def get_fine_grained_status():
     return pipeline.get_status()
 
 
-@router.post("/api/v3/fine-grained/analyze")
+@router.post("/fine-grained/analyze")
 async def analyze_fine_grained(req: FineGrainedAnalysisRequest):
     """对视频进行细粒度理解分析
 
