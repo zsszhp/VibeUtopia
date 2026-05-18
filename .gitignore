@@ -135,3 +135,22 @@ models
 chroma_data
 __pycache__/
 *.pyc
+
+# 重复的运行时数据（src/data/ 下不应有运行时文件）
+src/data/vibeutopia.db
+src/data/chroma_memories/
+
+# 测试日志和结果（已在上方定义，补充确认）
+tests/logs/
+tests/large_scale_test_results/
+tests/*.log
+
+# Git LFS 日志
+.git/lfs/logs/
+
+# node_modules 构建日志
+src/frontend/node_modules/**/*.log
+
+# 临时检查文件
+check_env.py
+check_env2.py

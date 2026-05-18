@@ -66,6 +66,10 @@ app.include_router(router_blogger, prefix="/api/v1")
 from backend.routes_local_models import router as router_local_models
 app.include_router(router_local_models)
 
+# 注册断点续传路由
+from backend.routes_resume import router as router_resume
+app.include_router(router_resume, prefix="/api/v1")
+
 
 # ─── WebSocket端点 ────────────────────────────────────────────────
 

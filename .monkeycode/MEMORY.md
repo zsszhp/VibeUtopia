@@ -321,3 +321,18 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
     - API测试通过: `/api/v3/fine-grained/status` 返回6个模块全部可用
     - OpenCV/FFmpeg均可用，5个必须区域已配置，30个已知开源项目已配置
   - **Git备份**: gitee推送成功
+
+### 断点续传机制实现（2026-05-18）
+- Date: 2026-05-18
+- Context: 用户反馈长视频分析经常遇到 API 限流中断问题，需要类似 YOLO 训练断点续训的机制
+- Category: 代码结构 | 环境配置
+- Instructions:
+  - **核心问题**: 长视频分析（>10分钟）可能需要 30+ 次 LLM 调用，API 限流（HTTP 429）导致中断后需从头重跑
+  - **解决方案**: 三层断点续传机制
+    - **CheckpointManager** (`src/backend/services/checkpoint_manager.py`): 检查点持久化到 `data/checkpoints/`，支持阶段级/帧级进度追踪，原子性写入，视频哈希校验
+    - **ResumableAnalyzer** (`src/backend/services/resumable_analyzer.py`): 8阶段分析管道，每阶段完成后自动保存检查点，限流感知自动等待重试（递增等待），中断后自动从断点恢复
+    - **routes_resume.py**: 6个API端点（submit/status/resume/delete/list/checkpoint），注册到 main.py 的 `/api/v1` 前缀下
+  - **工作流程**: 第一次运行创建检查点 → 逐阶段执行并保存 → 中断时保存状态 → 恢复时跳过已完成阶段
+  - **限流处理**: 检测到 429 → 保存检查点 → 等待 N 秒 → 重试（最多5次）→ 所有Key耗尽后标记 interrupted
+  - **Git备份**: 已提交并推送到 gitee 和 github
+  - **注意**: Windows 环境下 bash 工具无法捕获命令输出，测试需手动运行
