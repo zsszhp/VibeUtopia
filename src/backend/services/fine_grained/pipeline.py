@@ -18,6 +18,7 @@ from backend.services.fine_grained.region_amplifier import RegionAmplifier, Regi
 from backend.services.fine_grained.map_auditor import MapCompletenessAuditor, VideoMapAuditResult
 from backend.services.fine_grained.code_tracer import CodeOriginTracer, VideoCodeTraceResult
 from backend.services.fine_grained.symbol_detector import SensitiveSymbolDetector, VideoSymbolResult
+from backend.services.fine_grained.temporal_anomaly import TemporalAnomalyDetector, TemporalAnomalyResult
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ class FineGrainedRiskReport:
     map_audit: Optional[VideoMapAuditResult] = None
     code_trace: Optional[VideoCodeTraceResult] = None
     symbol_detect: Optional[VideoSymbolResult] = None
+    temporal_anomaly: Optional[TemporalAnomalyResult] = None
     has_fine_grained_risk: bool = False
     risk_upgrade: int = 0
     max_risk_level: str = "safe"
@@ -43,6 +45,7 @@ DEFAULT_PIPELINE_CONFIG = {
     "enable_map_audit": True,
     "enable_code_trace": True,
     "enable_symbol_detect": True,
+    "enable_temporal_anomaly": True,
     "dense_fps": 1.0,
     "anomaly_threshold_high": 0.7,
     "max_analysis_frames": 50,
@@ -65,6 +68,7 @@ class FineGrainedPipeline:
             "github_token": self.config.get("github_token", ""),
         })
         self.symbol_detector = SensitiveSymbolDetector()
+        self.temporal_detector = TemporalAnomalyDetector()
 
     async def analyze(self, video_path: str, output_dir: str | None = None) -> FineGrainedRiskReport:
         """细粒度视频理解主入口
@@ -215,6 +219,26 @@ class FineGrainedPipeline:
             except Exception as e:
                 logger.warning("敏感符号检测失败: %s", e)
 
+        # 3d. 时序异常检测
+        if self.config["enable_temporal_anomaly"] and report.dense_scan and not report.dense_scan.error:
+            logger.info("Step 3d: 时序异常检测...")
+            try:
+                anomaly_result = await self.temporal_detector.detect_from_scan(report.dense_scan)
+                report.temporal_anomaly = anomaly_result
+
+                if anomaly_result.has_anomaly:
+                    key_findings.append(f"时序异常检测发现{len(anomaly_result.anomalies)}处异常画面")
+                    risk_upgrade += 10
+                    if risk_order.get(anomaly_result.max_risk_level, 0) > risk_order.get(max_risk_level, 0):
+                        max_risk_level = anomaly_result.max_risk_level
+
+                    for a in anomaly_result.anomalies:
+                        if a.frame_path:
+                            evidence_frames.append(a.frame_path)
+
+            except Exception as e:
+                logger.warning("时序异常检测失败: %s", e)
+
         # Step 4: 结果融合
         report.has_fine_grained_risk = risk_upgrade > 0
         report.risk_upgrade = min(risk_upgrade, 100)
@@ -242,11 +266,13 @@ class FineGrainedPipeline:
                 "map_auditor": self.map_auditor.get_status(),
                 "code_tracer": self.code_tracer.get_status(),
                 "symbol_detector": self.symbol_detector.get_status(),
+                "temporal_anomaly": self.temporal_detector.get_status(),
             },
             "config": {
                 "enable_dense_scan": self.config["enable_dense_scan"],
                 "enable_map_audit": self.config["enable_map_audit"],
                 "enable_code_trace": self.config["enable_code_trace"],
                 "enable_symbol_detect": self.config["enable_symbol_detect"],
+                "enable_temporal_anomaly": self.config["enable_temporal_anomaly"],
             },
         }

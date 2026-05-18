@@ -61,6 +61,12 @@ class EnhancedAnalysisResult:
     audio_risk_summary: str = ""
     multimodal_integrated_score: int = 0
 
+    # Phase 2.7: 细粒度视频理解增强 (V3.4)
+    fine_grained_risk_upgrade: int = 0
+    fine_grained_findings: list = field(default_factory=list)
+    fine_grained_risk_level: str = "safe"
+    fine_grained_evidence_frames: list = field(default_factory=list)
+
     # Phase 3: 仿真增强（deep模式）
     simulation_id: str = ""
     simulation_summary: dict = field(default_factory=dict)
@@ -86,6 +92,7 @@ async def run_enhanced_analysis(
     enable_entity_chain: bool = True,
     enable_simulation: bool = False,
     audio_transcription: str = "",
+    video_path: str = "",
 ) -> EnhancedAnalysisResult:
     """编排增强风控分析4阶段Pipeline
 
@@ -125,6 +132,11 @@ async def run_enhanced_analysis(
         if audio_transcription:
             logger.info("增强分析 %s: Phase 2.6 多模态分析增强开始", task_id)
             await _run_phase2_6(text, result, audio_transcription)
+
+        # ===== Phase 2.7: 细粒度视频理解增强 (V3.4) =====
+        if video_path:
+            logger.info("增强分析 %s: Phase 2.7 细粒度视频理解增强开始", task_id)
+            await _run_phase2_7(video_path, result)
 
         # ===== Phase 3: 仿真增强（可选）=====
         if enable_simulation:
@@ -329,6 +341,43 @@ async def _run_phase2_6(text: str, result: EnhancedAnalysisResult, audio_transcr
 
     except Exception as e:
         logger.warning("多模态分析增强失败: %s", e)
+
+
+async def _run_phase2_7(video_path: str, result: EnhancedAnalysisResult):
+    """Phase 2.7: 细粒度视频理解增强 (V3.4)
+
+    对视频进行密集帧扫描+区域放大+专项检测器分析，
+    补齐"几帧定生死"的检测盲区（地图缺失、代码暴露、敏感符号等）。
+    """
+    if not video_path or not os.path.exists(video_path):
+        logger.debug("Phase 2.7: 无视频文件，跳过细粒度理解")
+        return
+
+    try:
+        from backend.services.fine_grained import FineGrainedPipeline
+
+        pipeline = FineGrainedPipeline()
+        report = await pipeline.analyze(video_path)
+
+        result.fine_grained_risk_upgrade = report.risk_upgrade
+        result.fine_grained_findings = report.key_findings
+        result.fine_grained_risk_level = report.max_risk_level
+        result.fine_grained_evidence_frames = report.evidence_frames
+
+        if report.has_fine_grained_risk:
+            result.mvp_overall_score = min(result.mvp_overall_score + report.risk_upgrade, 100)
+            result.risk_boosts["fine_grained_video"] = report.risk_upgrade
+            logger.info(
+                "细粒度视频理解增强：风险升级=%d, 级别=%s, 发现=%s",
+                report.risk_upgrade,
+                report.max_risk_level,
+                report.key_findings,
+            )
+        else:
+            logger.info("细粒度视频理解增强：未发现细粒度风险")
+
+    except Exception as e:
+        logger.warning("细粒度视频理解增强失败: %s", e)
 
 
 def _recalculate_with_dynamic_weights(result: EnhancedAnalysisResult):

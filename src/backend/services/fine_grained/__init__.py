@@ -8,6 +8,7 @@ from backend.services.fine_grained.region_amplifier import RegionAmplifier, Regi
 from backend.services.fine_grained.map_auditor import MapCompletenessAuditor, MapAuditResult, VideoMapAuditResult
 from backend.services.fine_grained.code_tracer import CodeOriginTracer, CodeTraceResult, VideoCodeTraceResult
 from backend.services.fine_grained.symbol_detector import SensitiveSymbolDetector, SymbolRiskResult, VideoSymbolResult
+from backend.services.fine_grained.temporal_anomaly import TemporalAnomalyDetector, TemporalAnomaly, TemporalAnomalyResult
 from backend.services.fine_grained.pipeline import FineGrainedPipeline, FineGrainedRiskReport
 
 __all__ = [
@@ -16,5 +17,6 @@ __all__ = [
     "MapCompletenessAuditor", "MapAuditResult", "VideoMapAuditResult",
     "CodeOriginTracer", "CodeTraceResult", "VideoCodeTraceResult",
     "SensitiveSymbolDetector", "SymbolRiskResult", "VideoSymbolResult",
+    "TemporalAnomalyDetector", "TemporalAnomaly", "TemporalAnomalyResult",
     "FineGrainedPipeline", "FineGrainedRiskReport",
 ]

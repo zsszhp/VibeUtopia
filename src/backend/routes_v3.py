@@ -1181,3 +1181,86 @@ async def generate_v2_vs_mvp_report(
     report = await comparator.generate_report(enable_consistency=enable_consistency)
 
     return report.to_dict()
+
+
+# ==================== V3.4 细粒度视频理解 API ====================
+
+class FineGrainedAnalysisRequest(BaseModel):
+    """细粒度视频分析请求"""
+    video_path: str = Field(..., description="本地视频文件路径")
+    enable_map_audit: bool = Field(default=True, description="启用地图完整性审核")
+    enable_code_trace: bool = Field(default=True, description="启用代码溯源检测")
+    enable_symbol_detect: bool = Field(default=True, description="启用敏感符号检测")
+    enable_temporal_anomaly: bool = Field(default=True, description="启用时序异常检测")
+
+
+class FineGrainedStatusResponse(BaseModel):
+    """细粒度视频理解状态响应"""
+    available: bool
+    modules: Dict[str, Any]
+    config: Dict[str, Any]
+
+
+@router.get("/api/v3/fine-grained/status")
+async def get_fine_grained_status():
+    """获取细粒度视频理解管线状态"""
+    from backend.services.fine_grained import FineGrainedPipeline
+
+    pipeline = FineGrainedPipeline()
+    return pipeline.get_status()
+
+
+@router.post("/api/v3/fine-grained/analyze")
+async def analyze_fine_grained(req: FineGrainedAnalysisRequest):
+    """对视频进行细粒度理解分析
+
+    检测视频中短暂画面和小区域细节的风险：
+    - 地图完整性审核（缺失台湾/南海诸岛等）
+    - 代码溯源检测（视频中的代码是否来自开源项目）
+    - 敏感符号检测（争议性标志/旗帜/手势）
+    - 时序异常检测（短暂异常画面）
+    """
+    import os
+
+    if not os.path.exists(req.video_path):
+        raise HTTPException(status_code=404, detail=f"视频文件不存在: {req.video_path}")
+
+    from backend.services.fine_grained import FineGrainedPipeline
+
+    pipeline = FineGrainedPipeline({
+        "enable_map_audit": req.enable_map_audit,
+        "enable_code_trace": req.enable_code_trace,
+        "enable_symbol_detect": req.enable_symbol_detect,
+        "enable_temporal_anomaly": req.enable_temporal_anomaly,
+    })
+
+    report = await pipeline.analyze(req.video_path)
+
+    return {
+        "video_path": report.video_path,
+        "has_fine_grained_risk": report.has_fine_grained_risk,
+        "risk_upgrade": report.risk_upgrade,
+        "max_risk_level": report.max_risk_level,
+        "key_findings": report.key_findings,
+        "evidence_frames": report.evidence_frames,
+        "map_audit": {
+            "has_map_risk": report.map_audit.has_map_risk if report.map_audit else False,
+            "max_risk_level": report.map_audit.max_risk_level if report.map_audit else "safe",
+            "map_frames_found": report.map_audit.map_frames_found if report.map_audit else 0,
+        } if report.map_audit else None,
+        "code_trace": {
+            "has_opensource_risk": report.code_trace.has_opensource_risk if report.code_trace else False,
+            "max_risk_level": report.code_trace.max_risk_level if report.code_trace else "safe",
+            "frames_with_code": report.code_trace.frames_with_code if report.code_trace else 0,
+        } if report.code_trace else None,
+        "symbol_detect": {
+            "has_symbol_risk": report.symbol_detect.has_symbol_risk if report.symbol_detect else False,
+            "max_risk_level": report.symbol_detect.max_risk_level if report.symbol_detect else "safe",
+        } if report.symbol_detect else None,
+        "temporal_anomaly": {
+            "has_anomaly": report.temporal_anomaly.has_anomaly if report.temporal_anomaly else False,
+            "max_risk_level": report.temporal_anomaly.max_risk_level if report.temporal_anomaly else "safe",
+            "anomaly_count": len(report.temporal_anomaly.anomalies) if report.temporal_anomaly else 0,
+        } if report.temporal_anomaly else None,
+        "error": report.error,
+    }
