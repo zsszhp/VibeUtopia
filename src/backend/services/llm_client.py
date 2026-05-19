@@ -219,17 +219,24 @@ class ModelRegistry:
 # ---------------------------------------------------------------------------
 
 class ModelRouter:
-    """根据 task_type 路由到最优模型，支持 fallback 和冷却"""
+    """根据 task_type 路由到最优模型，支持 fallback、冷却和 Key 智能轮换
 
-    # tier 降级顺序
+    Key 轮换策略：
+    1. 同一模型多 Key 时，优先使用 key_index 较小的（Key1 > Key2 > Key3）
+    2. 当前 Key 限流（429）→ 标记冷却 → 自动切换下一个 Key
+    3. 冷却期结束后，下次路由自动回切到优先级更高的 Key
+    4. 冷却时间可通过 MODEL_COOLDOWN_SECONDS 环境变量配置（默认 300 秒）
+    """
+
     TIER_ORDER = ["advanced", "standard", "lite"]
 
     def __init__(self, registry: ModelRegistry, cooldown_seconds: int = 300):
         self.registry = registry
         self._cooldown_seconds = cooldown_seconds
-        self._cooling: dict[str, float] = {}  # "provider:model_id" -> resume_timestamp
-        self._runtime_provider: str = ""  # 运行时覆盖：厂商
-        self._runtime_model: str = ""     # 运行时覆盖：模型
+        self._cooling: dict[str, float] = {}  # "provider:model_id:key_index" -> resume_timestamp
+        self._runtime_provider: str = ""
+        self._runtime_model: str = ""
+        self._key_usage_stats: dict[str, dict] = {}  # key -> {calls, errors, last_used}
 
     def set_override(self, provider: str = "", model: str = ""):
         """运行时设置覆盖，立即生效，无需重启"""
@@ -242,7 +249,7 @@ class ModelRouter:
         return {"provider": self._runtime_provider, "model": self._runtime_model}
 
     def route(self, task_type: str = "default", exclude: set[str] | None = None) -> ModelEndpoint | None:
-        """根据 task_type 路由到最优可用模型"""
+        """根据 task_type 路由到最优可用模型（自动回切已恢复的 Key）"""
         exclude = exclude or set()
         tier = self.registry.get_tier(task_type)
 
@@ -254,13 +261,14 @@ class ModelRouter:
             if override:
                 return override
 
-        # 2. 四级 fallback 策略
+        # 2. 四级 fallback 策略（候选列表已按 key_index 排序，优先使用 Key1）
         strategy = self.registry.fallback_strategy
         candidates = self._build_candidates(tier, strategy, exclude)
         return candidates[0] if candidates else None
 
     def _find_override(self, tier: str, exclude: set[str], provider: str, model: str) -> ModelEndpoint | None:
-        """查找指定的覆盖模型"""
+        """查找指定的覆盖模型（同模型多 Key 时优先使用 Key1）"""
+        candidates = []
         for ep in self.registry.get_endpoints(text_only=True):
             key = f"{ep.provider}:{ep.model_id}:{ep.key_index}"
             if key in exclude:
@@ -268,61 +276,86 @@ class ModelRouter:
             if not self.is_available(ep.provider, ep.model_id, ep.key_index):
                 continue
             if model and ep.model_id == model:
-                return ep
-            if provider and ep.provider == provider:
-                if ep.tier == tier:
-                    return ep
-        return None
+                candidates.append(ep)
+            elif provider and ep.provider == provider and ep.tier == tier:
+                candidates.append(ep)
+        # 同模型多 Key 时优先使用 key_index 较小的
+        candidates.sort(key=lambda e: e.key_index)
+        return candidates[0] if candidates else None
 
     def _build_candidates(self, tier: str, strategy: dict, exclude: set[str]) -> list[ModelEndpoint]:
-        """按 fallback 策略构建候选模型列表"""
+        """按 fallback 策略构建候选模型列表（同模型多 Key 按 key_index 排序，确保优先回切 Key1）"""
         candidates = []
         tier_idx = self.TIER_ORDER.index(tier) if tier in self.TIER_ORDER else 1
 
-        # 同 provider 同 tier
         if strategy.get("same_provider_same_tier", True):
             for ep in self.registry.get_endpoints(tier=tier, exclude=exclude, text_only=True):
                 if self.is_available(ep.provider, ep.model_id, ep.key_index):
                     candidates.append(ep)
 
-        # 同 provider 低 tier
         if strategy.get("same_provider_lower_tier", True):
             for lower_tier in self.TIER_ORDER[tier_idx + 1:]:
                 for ep in self.registry.get_endpoints(tier=lower_tier, exclude=exclude, text_only=True):
                     if self.is_available(ep.provider, ep.model_id, ep.key_index):
-                        # 避免重复（前面的 tier 可能已包含）
                         if ep not in candidates:
                             candidates.append(ep)
 
-        # 跨 provider 同 tier
         if strategy.get("cross_provider_same_tier", True):
-            # 已在前面收集了同 tier 的所有 provider，无需重复
             pass
 
-        # 跨 provider 低 tier（补充前面未覆盖的低 tier 跨 provider）
         if strategy.get("cross_provider_lower_tier", True):
             for lower_tier in self.TIER_ORDER[tier_idx + 1:]:
                 for ep in self.registry.get_endpoints(tier=lower_tier, exclude=exclude, text_only=True):
                     if self.is_available(ep.provider, ep.model_id, ep.key_index) and ep not in candidates:
                         candidates.append(ep)
 
+        # 关键排序：同 provider+model 的端点按 key_index 升序排列
+        # 确保 Key1 冷却恢复后自动回切到 Key1（优先级高于 Key2）
+        candidates.sort(key=lambda e: (self._endpoint_group_key(e), e.key_index))
         return candidates
 
+    @staticmethod
+    def _endpoint_group_key(ep: ModelEndpoint) -> tuple:
+        """端点分组键：同 provider+model+tier 为一组"""
+        return (ep.provider, ep.model_id, ep.tier)
+
     def mark_unavailable(self, provider: str, model_id: str, key_index: int = 0):
-        """标记模型 Key 临时不可用"""
+        """标记模型 Key 临时不可用（进入冷却期）"""
         key = f"{provider}:{model_id}:{key_index}"
         self._cooling[key] = time.time() + self._cooldown_seconds
         label = f"Key{key_index + 1}" if key_index else "Key1"
-        logger.warning("模型 %s %s 标记为临时不可用，冷却 %d 秒", provider, label, self._cooldown_seconds)
+
+        # 更新使用统计
+        if key not in self._key_usage_stats:
+            self._key_usage_stats[key] = {"calls": 0, "errors": 0, "last_used": 0}
+        self._key_usage_stats[key]["errors"] += 1
+
+        logger.warning(
+            "模型 %s %s 限流标记冷却 %d 秒（第%d次限流），自动切换到下一个可用 Key",
+            provider, label, self._cooldown_seconds,
+            self._key_usage_stats[key]["errors"],
+        )
+
+    def record_success(self, provider: str, model_id: str, key_index: int = 0):
+        """记录 Key 调用成功（用于统计和回切判断）"""
+        key = f"{provider}:{model_id}:{key_index}"
+        if key not in self._key_usage_stats:
+            self._key_usage_stats[key] = {"calls": 0, "errors": 0, "last_used": 0}
+        self._key_usage_stats[key]["calls"] += 1
+        self._key_usage_stats[key]["last_used"] = time.time()
 
     def is_available(self, provider: str, model_id: str, key_index: int = 0) -> bool:
-        """检查模型 Key 是否可用（未冷却）"""
+        """检查模型 Key 是否可用（冷却期结束后自动恢复，实现回切）"""
         key = f"{provider}:{model_id}:{key_index}"
         resume_at = self._cooling.get(key, 0)
         if time.time() < resume_at:
+            remaining = int(resume_at - time.time())
             return False
-        # 已过冷却期，清除
-        self._cooling.pop(key, None)
+        # 冷却期已过 → 自动恢复，下次路由会优先选到此 Key（回切）
+        if key in self._cooling:
+            self._cooling.pop(key, None)
+            label = f"Key{key_index + 1}"
+            logger.info("模型 %s %s 冷却期已结束，自动恢复可用（回切生效）", provider, label)
         return True
 
     def get_key_pool_status(self) -> dict:
@@ -344,19 +377,28 @@ class ModelRouter:
             if mk not in status[pkey]["models"]:
                 status[pkey]["models"][mk] = {}
             avail = self.is_available(ep.provider, ep.model_id, ep.key_index)
-            status[pkey]["models"][mk][f"Key{ep.key_index + 1}"] = {
+            key_label = f"Key{ep.key_index + 1}"
+            key_stats = self._key_usage_stats.get(f"{ep.provider}:{ep.model_id}:{ep.key_index}", {})
+            cooling_key = f"{ep.provider}:{ep.model_id}:{ep.key_index}"
+            remaining = max(0, int(self._cooling.get(cooling_key, 0) - time.time()))
+            status[pkey]["models"][mk][key_label] = {
                 "available": avail,
                 "tier": ep.tier,
+                "total_calls": key_stats.get("calls", 0),
+                "total_errors": key_stats.get("errors", 0),
+                "cooling_remaining_seconds": remaining if not avail else 0,
             }
         return status
 
     def get_active_endpoint(self, provider: str, model_id: str) -> ModelEndpoint | None:
-        """返回指定模型当前可用的第一个 Key 端点"""
+        """返回指定模型当前可用的第一个 Key 端点（优先 key_index 较小者）"""
+        candidates = []
         for ep in self.registry.endpoints:
             if ep.provider == provider and ep.model_id == model_id:
                 if self.is_available(ep.provider, ep.model_id, ep.key_index):
-                    return ep
-        return None
+                    candidates.append(ep)
+        candidates.sort(key=lambda e: e.key_index)
+        return candidates[0] if candidates else None
 
 
 # ---------------------------------------------------------------------------
@@ -464,6 +506,7 @@ async def call_vlm(prompt: str, image_base64: str, system: str = "你是一个�
 
         try:
             result = await _call_endpoint_vlm(endpoint, prompt, image_base64, system)
+            router.record_success(endpoint.provider, endpoint.model_id, endpoint.key_index)
             return result
         except QuotaExhaustedError as e:
             router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
@@ -557,6 +600,7 @@ async def _call_with_routing(prompt: str, system: str, task_type: str) -> str:
 
         try:
             result = await _call_endpoint(endpoint, prompt, system)
+            router.record_success(endpoint.provider, endpoint.model_id, endpoint.key_index)
             return result
         except QuotaExhaustedError as e:
             router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
