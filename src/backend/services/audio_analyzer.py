@@ -163,13 +163,27 @@ class AudioAnalyzer:
         return result
 
     async def _extract_audio(self, video_path: str) -> Optional[str]:
-        """从视频提取音频为WAV"""
+        """从视频提取音频为WAV
+
+        如果输入已经是音频文件（mp3/wav/aac/m4a/flac），直接转码为WAV
+        如果输入是视频文件，使用ffmpeg提取音频
+        """
         if not os.path.exists(video_path):
             return None
 
-        if not _HAS_FFMPEG:
-            # 尝试使用OpenCV判断是否有音轨
-            logger.warning("ffmpeg未安装，无法提取音频")
+        audio_extensions = {".mp3", ".wav", ".aac", ".m4a", ".flac", ".ogg", ".wma"}
+        ext = os.path.splitext(video_path)[1].lower()
+        is_audio = ext in audio_extensions
+
+        if is_audio and ext == ".wav":
+            return video_path
+
+        if not _HAS_FFMPEG and not is_audio:
+            logger.warning("ffmpeg未安装，无法从视频提取音频")
+            return None
+
+        if not _HAS_FFMPEG and is_audio:
+            logger.warning("ffmpeg未安装，无法转码音频文件为WAV")
             return None
 
         try:

@@ -140,10 +140,6 @@ providers:
         tier: standard
         vision: false
         text: true
-      - id: "LongCat-VL"
-        tier: standard
-        vision: true
-        text: true
 
   # --- 商汤 SenseNova (DeepSeek V4 Flash) ---
   sensenova:
