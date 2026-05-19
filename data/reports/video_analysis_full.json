@@ -1,0 +1,1179 @@
+[
+  {
+    "case": "ai",
+    "description": "AI相关内容视频（计算机科学专业与AI影响）",
+    "task_id": "3ccfb32a-a496-4aa0-9a25-e0218804679a",
+    "status": "timeout",
+    "elapsed_seconds": 904,
+    "text_length": 3362,
+    "overall_risk_score": 0,
+    "risk_level": "",
+    "confidence": 0,
+    "uncertainty_sources": [],
+    "dimensions": [],
+    "platform_reactions": {},
+    "cross_effects": [],
+    "simulation_data": {},
+    "evidence_chains": [],
+    "confidence_breakdown": {}
+  },
+  {
+    "case": "fight",
+    "description": "争议/冲突类视频（朝鲜战争历史分析）",
+    "task_id": "d892b949-e6cf-4eb5-90c1-a5da7e7f8188",
+    "status": "timeout",
+    "elapsed_seconds": 906,
+    "text_length": 6051,
+    "overall_risk_score": 0,
+    "risk_level": "",
+    "confidence": 0,
+    "uncertainty_sources": [],
+    "dimensions": [],
+    "platform_reactions": {},
+    "cross_effects": [],
+    "simulation_data": {},
+    "evidence_chains": [],
+    "confidence_breakdown": {}
+  },
+  {
+    "case": "mhy",
+    "description": "米哈游相关视频（AI模型评测）",
+    "task_id": "41f30e33-b2a8-4e5d-9d4c-8b4ede018dc4",
+    "status": "completed",
+    "elapsed_seconds": 446,
+    "text_length": 3406,
+    "overall_risk_score": 24,
+    "risk_level": "green",
+    "confidence": 0.57,
+    "uncertainty_sources": [
+      "数据源质量较低,可能影响评估准确性",
+      "证据链不够充分,建议人工复核",
+      "总体置信度较低,建议结合人工判断"
+    ],
+    "dimensions": [
+      {
+        "name": "政治敏感",
+        "score": 0,
+        "severity": "green",
+        "evidence": "未检测到相关风险。全文聚焦于AI视频生成技术LPM模型的架构、创新点及在游戏与交互中的应用，未涉及政治体制、主权、外交、涉政人物或煽动对立等内容。",
+        "evidence_source": {},
+        "confidence": 0.95,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "法律合规",
+        "score": 0,
+        "severity": "green",
+        "evidence": "未检测到广告法违规、侵权、虚假宣传或规避法律审核内容。虽提及技术性能（如‘171残数模型’‘分钟级持续一致性’），但属于技术描述范畴，未使用绝对化用语或疗效承诺。",
+        "evidence_source": {},
+        "confidence": 0.93,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "民族宗教",
+        "score": 0,
+        "severity": "green",
+        "evidence": "未检测到民族歧视、宗教冒犯或文化禁忌内容。文案中无相关敏感表述。",
+        "evidence_source": {},
+        "confidence": 0.97,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "事实错误",
+        "score": 0,
+        "severity": "green",
+        "evidence": "未检测到医疗谣言、科学谬误或明确虚假信息。文中关于LPM模型的技术描述（如‘双音频输入’‘全双工交互’）虽存在术语混乱（疑似转写错误），但整体属于对前沿AI技术的解读，且标注了‘根据我能查到资料’，表明信息边界。未发现故意造谣或传播不实信息意图。",
+        "evidence_source": {},
+        "confidence": 0.88,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "平台禁区",
+        "score": 0,
+        "severity": "green",
+        "evidence": "未检测到规避审核手段、黑灰产技巧或平台规则漏洞相关内容。技术讨论未涉及违规操作。",
+        "evidence_source": {},
+        "confidence": 0.96,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "性别议题",
+        "score": 0,
+        "severity": "green",
+        "evidence": "未检测到性别对立、物化歧视或刻板印象强化内容。虽结尾提到‘赛博老婆’，但结合上下文为比喻性表达，指代‘可交互的虚拟角色’，且全文聚焦技术逻辑，无性化或贬低特定性别的表述。",
+        "evidence_source": {},
+        "confidence": 0.9,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "群体冒犯",
+        "score": 0,
+        "severity": "green",
+        "evidence": "未检测到地域、职业、年龄歧视或群体标签化内容。提及‘新加坡AI团队’‘微软全球合伙人’等为事实陈述，无贬损意图。",
+        "evidence_source": {},
+        "confidence": 0.94,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "道德伦理",
+        "score": 20,
+        "severity": "green",
+        "evidence": "轻微涉及虚拟角色伦理讨论（如‘让你真的愿意和他轻速的对象’），但未深入探讨或鼓吹违背公序良俗的行为。整体仍以技术实现为核心，伦理暗示较弱。",
+        "evidence_source": {},
+        "confidence": 0.85,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "时事踩雷",
+        "score": 0,
+        "severity": "green",
+        "evidence": "未蹭热点、灾难或敏感事件。引用《西部世界》仅为类比游戏体验，非关联现实争议事件。",
+        "evidence_source": {},
+        "confidence": 0.98,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "情绪极化",
+        "score": 0,
+        "severity": "green",
+        "evidence": "未检测到煽动仇恨、制造对立或鼓动暴力内容。全文为技术性解说，语气理性，无极端词汇或动员性语言。",
+        "evidence_source": {},
+        "confidence": 0.97,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "价值观倾向",
+        "score": 30,
+        "severity": "yellow",
+        "evidence": "提及‘千人千面的游戏体验’‘赛博老婆’等概念，隐含对高度拟人化虚拟伴侣的技术追求，可能引发对技术依赖或现实人际关系弱化的隐忧，但未明确鼓吹躺平、拜金或反社会倾向。",
+        "evidence_source": {},
+        "confidence": 0.82,
+        "suggestion": "",
+        "affected_groups": [
+          "青少年用户",
+          "虚拟社交依赖群体"
+        ]
+      }
+    ],
+    "platform_reactions": {
+      "bilibili": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      },
+      "xiaohongshu": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      },
+      "zhihu": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      },
+      "douyin": {
+        "positive": 0.6,
+        "neutral": 0.4,
+        "negative": 0.0
+      },
+      "weibo": {
+        "positive": 0.8,
+        "neutral": 0.2,
+        "negative": 0.0
+      },
+      "kuaishou": {
+        "positive": 0.2,
+        "neutral": 0.8,
+        "negative": 0.0
+      },
+      "wechat_channels": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "douban": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      },
+      "hupu": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      },
+      "toutiao": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "tieba": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      },
+      "taptap": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "wechat_official": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "shipinhao": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "twitter": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "facebook": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "instagram": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "youtube": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "telegram": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "reddit": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "tiktok_global": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "linkedin": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "nga": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      },
+      "v2ex": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      },
+      "maimai": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "boss_zhilian": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "smzdm": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "zhihu_zhuanlan": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "jike": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      }
+    },
+    "cross_effects": [],
+    "simulation_data": {
+      "weibo": {
+        "platform_id": "weibo",
+        "platform_name": "微博",
+        "emotion_distribution": {
+          "positive": 0.45,
+          "neutral": 0.4,
+          "negative": 0.15
+        },
+        "risk_score": 13.3,
+        "risk_level": "safe",
+        "typical_reactions": [
+          {
+            "reaction_type": "正面",
+            "example_comment": "终于有人讲清楚米哈游的AI不是噱头了！LPM这个‘表演即反应’的思路真的颠覆认知，比那些只会对口型的强太多了。",
+            "reasoning": "文案深度解析了LPM模型的技术创新点（如全双工交互、身份一致性、实时反应机制），契合科技爱好者和游戏用户对‘真正智能NPC’的长期期待，易引发技术认同感。"
+          },
+          {
+            "reaction_type": "中性",
+            "example_comment": "技术细节挺多，但演示视频确实不够炸裂……不过想想他们目标是实时交互而不是短视频生成，也能理解。",
+            "reasoning": "用户注意到文案中‘演示画面不惊艳’的自述，结合对AI视频行业‘重效果轻交互’现状的认知，形成理性权衡，情绪趋于平和。"
+          },
+          {
+            "reaction_type": "负面",
+            "example_comment": "又是米哈游吹？43亿论文都出来了，结果连个能用的产品都没有，光说不练假把式。",
+            "reasoning": "部分用户对‘论文’‘模型’等术语敏感，若此前对米哈游AI宣传有过高期待，可能因缺乏即时可玩产品而产生 skepticism（怀疑），但攻击性较低。"
+          }
+        ],
+        "key_concerns": [
+          "技术实现与实际产品落地的差距（‘论文很强但无产品’）",
+          "对‘临礼’项目真实进展的质疑（是否过度解读低调更新）"
+        ],
+        "amplification_risk": 0.3,
+        "platform_specific_advice": [
+          "在开头增加‘非广告，纯技术分析’ disclaimer，降低商业吹捧感知",
+          "将‘43亿论文’改为‘43页论文’，避免数字夸张引发质疑（原文字符错误易被放大）",
+          "补充1-2句对比主流AI视频工具（如Sora、Runway）的差异，帮助普通用户理解LPM独特性"
+        ]
+      },
+      "bilibili": {
+        "platform_id": "bilibili",
+        "platform_name": "B站",
+        "emotion_distribution": {
+          "positive": 0.65,
+          "neutral": 0.25,
+          "negative": 0.1
+        },
+        "risk_score": 16.3,
+        "risk_level": "safe",
+        "typical_reactions": [
+          {
+            "reaction_type": "正面",
+            "example_comment": "米哈游这波真的在憋大招啊！LPM不是传统AI视频模型，而是‘大型表演模型’，这个思路太颠覆了！",
+            "reasoning": "文案深度解析了米哈游LPM模型的技术创新，强调其‘听’与‘反应’的能力，契合B站用户对前沿科技与游戏结合的兴趣，尤其是‘像人一样感知’的理念容易引发技术爱好者共鸣。"
+          },
+          {
+            "reaction_type": "中性",
+            "example_comment": "技术细节讲得很清楚，但演示画面确实不够炸裂，期待实际落地效果。",
+            "reasoning": "用户认可内容的专业性和信息密度，但对视觉呈现的‘惊艳度’有所保留，属于理性观望态度，符合B站中长视频用户对‘干货 vs 观感’的平衡期待。"
+          },
+          {
+            "reaction_type": "负面",
+            "example_comment": "又是AI替代人类表演？别最后做出来的角色比真人还假，看着瘆得慌。",
+            "reasoning": "部分用户对AI生成角色的情感真实性和‘恐怖谷效应’存在天然警惕，尤其当强调‘情绪回应’‘存在感’时，可能触发对技术伦理的隐忧。"
+          }
+        ],
+        "key_concerns": [
+          "AI角色情感真实性与人类表演的边界",
+          "技术演示效果与实际宣传是否存在落差"
+        ],
+        "amplification_risk": 0.5,
+        "platform_specific_advice": [
+          "建议在视频开头加入‘非恰饭，纯技术解析’声明，强化社区信任，避免被误判为商业推广",
+          "可设计互动弹幕问题如‘你希望AI角色如何回应你？’，引导用户参与讨论，增强社区认同感"
+        ]
+      },
+      "xiaohongshu": {
+        "platform_id": "xiaohongshu",
+        "platform_name": "小红书",
+        "emotion_distribution": {
+          "positive": 0.45,
+          "neutral": 0.4,
+          "negative": 0.15
+        },
+        "risk_score": 16.3,
+        "risk_level": "safe",
+        "typical_reactions": [
+          {
+            "reaction_type": "正面",
+            "example_comment": "虽然看不懂技术细节，但感觉米哈游这次真的在认真做‘人’，不是工具！期待能真正聊天的NPC！",
+            "reasoning": "小红书用户对‘情感连接’‘真实互动’等概念敏感，尤其女性用户更关注AI是否具备共情能力，而非单纯效率。文案强调‘倾听’‘情绪反馈’‘存在感’，契合平台对‘人性化科技’的偏好。"
+          },
+          {
+            "reaction_type": "中性",
+            "example_comment": "技术解析挺硬核的，但视频效果看起来平平无奇啊……是不是吹过头了？",
+            "reasoning": "小红书用户习惯‘所见即所得’的种草逻辑，若视觉呈现不够惊艳，容易产生‘货不对板’的质疑。尽管技术逻辑扎实，但缺乏直观冲击力可能引发理性观望。"
+          },
+          {
+            "reaction_type": "负面",
+            "example_comment": "又是AI换脸+虚拟偶像那套？别最后变成更精致的身材焦虑制造机……",
+            "reasoning": "平台对‘AI生成形象’高度警惕，尤其涉及面部表情、身体动作时，易触发‘虚假审美’‘身材焦虑’等文化禁忌。部分用户会将LPM技术与过往AI美颜乱象关联，产生防御性批评。"
+          }
+        ],
+        "key_concerns": [
+          "AI角色是否会导致新的审美标准化或情感依赖",
+          "技术演示效果与宣传是否存在差距",
+          "‘临礼’项目是否涉及用户数据隐私或过度拟人化伦理问题"
+        ],
+        "amplification_risk": 0.3,
+        "platform_specific_advice": [
+          "增加‘非技术向’解读模块：用生活化类比（如‘就像朋友边听边点头回应你’）解释LPM核心创新，降低理解门槛",
+          "补充视觉对比图：展示传统AI视频 vs LPM在‘倾听反应’上的差异，强化‘这不是普通换脸’的认知",
+          "弱化技术参数堆砌，突出‘情感价值’：如‘未来游戏里，NPC会记住你上次说过的话’等具象场景，契合小红书‘生活质感’叙事风格"
+        ]
+      },
+      "douyin": {
+        "platform_id": "douyin",
+        "platform_name": "抖音",
+        "emotion_distribution": {
+          "positive": 0.65,
+          "neutral": 0.25,
+          "negative": 0.1
+        },
+        "risk_score": 16.3,
+        "risk_level": "safe",
+        "typical_reactions": [
+          {
+            "reaction_type": "正面",
+            "example_comment": "米哈游这波技术真的有点东西！LPM把‘听’和‘说’拆开处理，感觉像在造真人NPC了，期待上线！",
+            "reasoning": "文案深入解析了LPM模型的技术创新，尤其强调‘表演即反应’和‘全双工交互’，契合用户对AI拟人化、沉浸体验的期待，容易引发科技爱好者和游戏玩家的正向共鸣。"
+          },
+          {
+            "reaction_type": "中性",
+            "example_comment": "技术讲得很细，但演示视频看着也就那样啊，是不是吹过头了？",
+            "reasoning": "尽管文案强调技术突破，但抖音用户更依赖视觉冲击。若配套视频缺乏惊艳效果，部分用户会产生‘说得好听做得一般’的质疑，属于理性观望态度。"
+          },
+          {
+            "reaction_type": "负面",
+            "example_comment": "又是AI换脸又是实时互动，以后游戏里全是假人，真玩家越来越少，没意思。",
+            "reasoning": "部分用户担忧过度拟真的AI角色会削弱真实社交体验，尤其在‘信息茧房强度0.6、极化倾向0.7’的平台上，此类担忧易被放大，形成对技术伦理的轻微抵触。"
+          }
+        ],
+        "key_concerns": [
+          "技术演示效果是否匹配文案描述的高期待",
+          "AI角色过度拟真是否会导致真实社交疏离"
+        ],
+        "amplification_risk": 0.5,
+        "platform_specific_advice": [
+          "建议搭配高动态、强情绪反馈的LPM演示片段（如角色边听边点头、眼神跟随），弥补‘视觉震撼不足’的短板，契合抖音‘情绪驱动’传播逻辑",
+          "在视频标题或字幕中加入‘西部世界照进现实’‘米哈游造出会听你说话的NPC’等具象化、情绪化表述，提升点击与转发率"
+        ]
+      },
+      "zhihu": {
+        "platform_id": "zhihu",
+        "platform_name": "知乎",
+        "emotion_distribution": {
+          "positive": 0.55,
+          "neutral": 0.35,
+          "negative": 0.1
+        },
+        "risk_score": 13.3,
+        "risk_level": "safe",
+        "typical_reactions": [
+          {
+            "reaction_type": "正面",
+            "example_comment": "终于有人把AI表演模型和传统视频生成区分开了！LPM的思路确实更接近人类交互本质，不是堆参数而是重构感知逻辑。",
+            "reasoning": "知乎用户对技术创新和深度分析有较高认可度，尤其当内容体现专业洞察（如引用论文、技术路径对比）时，容易获得理性支持。"
+          },
+          {
+            "reaction_type": "中性",
+            "example_comment": "技术细节讲得很清楚，但演示效果确实不如Sora震撼，不知道是不是因为侧重实时交互而非视觉奇观。",
+            "reasoning": "用户习惯于在长文中寻找平衡视角，即使整体正面，也会指出“预期落差”，体现平台典型的审慎讨论风格。"
+          },
+          {
+            "reaction_type": "负面",
+            "example_comment": "通篇都在吹米哈游‘颠覆行业’，但实际落地产品还没看到，别又是PPT技术。",
+            "reasoning": "部分用户对大厂宣传敏感，尤其当文案使用“压住未来”“真正答案”等绝对化表述时，易触发对“过度包装”的质疑。"
+          }
+        ],
+        "key_concerns": [
+          "是否夸大LPM模型的实际能力与行业地位",
+          "米哈游技术路线与其他AI视频公司（如Runway、Sora）的真实差距"
+        ],
+        "amplification_risk": 0.3,
+        "platform_specific_advice": [
+          "弱化绝对化表述（如‘真正压住的游戏形态’），改为‘可能代表一种新方向’，避免引发‘捧杀’争议",
+          "补充与其他主流模型（如Sora、Pika）的客观对比数据，增强论述可信度，符合知乎用户偏好证据的习惯"
+        ]
+      }
+    },
+    "evidence_chains": [
+      {
+        "dimension": "价值观倾向",
+        "score": 0,
+        "severity": "yellow",
+        "primary_evidence": {
+          "text": "",
+          "position": {
+            "start": 0,
+            "end": 0
+          },
+          "context": ""
+        },
+        "assessment_basis": {
+          "rule": "",
+          "reasoning": "",
+          "keywords": []
+        },
+        "cross_validation": [],
+        "propagation_path": [
+          {
+            "stage": "current",
+            "severity": "low",
+            "description": "当前风险等级: 0分"
+          }
+        ],
+        "confidence": 0.5
+      },
+      {
+        "dimension": "事实错误",
+        "score": 0,
+        "severity": "green",
+        "primary_evidence": {
+          "text": "",
+          "position": {
+            "start": 0,
+            "end": 0
+          },
+          "context": ""
+        },
+        "assessment_basis": {
+          "rule": "",
+          "reasoning": "",
+          "keywords": []
+        },
+        "cross_validation": [],
+        "propagation_path": [
+          {
+            "stage": "current",
+            "severity": "low",
+            "description": "当前风险等级: 0分"
+          }
+        ],
+        "confidence": 0.5
+      },
+      {
+        "dimension": "事实错误",
+        "score": 0,
+        "severity": "green",
+        "primary_evidence": {
+          "text": "",
+          "position": {
+            "start": 0,
+            "end": 0
+          },
+          "context": ""
+        },
+        "assessment_basis": {
+          "rule": "",
+          "reasoning": "",
+          "keywords": []
+        },
+        "cross_validation": [],
+        "propagation_path": [
+          {
+            "stage": "current",
+            "severity": "low",
+            "description": "当前风险等级: 0分"
+          }
+        ],
+        "confidence": 0.5
+      }
+    ],
+    "confidence_breakdown": {
+      "overall_confidence": 0.57,
+      "factors": {
+        "data_quality": 0.066,
+        "consistency": 0.9024793388429753,
+        "evidence": 0.35,
+        "platform_validation": 0.957734887039239
+      },
+      "breakdown": {
+        "data_quality_score": 0.07,
+        "consistency_score": 0.9,
+        "evidence_score": 0.35,
+        "platform_validation_score": 0.96
+      }
+    }
+  },
+  {
+    "case": "moon",
+    "description": "月亮/天文类视频（宇宙天文科普）",
+    "task_id": "035307a7-0e6d-41ac-95cd-da663c3901bd",
+    "status": "completed",
+    "elapsed_seconds": 438,
+    "text_length": 4767,
+    "overall_risk_score": 40,
+    "risk_level": "yellow",
+    "confidence": 0.51,
+    "uncertainty_sources": [
+      "数据源质量较低,可能影响评估准确性",
+      "证据链不够充分,建议人工复核",
+      "总体置信度较低,建议结合人工判断"
+    ],
+    "dimensions": [
+      {
+        "name": "政治敏感",
+        "score": 0,
+        "severity": "green",
+        "evidence": "未检测到相关风险。文案虽提及美苏冷战、纳粹技术转移等历史背景，但均为客观陈述航天史实，未涉及当前政治体制批评、领土主权、外交红线或煽动对立内容。",
+        "evidence_source": {},
+        "confidence": 0.95,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "法律合规",
+        "score": 0,
+        "severity": "green",
+        "evidence": "未检测到相关风险。文案无广告法违规、侵权、虚假宣传或规避审核内容。结尾呼吁点赞关注属于正常内容互动引导，不构成诱导或违规。",
+        "evidence_source": {},
+        "confidence": 0.98,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "民族宗教",
+        "score": 0,
+        "severity": "green",
+        "evidence": "未检测到相关风险。文案未涉及任何民族、宗教、文化禁忌或歧视性表述。",
+        "evidence_source": {},
+        "confidence": 0.99,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "事实错误",
+        "score": 45,
+        "severity": "yellow",
+        "evidence": "存在多处疑似转写错误导致的事实表述混乱，如‘地球是宇宙脱去的存在’‘血液领星是来自中子型对撞的残海’等语句语义不清，可能源于ASR错误。但核心航天史实（如阿波罗计划、双子星8号事故、旅行者1号等）基本准确。转写噪声干扰判断，需谨慎评估。",
+        "evidence_source": {},
+        "confidence": 0.65,
+        "suggestion": "",
+        "affected_groups": [
+          "公众科普受众"
+        ]
+      },
+      {
+        "name": "平台禁区",
+        "score": 0,
+        "severity": "green",
+        "evidence": "未检测到规避审核、黑灰产技巧或平台规则漏洞相关内容。",
+        "evidence_source": {},
+        "confidence": 0.99,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "性别议题",
+        "score": 0,
+        "severity": "green",
+        "evidence": "未检测到相关风险。文案未涉及性别对立、物化或刻板印象内容。",
+        "evidence_source": {},
+        "confidence": 0.99,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "群体冒犯",
+        "score": 0,
+        "severity": "green",
+        "evidence": "未检测到地域、职业、年龄或阶级歧视内容。提及‘73个国家领导人’体现国际合作，无冒犯意图。",
+        "evidence_source": {},
+        "confidence": 0.98,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "道德伦理",
+        "score": 30,
+        "severity": "yellow",
+        "evidence": "提及纳粹技术用于航天发展（‘Wirth火箭是纳粹企图改变战局的暴复性武器’），但未美化暴力，而是反思‘用毁灭世纪的武器假装探索和平’。整体语境为批判性历史反思，未违背公序良俗。",
+        "evidence_source": {},
+        "confidence": 0.85,
+        "suggestion": "",
+        "affected_groups": [
+          "历史敏感群体"
+        ]
+      },
+      {
+        "name": "时事踩雷",
+        "score": 0,
+        "severity": "green",
+        "evidence": "未蹭当前热点、灾难或敏感事件。内容聚焦历史航天事件，无关联翻车或不当隐喻。",
+        "evidence_source": {},
+        "confidence": 0.97,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "情绪极化",
+        "score": 20,
+        "severity": "green",
+        "evidence": "虽有‘死亡与爆炸’‘浴发失控’等紧张描述，但整体为客观叙事，无煽动仇恨、制造对立或鼓动暴力意图。结尾呼吁和平，情绪基调理性克制。",
+        "evidence_source": {},
+        "confidence": 0.9,
+        "suggestion": "",
+        "affected_groups": []
+      },
+      {
+        "name": "价值观倾向",
+        "score": 35,
+        "severity": "yellow",
+        "evidence": "存在对人类技术局限性的哲学反思（‘也许在宇宙看来 鱼万或手中指湖的风准 没有本质区别’），但未鼓吹历史虚无主义、拜金或反社会倾向。整体传递探索精神与人类共同体意识，属积极价值观。",
+        "evidence_source": {},
+        "confidence": 0.8,
+        "suggestion": "",
+        "affected_groups": [
+          "青少年观众"
+        ]
+      }
+    ],
+    "platform_reactions": {
+      "bilibili": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      },
+      "xiaohongshu": {
+        "positive": 0.8,
+        "neutral": 0.2,
+        "negative": 0.0
+      },
+      "zhihu": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      },
+      "douyin": {
+        "positive": 0.8,
+        "neutral": 0.2,
+        "negative": 0.0
+      },
+      "weibo": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      },
+      "kuaishou": {
+        "positive": 0.6,
+        "neutral": 0.4,
+        "negative": 0.0
+      },
+      "wechat_channels": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "douban": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      },
+      "hupu": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      },
+      "toutiao": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "tieba": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      },
+      "taptap": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "wechat_official": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "shipinhao": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "twitter": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "facebook": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "instagram": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "youtube": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "telegram": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "reddit": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "tiktok_global": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "linkedin": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "nga": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      },
+      "v2ex": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      },
+      "maimai": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "boss_zhilian": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "smzdm": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "zhihu_zhuanlan": {
+        "positive": 0.33,
+        "neutral": 0.34,
+        "negative": 0.33
+      },
+      "jike": {
+        "positive": 1.0,
+        "neutral": 0.0,
+        "negative": 0.0
+      }
+    },
+    "cross_effects": [],
+    "simulation_data": {
+      "weibo": {
+        "platform_id": "weibo",
+        "platform_name": "微博",
+        "emotion_distribution": {
+          "positive": 0.5,
+          "neutral": 0.35,
+          "negative": 0.15
+        },
+        "risk_score": 19.9,
+        "risk_level": "safe",
+        "typical_reactions": [
+          {
+            "reaction_type": "正面",
+            "example_comment": "太震撼了！人类探索宇宙的故事永远让人热泪盈眶，阿姆斯特朗那一步真是划时代的勇气。",
+            "reasoning": "文案充满诗意与史诗感，唤起民族自豪感和人类共同体意识，符合微博用户对宏大叙事的共情偏好。"
+          },
+          {
+            "reaction_type": "中性",
+            "example_comment": "内容挺长，但信息密度高，像一篇微型科普散文，适合慢慢读。",
+            "reasoning": "部分用户认为文本虽晦涩但具知识性，尤其在科技爱好者圈层中可能获得理性认可。"
+          },
+          {
+            "reaction_type": "负面",
+            "example_comment": "排版太乱，错别字一堆，‘脱去’‘浩汉’‘充风’看得人头疼，根本没法认真读。",
+            "reasoning": "文案存在明显文字错误和语序混乱，影响阅读体验，易被普通用户视为“水文”或AI生成内容而反感。"
+          }
+        ],
+        "key_concerns": [
+          "文本中存在大量错别字与语病（如‘脱去’‘浩汉’‘充风’‘隆sauve’等），可能被质疑内容质量或真实性",
+          "涉及美国航天史细节较多，若被误读为过度美化西方科技成就，可能引发小范围‘崇洋’争议"
+        ],
+        "amplification_risk": 0.3,
+        "platform_specific_advice": [
+          "建议发布前进行文字校对，修正明显错别字与语病，提升专业可信度",
+          "可配图阿波罗11号发射、登月舱着陆等高清历史影像，增强视觉冲击与情绪共鸣",
+          "添加#人类登月55周年# #航天精神# 等正能量话题标签，引导正向讨论，规避敏感联想"
+        ]
+      },
+      "bilibili": {
+        "platform_id": "bilibili",
+        "platform_name": "B站",
+        "emotion_distribution": {
+          "positive": 0.65,
+          "neutral": 0.25,
+          "negative": 0.1
+        },
+        "risk_score": 19.9,
+        "risk_level": "safe",
+        "typical_reactions": [
+          {
+            "reaction_type": "正面",
+            "example_comment": "泪目了，人类真的太渺小又太伟大了，阿姆斯特朗那段看得我起鸡皮疙瘩",
+            "reasoning": "文案通过诗意的语言讲述人类航天史，强调勇气、牺牲与探索精神，极易引发B站用户对‘人类共同体’和‘星辰大海’的情感共鸣，尤其契合二次元用户对宏大叙事与孤独英雄的审美偏好"
+          },
+          {
+            "reaction_type": "中性",
+            "example_comment": "文案写得挺有诗意，但有些地方语序有点怪，像是机翻风格，影响阅读流畅度",
+            "reasoning": "B站用户对内容质量敏感，尤其反感低质或抄袭内容。虽然主题积极，但文案中存在明显语法混乱、用词不当（如“脱去的存在”“垂菜”“湿谷”等），可能被质疑为AI生成或编辑粗糙"
+          },
+          {
+            "reaction_type": "负面",
+            "example_comment": "又是这种‘人类伟大’的宏大叙事，能不能别总吹美国登月？中国航天也很强好吗",
+            "reasoning": "尽管文案未直接贬低中国，但通篇聚焦美国阿波罗计划，在B站当前民族主义情绪上升的背景下，可能被部分用户视为“西方中心主义”叙事，触发群体认同冲突"
+          }
+        ],
+        "key_concerns": [
+          "文案语言风格不统一，疑似AI生成或编辑失误，可能引发对内容真实性的质疑",
+          "过度聚焦美国航天成就，缺乏全球视角，可能引发‘崇美’或‘忽视中国贡献’的批评"
+        ],
+        "amplification_risk": 0.5,
+        "platform_specific_advice": [
+          "优化语言表达，修正明显语病和生造词（如‘垂菜’‘湿谷’），建议由中文母语者润色，避免被误判为低质AI内容",
+          "增加中国航天元素（如‘天问’‘嫦娥’）作为对比或呼应，平衡叙事视角，降低民族主义情绪反弹风险",
+          "可考虑以‘人类命运共同体’为结尾升华点，强化B站用户偏好的集体认同与情感共鸣"
+        ]
+      },
+      "xiaohongshu": {
+        "platform_id": "xiaohongshu",
+        "platform_name": "小红书",
+        "emotion_distribution": {
+          "positive": 0.45,
+          "neutral": 0.4,
+          "negative": 0.15
+        },
+        "risk_score": 19.9,
+        "risk_level": "safe",
+        "typical_reactions": [
+          {
+            "reaction_type": "正面",
+            "example_comment": "太震撼了！原来我们的身体就是星尘组成的，人类探索宇宙的故事真的让人热泪盈眶 🌌✨",
+            "reasoning": "文案充满诗意和科学浪漫主义，契合小红书用户对‘治愈系’‘哲思类’内容的偏好，容易引发情感共鸣"
+          },
+          {
+            "reaction_type": "中性",
+            "example_comment": "内容很宏大，但排版和错别字有点多，读起来有点累，如果能配个清晰的时间线图就好了",
+            "reasoning": "小红书用户重视阅读体验和视觉呈现，尽管主题吸引人，但文本存在语病、错字（如‘脱去’‘充风’‘隆sauve’等）影响理解"
+          },
+          {
+            "reaction_type": "负面",
+            "example_comment": "感觉像AI写的，虽然词藻华丽但逻辑跳跃，有些地方根本看不懂，像是在堆砌宇宙词汇",
+            "reasoning": "部分用户可能对过度文学化、缺乏清晰叙事结构的科普内容产生疏离感，尤其当信息密度高但表达不清时"
+          }
+        ],
+        "key_concerns": [
+          "文本中存在大量错别字和语病，可能降低可信度",
+          "内容过于抽象宏大，缺乏与日常生活或女性视角的连接点",
+          "未结合具体视觉元素（如登月老照片、星尘艺术图），削弱小红书平台适配性"
+        ],
+        "amplification_risk": 0.3,
+        "platform_specific_advice": [
+          "建议将长文拆分为3-4篇系列笔记，每篇聚焦一个主题（如‘人体中的星尘’‘阿波罗11号的生死20分钟’），提升可读性和传播性",
+          "增加高质量配图：如NASA历史影像、宇宙艺术插画、宇航员家庭照片等，强化情感共鸣",
+          "在文末加入‘互动提问’如：‘你小时候有没有抬头看过星星？’引导用户分享个人故事，增强社区参与感"
+        ]
+      },
+      "douyin": {
+        "platform_id": "douyin",
+        "platform_name": "抖音",
+        "emotion_distribution": {
+          "positive": 0.6,
+          "neutral": 0.3,
+          "negative": 0.1
+        },
+        "risk_score": 19.9,
+        "risk_level": "safe",
+        "typical_reactions": [
+          {
+            "reaction_type": "正面",
+            "example_comment": "太震撼了！原来我们的身体就是星尘组成的，人类探索太空真的太伟大了！",
+            "reasoning": "文案充满诗意和科学浪漫主义，容易激发用户对宇宙、人类文明和航天探索的敬畏与自豪感，符合抖音用户对‘宏大叙事+情感共鸣’内容的偏好。"
+          },
+          {
+            "reaction_type": "中性",
+            "example_comment": "文案写得像诗，但有些地方看不懂，是不是有点太文艺了？",
+            "reasoning": "部分用户可能认为文案过于抽象或文学化，尤其在短视频快节奏语境下，信息密度高但理解门槛略高，导致部分用户仅作观望或浅层浏览。"
+          },
+          {
+            "reaction_type": "负面",
+            "example_comment": "感觉像是在堆砌辞藻，实际内容空洞，而且有些历史细节好像不太准确？",
+            "reasoning": "少数具备科学或历史背景的用户可能质疑文案中部分表述的准确性（如‘47只自治火箭’等），或认为其‘伪文艺’，从而产生轻微反感。"
+          }
+        ],
+        "key_concerns": [
+          "文案中存在部分模糊或疑似错误的历史/科学表述（如‘47只自治火箭’、‘6万年前第一次元阳’等），可能引发考据型用户质疑",
+          "过度诗意化表达可能削弱信息可信度，被误判为‘虚假宣传’或‘伪科学’风格"
+        ],
+        "amplification_risk": 0.4,
+        "platform_specific_advice": [
+          "建议将文案拆分为3-5个15秒短视频片段，每段聚焦一个核心意象（如‘人体是星尘’、‘阿波罗11号倒计时’、‘登月舱警报’），提升可看性和传播效率",
+          "在视频字幕或评论区补充权威资料来源（如NASA档案、科学期刊），增强可信度，避免被误认为虚构内容",
+          "可搭配真实航天影像+史诗感背景音乐（如《星际穿越》配乐），强化情绪感染力，契合抖音‘视听情绪驱动’的传播逻辑"
+        ]
+      },
+      "zhihu": {
+        "platform_id": "zhihu",
+        "platform_name": "知乎",
+        "emotion_distribution": {
+          "positive": 0.45,
+          "neutral": 0.4,
+          "negative": 0.15
+        },
+        "risk_score": 19.9,
+        "risk_level": "safe",
+        "typical_reactions": [
+          {
+            "reaction_type": "正面",
+            "example_comment": "文笔很有诗意，把航天史写成了一首宇宙史诗，看得我热泪盈眶。",
+            "reasoning": "知乎用户普遍欣赏有思想深度和文学性的表达，尤其对将科学探索与人类精神结合的长文有较高接受度。"
+          },
+          {
+            "reaction_type": "中性",
+            "example_comment": "虽然文字很美，但部分史实表述模糊，比如‘47只自治火箭’缺乏出处，建议补充文献支持。",
+            "reasoning": "知乎用户对事实准确性高度敏感（风险维度0.95），即使内容整体积极，也会对模糊或未经证实的细节提出质疑。"
+          },
+          {
+            "reaction_type": "负面",
+            "example_comment": "‘地球是宇宙脱去的存在’这种说法太玄学了，听起来像伪科学，建议避免这种模糊的形而上学表达。",
+            "reasoning": "平台文化禁忌明确反对伪科学和逻辑跳跃，此类诗意但缺乏科学依据的比喻容易引发批评。"
+          }
+        ],
+        "key_concerns": [
+          "部分历史事件描述缺乏明确出处（如明朝官员使用47只火箭）",
+          "将诗意比喻与科学事实混用，可能被质疑‘用文学包装伪科学’",
+          "对阿波罗计划成功概率‘仅5%’的说法未提供数据来源，易引发争议"
+        ],
+        "amplification_risk": 0.3,
+        "platform_specific_advice": [
+          "在文末添加参考文献或数据来源，特别是关于明朝火箭、阿波罗11号成功概率等关键数据",
+          "将‘地球是宇宙脱去的存在’等诗意表达调整为更科学的表述，如‘人类由星尘构成’，既保留诗意又符合科学共识",
+          "增加一段对‘技术乐观主义与人类局限’的理性反思，契合知乎用户偏好深度思辨的特点"
+        ]
+      }
+    },
+    "evidence_chains": [
+      {
+        "dimension": "事实错误",
+        "score": 0,
+        "severity": "yellow",
+        "primary_evidence": {
+          "text": "",
+          "position": {
+            "start": 0,
+            "end": 0
+          },
+          "context": ""
+        },
+        "assessment_basis": {
+          "rule": "",
+          "reasoning": "",
+          "keywords": []
+        },
+        "cross_validation": [],
+        "propagation_path": [
+          {
+            "stage": "current",
+            "severity": "low",
+            "description": "当前风险等级: 0分"
+          }
+        ],
+        "confidence": 0.5
+      },
+      {
+        "dimension": "事实错误",
+        "score": 0,
+        "severity": "yellow",
+        "primary_evidence": {
+          "text": "",
+          "position": {
+            "start": 0,
+            "end": 0
+          },
+          "context": ""
+        },
+        "assessment_basis": {
+          "rule": "",
+          "reasoning": "",
+          "keywords": []
+        },
+        "cross_validation": [],
+        "propagation_path": [
+          {
+            "stage": "current",
+            "severity": "low",
+            "description": "当前风险等级: 0分"
+          }
+        ],
+        "confidence": 0.5
+      },
+      {
+        "dimension": "道德伦理",
+        "score": 0,
+        "severity": "yellow",
+        "primary_evidence": {
+          "text": "",
+          "position": {
+            "start": 0,
+            "end": 0
+          },
+          "context": ""
+        },
+        "assessment_basis": {
+          "rule": "",
+          "reasoning": "",
+          "keywords": []
+        },
+        "cross_validation": [],
+        "propagation_path": [
+          {
+            "stage": "current",
+            "severity": "low",
+            "description": "当前风险等级: 0分"
+          }
+        ],
+        "confidence": 0.5
+      }
+    ],
+    "confidence_breakdown": {
+      "overall_confidence": 0.51,
+      "factors": {
+        "data_quality": 0.066,
+        "consistency": 0.7260330578512397,
+        "evidence": 0.35,
+        "platform_validation": 0.957734887039239
+      },
+      "breakdown": {
+        "data_quality_score": 0.07,
+        "consistency_score": 0.73,
+        "evidence_score": 0.35,
+        "platform_validation_score": 0.96
+      }
+    }
+  }
+]
