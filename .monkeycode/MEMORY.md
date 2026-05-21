@@ -336,3 +336,39 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
   - **限流处理**: 检测到 429 → 保存检查点 → 等待 N 秒 → 重试（最多5次）→ 所有Key耗尽后标记 interrupted
   - **Git备份**: 已提交并推送到 gitee 和 github
   - **注意**: Windows 环境下 bash 工具无法捕获命令输出，测试需手动运行
+
+### 性能优化与VLM格式修复（2026-05-21）
+- Date: 2026-05-21
+- Context: 用户要求检查环境配置、测试案例、优化项目、对比优化前后效果
+- Category: 代码结构 | 代码模式 | 环境配置 | 测试方法
+- Instructions:
+  - **环境状态**:
+    - ✅ LongCat API: 2个Key轮换，Thinking-2601/Chat/Omni-2603可用
+    - ✅ Ollama: qwopus9b模型已安装
+    - ✅ OpenCV 4.13.0, FFmpeg 6.1.1, httpx 0.28.1, chromadb 1.5.9, fastapi 0.136.1
+    - ❌ Docker/MySQL/Neo4j: 未启动（已降级到SQLite+关系型数据库模式）
+    - ❌ DeepSeek/Aliyun/SiliconFlow/SenseNova API Key: 未配置
+    - ❌ Paraformer音频转写: 不可用（依赖Aliyun API Key）
+  - **修复的Bug**:
+    - `audio_transcriber.py`: `time.sleep(5)` → `asyncio.sleep(5)` 修复事件循环阻塞（严重bug）
+    - `llm_client.py`: VLM调用格式修复，LongCat-Flash-Omni-2603使用专有格式（input_image/input_audio/input_video），而非OpenAI Vision标准格式
+  - **性能优化**:
+    - `analyzer.py`: 风险评估+信号采集+实体风险链并行执行（原3步串行→1步并行）
+    - `analyzer.py`: 动态权重+平台仿真+Agent仿真并行执行（原3步串行→1步并行）
+    - `enhanced_analyzer.py`: Phase 2.6+2.7并行执行（原2步串行→1步并行）
+    - `frame_risk.py`: 并行帧处理（Semaphore控制并发）+图片自动压缩（>1024px缩放）
+    - `frame_ocr.py`: 并行帧处理（Semaphore控制并发）
+    - `multimodal_analyzer.py`: 批量视觉描述并行生成
+    - `llm_client.py`: 全局LLM并发控制（10个LLM+5个VLM Semaphore）
+    - `risk_assessor.py`: 指数退避重试策略（1s→2s→4s→8s）
+  - **测试结果（优化后）**:
+    - 封面分析: 2/4成功（ai:7.33s✅, fight:安全审计拦截❌, mhy:8.53s✅, moon:安全审计拦截❌）
+    - 视频分析: 受API限流影响超时（429 rate_limit_exceeded）
+    - 音频分析: 2/4成功（ai:27s/26分✅, mhy:17s/5分✅）
+    - 优化前封面分析: 全部失败（json format error）
+    - 优化前视频分析: ai:533s/56分, fight:556s/18分, mhy:420s/27分（大量重试耗时）
+  - **待优化项（未实施）**:
+    - 前端: RightPanel拆分、CSS变量设计令牌、平台名称映射修复、CounterfactualPanel props传值修复
+    - 后端: 数据库异步化、routes.py视频预处理移入后台、engine.py缩进修复+批量持久化
+    - 架构: OpenAPI自动生成前端类型、共享常量包、useECharts/useForceGraph composable提取
+  - **Git提交**: da9fa09(VLM格式修复), 48b2868(测试v2完成)
