@@ -107,34 +107,28 @@ class VRAMManager:
         """注册默认多模态模型"""
         default_models = [
             ModelInfo(
-                name="画面理解-Qwen3-VL-Plus",
-                model_id="qwen-vl-plus",
+                name="画面理解-Qwen3-VL-8B",
+                model_id="qwen3-vl:8b",
                 priority=ModelPriority.HIGH,
-                vram_required_mb=4096,  # 4GB
+                vram_required_mb=6656,
             ),
             ModelInfo(
-                name="画面理解-GLM-5V-Turbo",
-                model_id="glm-5v-turbo",
+                name="画面理解-MiniCPM-o-2.6",
+                model_id="openbmb/minicpm-o2.6",
                 priority=ModelPriority.HIGH,
-                vram_required_mb=3072,  # 3GB
+                vram_required_mb=7168,
             ),
             ModelInfo(
-                name="OCR-GLM-OCR",
-                model_id="glm-ocr",
+                name="OCR-Qwen3-VL-8B",
+                model_id="qwen3-vl:8b-ocr",
                 priority=ModelPriority.MEDIUM,
-                vram_required_mb=2048,  # 2GB
-            ),
-            ModelInfo(
-                name="OCR-PaddleOCR-VL",
-                model_id="paddleocr-vl",
-                priority=ModelPriority.LOW,
-                vram_required_mb=1536,  # 1.5GB
+                vram_required_mb=6656,
             ),
             ModelInfo(
                 name="音频转写-Whisper-Large",
                 model_id="whisper-large-v3",
                 priority=ModelPriority.MEDIUM,
-                vram_required_mb=3072,  # 3GB
+                vram_required_mb=3072,
             ),
         ]
         

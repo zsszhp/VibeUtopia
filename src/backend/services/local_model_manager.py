@@ -78,30 +78,29 @@ class OllamaManager:
     def get_recommended_models(self, vram_gb: float = 0) -> list[dict]:
         """根据 VRAM 推荐模型"""
         if vram_gb <= 0:
-            # 未检测到 GPU，推荐 CPU 可跑的小模型
             return [
-                {"id": "qwen2.5:1.5b", "size_gb": 1.0, "reason": "轻量中文模型，CPU 可跑"},
-                {"id": "llama3.2:1b", "size_gb": 1.2, "reason": "轻量英文模型，CPU 可跑"},
+                {"id": "qwen3:1.7b", "size_gb": 1.2, "reason": "轻量中文模型，CPU 可跑"},
             ]
         elif vram_gb < 8:
             return [
-                {"id": "qwen2.5:7b", "size_gb": 4.5, "reason": "7B 中文模型，适合 4-8GB VRAM"},
-                {"id": "llama3.2:8b", "size_gb": 4.9, "reason": "8B 通用模型"},
+                {"id": "qwen3-vl:4b", "size_gb": 3.0, "reason": "4B视觉模型，适合 4-8GB VRAM"},
+                {"id": "qwen3:4b", "size_gb": 2.8, "reason": "4B中文文本模型"},
             ]
         elif vram_gb < 16:
             return [
-                {"id": "qwen2.5:14b", "size_gb": 9.0, "reason": "14B 中文模型，适合 8-16GB VRAM"},
-                {"id": "deepseek-r1:14b", "size_gb": 9.0, "reason": "14B 推理模型"},
+                {"id": "qwen3-vl:8b", "size_gb": 6.1, "reason": "8B视觉模型，2026最佳本地VLM，256K上下文+2h视频理解"},
+                {"id": "openbmb/minicpm-o2.6", "size_gb": 4.4, "reason": "8B多模态模型，GPT-4o级，端侧优化"},
+                {"id": "qwen3:8b", "size_gb": 5.0, "reason": "8B中文文本模型"},
             ]
         elif vram_gb < 24:
             return [
-                {"id": "qwen2.5:32b", "size_gb": 18.0, "reason": "32B 中文模型，适合 16-24GB VRAM"},
-                {"id": "deepseek-r1:32b", "size_gb": 18.0, "reason": "32B 推理模型"},
+                {"id": "qwen3-vl:8b", "size_gb": 6.1, "reason": "8B视觉模型（主力）"},
+                {"id": "qwen3-vl:30b", "size_gb": 18.0, "reason": "30B MoE视觉模型，3B激活参数"},
             ]
         else:
             return [
-                {"id": "qwen2.5:72b", "size_gb": 40.0, "reason": "72B 旗舰中文模型，适合 24GB+ VRAM"},
-                {"id": "deepseek-r1:67b", "size_gb": 38.0, "reason": "67B 推理旗舰模型"},
+                {"id": "qwen3-vl:32b", "size_gb": 20.0, "reason": "32B旗舰视觉模型"},
+                {"id": "qwen3-vl:235b", "size_gb": 130.0, "reason": "235B MoE SOTA视觉模型"},
             ]
 
     def pull_model(self, model_id: str) -> bool:
@@ -124,18 +123,11 @@ class OllamaManager:
                 "api_key_env": "OLLAMA_API_KEY",
                 "base_url": self.base_url,
                 "models": [
-                    {"id": "qwen2.5:7b", "tier": "standard", "vision": False, "text": True},
-                    {"id": "qwen2.5:14b", "tier": "advanced", "vision": False, "text": True},
-                    {"id": "qwen2.5:32b", "tier": "advanced", "vision": False, "text": True},
-                    {"id": "qwen2.5:72b", "tier": "advanced", "vision": False, "text": True},
-                    {"id": "deepseek-r1:14b", "tier": "advanced", "vision": False, "text": True},
-                    {"id": "deepseek-r1:32b", "tier": "advanced", "vision": False, "text": True},
-                    {"id": "llama3.2:8b", "tier": "standard", "vision": False, "text": True},
-                    {"id": "llama3.2:70b", "tier": "advanced", "vision": False, "text": True},
-                    {"id": "llama3.2-vision:11b", "tier": "standard", "vision": True, "text": True},
-                    {"id": "llama3.2-vision:90b", "tier": "advanced", "vision": True, "text": True},
-                    {"id": "qwen2-vl:7b", "tier": "standard", "vision": True, "text": True},
-                    {"id": "minicpm-v:8b", "tier": "standard", "vision": True, "text": True},
+                    {"id": "qwen3-vl:8b", "tier": "advanced", "vision": True, "text": True},
+                    {"id": "openbmb/minicpm-o2.6", "tier": "standard", "vision": True, "text": True},
+                    {"id": "qwen3:8b", "tier": "advanced", "vision": False, "text": True},
+                    {"id": "qwen3-vl:4b", "tier": "standard", "vision": True, "text": True},
+                    {"id": "qwen3:4b", "tier": "standard", "vision": False, "text": True},
                 ],
             }
         }

@@ -157,31 +157,32 @@ providers:
         text: true
 
   # --- Ollama (笔记本本地 RTX 5070 Ti 12GB VRAM) ---
-  # 按顺序加载策略：Phase1文本→Phase2视觉→Phase3音频→Phase4融合
+  # 视频理解VLM模型方案 (2026.5 更新)
+  # 主力: Qwen3-VL-8B (256K上下文, 2h视频, 秒级时间戳, 32语言OCR)
+  # 备选: MiniCPM-o-2.6 (GPT-4o级多模态, 端侧优化, 实时视频流)
   ollama:
     name: "Ollama (笔记本本地)"
     api_key_env: "OLLAMA_API_KEY"
     base_url: "http://localhost:11434/v1"
     models:
-      # Phase 1: 文本主力 - Qwen3.6-9B (Q6_K ~9.5GB VRAM)
-      - id: "qwen3.6:9b"
+      # 视觉主力: Qwen3-VL-8B (Q4 ~6.5GB VRAM) - 2026最佳本地VLM
+      - id: "qwen3-vl:8b"
         tier: advanced
-        vision: false
+        vision: true
         text: true
         priority: 1
-      # Phase 2: 视觉主力 - Qwen3.5-VL-8B (Q4 ~6GB VRAM)
-      - id: "qwen3.5-vl:8b"
+      # 视觉备选: MiniCPM-o-2.6 (Q4 ~7GB VRAM) - 端侧优化, 实时视频流
+      - id: "openbmb/minicpm-o2.6"
         tier: standard
         vision: true
         text: true
         priority: 2
-      # 常驻: Embedding - bge-m3 (~2GB VRAM)
-      - id: "bge-m3"
-        tier: standard
+      # 文本主力: Qwen3-8B (Q4 ~5GB VRAM)
+      - id: "qwen3:8b"
+        tier: advanced
         vision: false
-        text: false
-        embedding: true
-        priority: 0
+        text: true
+        priority: 3
 
   # --- vLLM (本地高性能推理，V3.2) ---
   vllm:
