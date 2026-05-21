@@ -1,0 +1,74 @@
+[
+  {
+    "name": "ai",
+    "description": "AI相关内容视频（计算机科学专业与AI影响）",
+    "cover": {
+      "status": "error",
+      "error": "No module named 'backend'"
+    },
+    "video": {
+      "status": "error",
+      "error": "No module named 'backend'",
+      "elapsed": 0
+    },
+    "audio": {
+      "status": "error",
+      "error": "No module named 'backend'",
+      "elapsed": 0
+    }
+  },
+  {
+    "name": "fight",
+    "description": "争议/冲突类视频（朝鲜战争历史分析）",
+    "cover": {
+      "status": "error",
+      "error": "No module named 'backend'"
+    },
+    "video": {
+      "status": "error",
+      "error": "No module named 'backend'",
+      "elapsed": 0
+    },
+    "audio": {
+      "status": "error",
+      "error": "No module named 'backend'",
+      "elapsed": 0
+    }
+  },
+  {
+    "name": "mhy",
+    "description": "米哈游相关视频（AI模型评测）",
+    "cover": {
+      "status": "error",
+      "error": "No module named 'backend'"
+    },
+    "video": {
+      "status": "error",
+      "error": "No module named 'backend'",
+      "elapsed": 0
+    },
+    "audio": {
+      "status": "error",
+      "error": "No module named 'backend'",
+      "elapsed": 0
+    }
+  },
+  {
+    "name": "moon",
+    "description": "月亮/天文类视频（宇宙天文科普）",
+    "cover": {
+      "status": "error",
+      "error": "No module named 'backend'"
+    },
+    "video": {
+      "status": "error",
+      "error": "No module named 'backend'",
+      "elapsed": 0
+    },
+    "audio": {
+      "status": "error",
+      "error": "No module named 'backend'",
+      "elapsed": 0
+    }
+  }
+]

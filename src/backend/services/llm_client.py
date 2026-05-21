@@ -564,24 +564,43 @@ def _route_vlm(task_type: str = "default", exclude: set[str] | None = None) -> M
 
 
 async def _call_endpoint_vlm(endpoint: ModelEndpoint, prompt: str, image_base64: str, system: str) -> str:
-    """调用指定端点的视觉模型，构造 OpenAI Vision 多模态消息格式"""
+    """调用指定端点的视觉模型，自动适配不同API格式"""
     url = f"{endpoint.base_url}/chat/completions"
     headers = {
         "Authorization": f"Bearer {endpoint.api_key}",
         "Content-Type": "application/json",
     }
-    payload = {
-        "model": endpoint.model_id,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": [
-                {"type": "text", "text": prompt},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}},
-            ]},
-        ],
-        "temperature": 0.7,
-        "max_tokens": 4096,
-    }
+
+    is_omni = "omni" in endpoint.model_id.lower()
+
+    if is_omni:
+        payload = {
+            "model": endpoint.model_id,
+            "messages": [
+                {"role": "system", "content": [{"type": "text", "text": system}]},
+                {"role": "user", "content": [
+                    {"type": "input_image", "input_image": {"type": "base64", "data": [image_base64]}},
+                    {"type": "text", "text": prompt},
+                ]},
+            ],
+            "stream": False,
+            "max_tokens": 4096,
+            "temperature": 0.7,
+            "output_modalities": ["text"],
+        }
+    else:
+        payload = {
+            "model": endpoint.model_id,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}},
+                ]},
+            ],
+            "temperature": 0.7,
+            "max_tokens": 4096,
+        }
 
     if _HAS_HTTPX:
         return await _httpx_call(url, headers, payload, endpoint)
