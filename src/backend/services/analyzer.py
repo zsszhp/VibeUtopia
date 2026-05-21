@@ -226,12 +226,36 @@ async def run_analysis(task_id: str, text: str):
         await _broadcast_step(task_id, "understanding", 0.15, f"内容质量检测完成: {tq_level}")
 
         # ═══════════════════════════════════════════════════════════════════════
-        # 步骤2: 风险评估 (15% - 50%)
+        # 步骤2: 风险评估 + 信号采集 + 实体风险链 并行执行 (15% - 65%)
         # ═══════════════════════════════════════════════════════════════════════
-        await _broadcast_step(task_id, "assessment", 0.2, "开始进行风险评估...")
+        await _broadcast_step(task_id, "assessment", 0.2, "开始并行执行风险评估、信号采集、实体风险链分析...")
 
-        # 先启动风险评估获取维度列表
-        risk_results = await assess_risks(text, transcript_quality=transcript_quality)
+        async def _do_risk_assessment():
+            return await assess_risks(text, transcript_quality=transcript_quality)
+
+        async def _do_signal_collection():
+            try:
+                from backend.services.signal_matcher import SignalMatcher
+                matcher = SignalMatcher()
+                return await matcher.match(text)
+            except Exception as e:
+                logger.warning("信号采集失败(降级继续): %s", e)
+                return None
+
+        async def _do_entity_chain():
+            try:
+                from backend.services.entity_risk_chain import analyze_entity_risk_chain
+                return await analyze_entity_risk_chain(text)
+            except Exception as e:
+                logger.warning("实体风险链分析失败(降级继续): %s", e)
+                return None
+
+        risk_results, signal_result, entity_chain_result = await asyncio.gather(
+            _do_risk_assessment(),
+            _do_signal_collection(),
+            _do_entity_chain(),
+        )
+
         dimensions = risk_results.get("dimensions", [])
         risk_sentences = risk_results.get("risk_sentences", [])
 
@@ -249,7 +273,6 @@ async def run_analysis(task_id: str, text: str):
             )
             completed_dims.append(dim_name)
 
-            # 高风险维度发送预警
             if dim.get("severity") in ("high", "critical"):
                 await _broadcast_risk_alert(
                     task_id,
@@ -259,115 +282,95 @@ async def run_analysis(task_id: str, text: str):
                     dim.get("evidence", "")[:100]
                 )
 
-        await _broadcast_step(task_id, "assessment", 0.5, "风险评估完成", dimension_names, [])
-
-        # ═══════════════════════════════════════════════════════════════════════
-        # 步骤3: 信号采集 (50% - 60%)
-        # ═══════════════════════════════════════════════════════════════════════
-        await _broadcast_step(task_id, "signal", 0.55, "正在采集平台热点信号...")
+        # 处理信号关联结果
         signal_correlations = []
-        try:
-            from backend.services.signal_matcher import SignalMatcher
-            matcher = SignalMatcher()
-            signal_result = await matcher.match(text)
+        signal_dimension_boosts = {}
+        signal_risk_boost = 0.0
+        if signal_result and hasattr(signal_result, 'matches'):
             signal_correlations = signal_result.matches
+            if hasattr(signal_result, 'risk_dimension_boosts'):
+                signal_dimension_boosts = signal_result.risk_dimension_boosts
+            if hasattr(signal_result, 'overall_risk_boost'):
+                signal_risk_boost = signal_result.overall_risk_boost
             if signal_correlations:
                 await _broadcast_step(
                     task_id, "signal", 0.58,
                     f"发现{len(signal_correlations)}个热点关联",
                 )
-        except Exception as e:
-            logger.warning("信号采集失败(降级继续): %s", e)
-        await _broadcast_step(task_id, "signal", 0.6, "信号采集完成")
 
-        # ═══════════════════════════════════════════════════════════════════════
-        # 步骤3.5: 实体风险链分析 (60% - 65%)
-        # ═══════════════════════════════════════════════════════════════════════
-        await _broadcast_step(task_id, "entity_chain", 0.62, "正在分析实体风险传导链...")
-        entity_chain_result = None
+        # 处理实体风险链结果
         entity_dimension_boosts = {}
-        try:
-            from backend.services.entity_risk_chain import analyze_entity_risk_chain
-            entity_chain_result = await analyze_entity_risk_chain(text)
-            if entity_chain_result and entity_chain_result.chains:
-                entity_dimension_boosts = entity_chain_result.risk_dimension_boosts
-                await _broadcast_step(
-                    task_id, "entity_chain", 0.65,
-                    f"发现{len(entity_chain_result.chains)}条风险传导链",
-                )
-            else:
-                await _broadcast_step(task_id, "entity_chain", 0.65, "未发现显著风险传导链")
-        except Exception as e:
-            logger.warning("实体风险链分析失败(降级继续): %s", e)
-
-        # ═══════════════════════════════════════════════════════════════════════
-        # 步骤3.6: 动态权重调整 (65% - 68%)
-        # ═══════════════════════════════════════════════════════════════════════
-        await _broadcast_step(task_id, "dynamic_weights", 0.66, "正在调整风险维度权重...")
-        signal_dimension_boosts = {}
-        if signal_correlations:
-            from backend.services.signal_matcher import SignalMatchResult
-            if hasattr(signal_result, 'risk_dimension_boosts'):
-                signal_dimension_boosts = signal_result.risk_dimension_boosts
-
-        try:
-            from backend.services.dynamic_weights import DynamicWeights
-            dw = DynamicWeights()
-            weights_result = dw.adjust(
-                signal_dimension_boosts=signal_dimension_boosts,
-                entity_dimension_boosts=entity_dimension_boosts,
+        if entity_chain_result and entity_chain_result.chains:
+            entity_dimension_boosts = entity_chain_result.risk_dimension_boosts
+            await _broadcast_step(
+                task_id, "entity_chain", 0.65,
+                f"发现{len(entity_chain_result.chains)}条风险传导链",
             )
-            # 应用动态权重到维度结果
+
+        await _broadcast_step(task_id, "assessment", 0.5, "风险评估完成", dimension_names, [])
+
+        # ═══════════════════════════════════════════════════════════════════════
+        # 步骤3: 动态权重 + 平台权重仿真 + Agent仿真 并行执行 (65% - 85%)
+        # ═══════════════════════════════════════════════════════════════════════
+        await _broadcast_step(task_id, "dynamic_weights", 0.66, "正在并行执行动态权重调整、平台仿真...")
+
+        async def _do_dynamic_weights():
+            try:
+                from backend.services.dynamic_weights import DynamicWeights
+                dw = DynamicWeights()
+                return dw.adjust(
+                    signal_dimension_boosts=signal_dimension_boosts,
+                    entity_dimension_boosts=entity_dimension_boosts,
+                )
+            except Exception as e:
+                logger.warning("动态权重调整失败(降级继续): %s", e)
+                return None
+
+        async def _do_platform_sim():
+            try:
+                from backend.services.platform_simulator import PlatformSimulator, get_platform_risk_summary
+                simulator = PlatformSimulator()
+                base_risk_scores = {d.get("name", ""): d.get("score", 0) for d in dimensions}
+                platform_reactions = await simulator.simulate_all_platforms(
+                    text=text,
+                    platforms=None,
+                    base_risk_scores=base_risk_scores,
+                    max_concurrent=3,
+                )
+                if platform_reactions:
+                    return {pid: r.to_dict() for pid, r in platform_reactions.items()}, get_platform_risk_summary(platform_reactions)
+                return {}, None
+            except Exception as e:
+                logger.warning("平台权重仿真失败(降级继续): %s", e)
+                return {}, None
+
+        async def _do_agent_sim():
+            try:
+                return await simulate_all_platforms_with_agents(text)
+            except Exception as e:
+                logger.warning("Agent仿真失败(降级继续): %s", e)
+                return []
+
+        weights_result, (platform_sim_reactions, sim_summary), platform_results = await asyncio.gather(
+            _do_dynamic_weights(),
+            _do_platform_sim(),
+            _do_agent_sim(),
+        )
+
+        # 应用动态权重到维度结果
+        if weights_result and weights_result.adjusted_weights:
             for dim in dimensions:
                 dim_name = dim.get("name", "")
                 if dim_name in weights_result.adjusted_weights:
                     dim["dimension_weight"] = weights_result.adjusted_weights[dim_name]
-            await _broadcast_step(task_id, "dynamic_weights", 0.68, "动态权重调整完成")
-        except Exception as e:
-            logger.warning("动态权重调整失败(降级继续): %s", e)
 
-        # ═══════════════════════════════════════════════════════════════════════
-        # 步骤3.7: 平台权重仿真 (68% - 70%) — 阶段2新增
-        # ═══════════════════════════════════════════════════════════════════════
-        await _broadcast_step(task_id, "platform_sim", 0.69, "正在模拟平台用户反应...")
-        platform_sim_reactions = {}
-        try:
-            from backend.services.platform_simulator import PlatformSimulator, get_platform_risk_summary
-            simulator = PlatformSimulator()
+        if sim_summary:
+            logger.info("平台权重仿真完成: %d个平台, 综合风险%.1f, 最高风险平台=%s",
+                       sim_summary["platform_count"],
+                       sim_summary["overall_risk"],
+                       sim_summary.get("highest_risk_platform"))
 
-            # 计算基础风险分数映射
-            base_risk_scores = {d.get("name", ""): d.get("score", 0) for d in dimensions}
-
-            # 并行仿真P0核心平台
-            platform_reactions = await simulator.simulate_all_platforms(
-                text=text,
-                platforms=None,  # 默认P0平台
-                base_risk_scores=base_risk_scores,
-                max_concurrent=3,
-            )
-
-            if platform_reactions:
-                platform_sim_reactions = {pid: r.to_dict() for pid, r in platform_reactions.items()}
-                sim_summary = get_platform_risk_summary(platform_reactions)
-                logger.info("平台权重仿真完成: %d个平台, 综合风险%.1f, 最高风险平台=%s",
-                           sim_summary["platform_count"],
-                           sim_summary["overall_risk"],
-                           sim_summary.get("highest_risk_platform"))
-                await _broadcast_step(
-                    task_id, "platform_sim", 0.70,
-                    f"平台仿真完成: {sim_summary['platform_count']}个平台，最高风险={sim_summary.get('highest_risk_platform', '')}",
-                )
-            else:
-                await _broadcast_step(task_id, "platform_sim", 0.70, "平台仿真完成(无结果)")
-        except Exception as e:
-            logger.warning("平台权重仿真失败(降级继续): %s", e)
-
-        # ═══════════════════════════════════════════════════════════════════════
-        # 步骤4: 仿真推演 (70% - 85%)
-        # ═══════════════════════════════════════════════════════════════════════
-        await _broadcast_step(task_id, "simulation", 0.72, "正在推演平台用户反应...")
-        platform_results = await simulate_all_platforms_with_agents(text)
-        await _broadcast_step(task_id, "simulation", 0.8, "平台反应推演完成")
+        await _broadcast_step(task_id, "simulation", 0.80, "并行仿真全部完成")
 
         # 并行对高风险句子生成改写
         await _broadcast_step(task_id, "simulation", 0.82, "正在生成改写建议...")
@@ -386,21 +389,18 @@ async def run_analysis(task_id: str, text: str):
         await _broadcast_step(task_id, "simulation", 0.85, "改写建议生成完成")
 
         # ═══════════════════════════════════════════════════════════════════════
-        # 步骤4.5: 跨模态冲突检测 (85% - 90%)
+        # 步骤4: 跨模态冲突检测 (85% - 90%) — 仅在有多模态数据时执行
         # ═══════════════════════════════════════════════════════════════════════
-        await _broadcast_step(task_id, "cross_modal", 0.87, "正在进行跨模态冲突检测...")
         cross_modal_result = None
+        await _broadcast_step(task_id, "cross_modal", 0.87, "跨模态冲突检测...")
         try:
             detector = CrossModalConflictDetector()
             cross_modal_result = await detector.detect_conflicts(
                 text=text,
-                visual_description=None,  # MVP阶段暂无画面分析
-                audio_transcript=None,    # MVP阶段暂无音频分析
+                visual_description=None,
+                audio_transcript=None,
             )
-            logger.info("跨模态检测完成: 冲突分数=%d, 隐藏风险=%s",
-                       cross_modal_result.get("overall_conflict_score", 0),
-                       cross_modal_result.get("has_hidden_risk", False))
-            if cross_modal_result.get("conflicts"):
+            if cross_modal_result and cross_modal_result.get("conflicts"):
                 await _broadcast_step(
                     task_id, "cross_modal", 0.90,
                     f"发现{len(cross_modal_result['conflicts'])}个跨模态冲突",
@@ -462,13 +462,7 @@ async def run_analysis(task_id: str, text: str):
                        overall_score, conflict_score, has_hidden_risk, overall_score)
 
         # 信号关联风险提升
-        signal_risk_boost = 0.0
-        signal_dimension_boosts = {}
         if signal_correlations:
-            from backend.services.signal_matcher import SignalMatchResult
-            if hasattr(signal_result, 'overall_risk_boost'):
-                signal_risk_boost = signal_result.overall_risk_boost
-                signal_dimension_boosts = signal_result.risk_dimension_boosts
             for dim in dimensions:
                 dim_name = dim.get("name", "")
                 if dim_name in signal_dimension_boosts:

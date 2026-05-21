@@ -163,11 +163,12 @@ class FrameOCR:
             logger.warning("API OCR调用失败: %s", e)
             return None
 
-    async def extract_video_text(self, frame_results: list) -> VideoOCRResult:
-        """从视频的所有关键帧提取文字
+    async def extract_video_text(self, frame_results: list, max_concurrent: int = 3) -> VideoOCRResult:
+        """从视频的所有关键帧提取文字 — 并行处理
 
         Args:
             frame_results: KeyFrameResult.frames 列表
+            max_concurrent: 最大并发VLM调用数
 
         Returns:
             VideoOCRResult
@@ -175,25 +176,37 @@ class FrameOCR:
         from backend.services.keyframe_extractor import KeyFrame
 
         video_result = VideoOCRResult(total_frames=len(frame_results))
+
+        sem = asyncio.Semaphore(max_concurrent)
+
+        async def _extract_with_semaphore(frame):
+            async with sem:
+                return await self.extract_text(
+                    frame.file_path,
+                    frame.index,
+                    frame.timestamp,
+                )
+
+        valid_frames = [f for f in frame_results if isinstance(f, KeyFrame)]
+        if not valid_frames:
+            return video_result
+
+        results = await asyncio.gather(
+            *[_extract_with_semaphore(f) for f in valid_frames],
+            return_exceptions=True,
+        )
+
         all_texts = []
         seen_texts = set()
 
-        for frame in frame_results:
-            if not isinstance(frame, KeyFrame):
+        for result in results:
+            if isinstance(result, Exception):
                 continue
-
-            result = await self.extract_text(
-                frame.file_path,
-                frame.index,
-                frame.timestamp,
-            )
-
             if result.error:
                 continue
 
             video_result.frame_results.append(result)
 
-            # 去重合并
             if self.config["dedup_text"] and result.full_text:
                 text_key = result.full_text.strip()
                 if text_key and text_key not in seen_texts:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from backend.services.llm_client import call_llm, load_prompt, parse_llm_json
@@ -62,6 +63,7 @@ async def assess_risks(text: str, transcript_quality: dict | None = None, prompt
         except Exception as e:
             logger.error("风险评估失败 (尝试%d/%d): %s", attempt + 1, max_retries, e)
             if attempt < max_retries - 1:
+                await asyncio.sleep(min(2 ** attempt, 8))
                 continue
             return {"dimensions": [], "risk_sentences": [], "cross_effects": []}
 

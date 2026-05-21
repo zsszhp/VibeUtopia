@@ -164,11 +164,12 @@ class FrameRiskAssessor:
             logger.warning("LLM视觉模型不可用，使用规则降级: %s", e)
             return self._rule_based_assess(frame_path, frame_index, timestamp)
 
-    async def assess_video_frames(self, frames: list) -> VideoRiskResult:
-        """评估视频所有关键帧
+    async def assess_video_frames(self, frames: list, max_concurrent: int = 3) -> VideoRiskResult:
+        """评估视频所有关键帧 — 并行处理
 
         Args:
             frames: KeyFrame列表
+            max_concurrent: 最大并发VLM调用数
 
         Returns:
             VideoRiskResult
@@ -176,20 +177,33 @@ class FrameRiskAssessor:
         from backend.services.keyframe_extractor import KeyFrame
 
         video_result = VideoRiskResult(total_frames=len(frames))
-        max_risk_score = 0
-        high_risk_count = 0
         summaries = []
 
-        for frame in frames:
-            if not isinstance(frame, KeyFrame):
+        sem = asyncio.Semaphore(max_concurrent)
+
+        async def _assess_with_semaphore(frame):
+            async with sem:
+                return await self.assess_frame(
+                    frame.file_path,
+                    frame.index,
+                    frame.timestamp,
+                )
+
+        valid_frames = [f for f in frames if isinstance(f, KeyFrame)]
+        if not valid_frames:
+            return video_result
+
+        results = await asyncio.gather(
+            *[_assess_with_semaphore(f) for f in valid_frames],
+            return_exceptions=True,
+        )
+
+        max_risk_score = 0
+        high_risk_count = 0
+
+        for result in results:
+            if isinstance(result, Exception):
                 continue
-
-            result = await self.assess_frame(
-                frame.file_path,
-                frame.index,
-                frame.timestamp,
-            )
-
             if result.error:
                 continue
 
@@ -212,11 +226,31 @@ class FrameRiskAssessor:
         return video_result
 
     @staticmethod
-    def _encode_image(frame_path: str) -> Optional[str]:
-        """将图片编码为base64"""
+    def _encode_image(frame_path: str, max_size: int = 1024) -> Optional[str]:
+        """将图片编码为base64，自动压缩大图"""
         try:
-            with open(frame_path, "rb") as f:
-                return base64.b64encode(f.read()).decode("utf-8")
+            from PIL import Image
+            import io
+
+            img = Image.open(frame_path)
+            if max(img.size) > max_size:
+                ratio = max_size / max(img.size)
+                new_size = (int(img.width * ratio), int(img.height * ratio))
+                img = img.resize(new_size, Image.LANCZOS)
+
+            if img.mode == "RGBA":
+                img = img.convert("RGB")
+
+            buffer = io.BytesIO()
+            img.save(buffer, format="JPEG", quality=85)
+            return base64.b64encode(buffer.getvalue()).decode("utf-8")
+        except ImportError:
+            try:
+                with open(frame_path, "rb") as f:
+                    return base64.b64encode(f.read()).decode("utf-8")
+            except Exception as e:
+                logger.error("图片编码失败: %s", e)
+                return None
         except Exception as e:
             logger.error("图片编码失败: %s", e)
             return None

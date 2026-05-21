@@ -9,6 +9,7 @@ Phase 4: 综合报告
 import asyncio
 import json
 import logging
+import os
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -128,15 +129,19 @@ async def run_enhanced_analysis(
         if result.dynamic_weights_result and result.dynamic_weights_result.adjustments:
             _recalculate_with_dynamic_weights(result)
 
-        # ===== Phase 2.6: 多模态分析增强 =====
+        # ===== Phase 2.6 + 2.7: 多模态 + 细粒度视频 并行执行 =====
+        phase2_6_task = None
+        phase2_7_task = None
         if audio_transcription:
             logger.info("增强分析 %s: Phase 2.6 多模态分析增强开始", task_id)
-            await _run_phase2_6(text, result, audio_transcription)
-
-        # ===== Phase 2.7: 细粒度视频理解增强 (V3.4) =====
+            phase2_6_task = _run_phase2_6(text, result, audio_transcription)
         if video_path:
             logger.info("增强分析 %s: Phase 2.7 细粒度视频理解增强开始", task_id)
-            await _run_phase2_7(video_path, result)
+            phase2_7_task = _run_phase2_7(video_path, result)
+
+        parallel_tasks = [t for t in [phase2_6_task, phase2_7_task] if t is not None]
+        if parallel_tasks:
+            await asyncio.gather(*parallel_tasks)
 
         # ===== Phase 3: 仿真增强（可选）=====
         if enable_simulation:

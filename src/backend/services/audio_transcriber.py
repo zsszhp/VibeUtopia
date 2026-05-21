@@ -7,6 +7,7 @@
 - 中英文混合识别
 """
 
+import asyncio
 import logging
 import os
 import time
@@ -157,7 +158,7 @@ class ParaformerTranscriber:
                 raise RuntimeError(f"Paraformer 转写任务失败：status={status}")
             # PENDING 或 RUNNING 状态继续轮询
 
-            await time.sleep(5)  # 每 5 秒轮询一次
+            await asyncio.sleep(5)
 
         raise TimeoutError(f"Paraformer 转写任务超时：task_id={task_id}")
 

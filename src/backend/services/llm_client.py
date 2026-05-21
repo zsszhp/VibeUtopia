@@ -408,6 +408,9 @@ class ModelRouter:
 registry = ModelRegistry(settings.MODEL_CONFIG_PATH)
 router = ModelRouter(registry, settings.MODEL_COOLDOWN_SECONDS)
 
+_llm_semaphore = asyncio.Semaphore(10)
+_vlm_semaphore = asyncio.Semaphore(5)
+
 
 # ---------------------------------------------------------------------------
 # 工具函数
@@ -464,22 +467,22 @@ def _is_quota_error(status_code: int) -> bool:
 # ---------------------------------------------------------------------------
 
 async def call_llm(prompt: str, system: str = "你是一个专业的AI助手。", task_type: str = "default") -> str:
-    """调用 LLM API，自动路由模型，支持 fallback
+    """调用 LLM API，自动路由模型，支持 fallback，带全局并发控制
 
     Args:
         prompt: 用户提示词
         system: 系统提示词
         task_type: 任务类型，用于智能路由 (risk_assessment / persona_simulation / rewrite / default)
     """
-    if registry.is_loaded:
-        return await _call_with_routing(prompt, system, task_type)
-    else:
-        # 降级模式：使用原有单一 provider
-        return await _call_legacy(prompt, system)
+    async with _llm_semaphore:
+        if registry.is_loaded:
+            return await _call_with_routing(prompt, system, task_type)
+        else:
+            return await _call_legacy(prompt, system)
 
 
 async def call_vlm(prompt: str, image_base64: str, system: str = "你是一个专业的AI助手。", task_type: str = "default") -> str:
-    """调用视觉语言模型 (VLM) API，支持图片输入
+    """调用视觉语言模型 (VLM) API，支持图片输入，带全局并发控制
 
     Args:
         prompt: 用户提示词
@@ -490,50 +493,51 @@ async def call_vlm(prompt: str, image_base64: str, system: str = "你是一个�
     Raises:
         RuntimeError: 无可用视觉模型时抛出
     """
-    if not registry.is_loaded:
-        raise RuntimeError("模型配置未加载，无法调用视觉模型")
+    async with _vlm_semaphore:
+        if not registry.is_loaded:
+            raise RuntimeError("模型配置未加载，无法调用视觉模型")
 
-    tried: set[str] = set()
-    last_error: Exception | None = None
+        tried: set[str] = set()
+        last_error: Exception | None = None
 
-    while True:
-        endpoint = _route_vlm(task_type, exclude=tried)
-        if endpoint is None:
-            break
+        while True:
+            endpoint = _route_vlm(task_type, exclude=tried)
+            if endpoint is None:
+                break
 
-        key = f"{endpoint.provider}:{endpoint.model_id}:{endpoint.key_index}"
-        tried.add(key)
+            key = f"{endpoint.provider}:{endpoint.model_id}:{endpoint.key_index}"
+            tried.add(key)
 
-        try:
-            result = await _call_endpoint_vlm(endpoint, prompt, image_base64, system)
-            router.record_success(endpoint.provider, endpoint.model_id, endpoint.key_index)
-            return result
-        except QuotaExhaustedError as e:
-            router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
-            logger.warning("视觉模型 %s 配额耗尽 (%s)，触发 fallback", key, e)
-            last_error = e
-        except Exception as e:
-            retried = False
-            for attempt in range(settings.LLM_MAX_RETRIES):
-                try:
-                    result = await _call_endpoint_vlm(endpoint, prompt, image_base64, system)
-                    return result
-                except QuotaExhaustedError as eq:
-                    router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
-                    logger.warning("视觉模型 %s 配额耗尽 (重试%d次): %s", key, attempt + 1, eq)
-                    last_error = eq
-                    retried = True
-                    break
-                except Exception as e2:
-                    last_error = e2
-                    logger.warning("VLM 调用失败 %s (重试%d次): %s", key, attempt + 1, e2)
+            try:
+                result = await _call_endpoint_vlm(endpoint, prompt, image_base64, system)
+                router.record_success(endpoint.provider, endpoint.model_id, endpoint.key_index)
+                return result
+            except QuotaExhaustedError as e:
+                router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
+                logger.warning("视觉模型 %s 配额耗尽 (%s)，触发 fallback", key, e)
+                last_error = e
+            except Exception as e:
+                retried = False
+                for attempt in range(settings.LLM_MAX_RETRIES):
+                    try:
+                        result = await _call_endpoint_vlm(endpoint, prompt, image_base64, system)
+                        return result
+                    except QuotaExhaustedError as eq:
+                        router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
+                        logger.warning("视觉模型 %s 配额耗尽 (重试%d次): %s", key, attempt + 1, eq)
+                        last_error = eq
+                        retried = True
+                        break
+                    except Exception as e2:
+                        last_error = e2
+                        logger.warning("VLM 调用失败 %s (重试%d次): %s", key, attempt + 1, e2)
 
-            if not retried:
-                logger.warning("视觉模型 %s 调用失败，尝试下一个模型", key)
+                if not retried:
+                    logger.warning("视觉模型 %s 调用失败，尝试下一个模型", key)
 
-    if last_error:
-        raise RuntimeError(f"所有视觉模型不可用，已尝试: {tried}，最后错误: {last_error}")
-    raise RuntimeError(f"无可用视觉模型（需要配置支持 vision 的模型端点）")
+        if last_error:
+            raise RuntimeError(f"所有视觉模型不可用，已尝试: {tried}，最后错误: {last_error}")
+        raise RuntimeError(f"无可用视觉模型（需要配置支持 vision 的模型端点）")
 
 
 def _route_vlm(task_type: str = "default", exclude: set[str] | None = None) -> ModelEndpoint | None:

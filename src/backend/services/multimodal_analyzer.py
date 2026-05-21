@@ -379,14 +379,15 @@ class VideoSegmentAnalyzer:
             logger.warning("VLM视觉描述生成失败: %s", e)
             return ""
 
-    async def generate_visual_description_batch(self, frame_paths: List[str]) -> str:
-        """批量生成多帧画面的合并描述
+    async def generate_visual_description_batch(self, frame_paths: List[str], max_concurrent: int = 3) -> str:
+        """批量生成多帧画面的合并描述 — 并行处理
 
         对多个关键帧分别生成描述，然后合并为统一描述。
         为控制成本，最多处理5帧。
 
         Args:
             frame_paths: 帧图片路径列表
+            max_concurrent: 最大并发VLM调用数
 
         Returns:
             合并后的视觉描述文本
@@ -395,12 +396,20 @@ class VideoSegmentAnalyzer:
             return ""
 
         sampled = frame_paths[:5]
-        descriptions = []
 
-        for fp in sampled:
-            desc = await self.generate_visual_description(fp)
-            if desc:
-                descriptions.append(desc)
+        import asyncio
+        sem = asyncio.Semaphore(max_concurrent)
+
+        async def _desc_with_sem(fp):
+            async with sem:
+                return await self.generate_visual_description(fp)
+
+        desc_results = await asyncio.gather(
+            *[_desc_with_sem(fp) for fp in sampled],
+            return_exceptions=True,
+        )
+
+        descriptions = [d for d in desc_results if isinstance(d, str) and d]
 
         if not descriptions:
             return ""
