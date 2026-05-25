@@ -142,6 +142,12 @@ src/data/chroma_memories/
 # node_modules 构建日志
 src/frontend/node_modules/**/*.log
 
+# IDE 硬链接规则文件（本地创建，指向 .ai_context.md）
+.antigravityrules
+.cursorrules
+.comaterules
+.codebuddyrules
+
 # 临时检查/调试脚本（不应提交到仓库）
 check_env.py
 check_env2.py

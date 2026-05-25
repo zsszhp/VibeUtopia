@@ -58,6 +58,7 @@
       "Bash(git reflog *)",
       "Bash(git config *)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2, ensure_ascii=False\\)\\)\")",
+<<<<<<< Updated upstream
       "Read(//home/z/**)",
       "Bash(echo 'export HF_HOME=/var/lib/models/huggingface')",
       "Bash(echo 'export PATH=$HOME/.local/bin:$PATH')",
@@ -66,6 +67,17 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:api.github.com)",
       "WebFetch(domain:gitee.com)"
+=======
+      "Bash(wmic cpu *)",
+      "Bash(wmic memorychip *)",
+      "Bash(wmic path *)",
+      "Bash(powershell -Command \"Get-PhysicalDisk | Select-Object FriendlyName,Size,MediaType | Format-List\")",
+      "Bash(systeminfo)",
+      "Bash(powershell *)",
+      "WebSearch",
+      "WebFetch(domain:qwenlm.github.io)",
+      "WebFetch(domain:ollama.com)"
+>>>>>>> Stashed changes
     ]
   }
 }
