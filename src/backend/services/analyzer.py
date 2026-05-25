@@ -15,6 +15,7 @@ from backend.services.transcript_detector import detect_transcript_quality, is_n
 from backend.services.cross_modal_detector import CrossModalConflictDetector, integrate_cross_modal_score
 from backend.services.evidence_chain import EvidenceChainBuilder
 from backend.services.confidence_calculator import ConfidenceCalculator
+from backend.services.error_handler import safe_execute
 
 logger = logging.getLogger(__name__)
 
@@ -234,26 +235,18 @@ async def run_analysis(task_id: str, text: str):
             return await assess_risks(text, transcript_quality=transcript_quality)
 
         async def _do_signal_collection():
-            try:
-                from backend.services.signal_matcher import SignalMatcher
-                matcher = SignalMatcher()
-                return await matcher.match(text)
-            except Exception as e:
-                logger.warning("信号采集失败(降级继续): %s", e)
-                return None
+            from backend.services.signal_matcher import SignalMatcher
+            matcher = SignalMatcher()
+            return await matcher.match(text)
 
         async def _do_entity_chain():
-            try:
-                from backend.services.entity_risk_chain import analyze_entity_risk_chain
-                return await analyze_entity_risk_chain(text)
-            except Exception as e:
-                logger.warning("实体风险链分析失败(降级继续): %s", e)
-                return None
+            from backend.services.entity_risk_chain import analyze_entity_risk_chain
+            return await analyze_entity_risk_chain(text)
 
         risk_results, signal_result, entity_chain_result = await asyncio.gather(
             _do_risk_assessment(),
-            _do_signal_collection(),
-            _do_entity_chain(),
+            safe_execute("signal", task_id, _do_signal_collection, fallback_value=None),
+            safe_execute("entity_chain", task_id, _do_entity_chain, fallback_value=None),
         )
 
         dimensions = risk_results.get("dimensions", [])
@@ -315,46 +308,34 @@ async def run_analysis(task_id: str, text: str):
         await _broadcast_step(task_id, "dynamic_weights", 0.66, "正在并行执行动态权重调整、平台仿真...")
 
         async def _do_dynamic_weights():
-            try:
-                from backend.services.dynamic_weights import DynamicWeights
-                dw = DynamicWeights()
-                return dw.adjust(
-                    signal_dimension_boosts=signal_dimension_boosts,
-                    entity_dimension_boosts=entity_dimension_boosts,
-                )
-            except Exception as e:
-                logger.warning("动态权重调整失败(降级继续): %s", e)
-                return None
+            from backend.services.dynamic_weights import DynamicWeights
+            dw = DynamicWeights()
+            return dw.adjust(
+                signal_dimension_boosts=signal_dimension_boosts,
+                entity_dimension_boosts=entity_dimension_boosts,
+            )
 
         async def _do_platform_sim():
-            try:
-                from backend.services.platform_simulator import PlatformSimulator, get_platform_risk_summary
-                simulator = PlatformSimulator()
-                base_risk_scores = {d.get("name", ""): d.get("score", 0) for d in dimensions}
-                platform_reactions = await simulator.simulate_all_platforms(
-                    text=text,
-                    platforms=None,
-                    base_risk_scores=base_risk_scores,
-                    max_concurrent=3,
-                )
-                if platform_reactions:
-                    return {pid: r.to_dict() for pid, r in platform_reactions.items()}, get_platform_risk_summary(platform_reactions)
-                return {}, None
-            except Exception as e:
-                logger.warning("平台权重仿真失败(降级继续): %s", e)
-                return {}, None
+            from backend.services.platform_simulator import PlatformSimulator, get_platform_risk_summary
+            simulator = PlatformSimulator()
+            base_risk_scores = {d.get("name", ""): d.get("score", 0) for d in dimensions}
+            platform_reactions = await simulator.simulate_all_platforms(
+                text=text,
+                platforms=None,
+                base_risk_scores=base_risk_scores,
+                max_concurrent=3,
+            )
+            if platform_reactions:
+                return {pid: r.to_dict() for pid, r in platform_reactions.items()}, get_platform_risk_summary(platform_reactions)
+            return {}, None
 
         async def _do_agent_sim():
-            try:
-                return await simulate_all_platforms_with_agents(text)
-            except Exception as e:
-                logger.warning("Agent仿真失败(降级继续): %s", e)
-                return []
+            return await simulate_all_platforms_with_agents(text)
 
         weights_result, (platform_sim_reactions, sim_summary), platform_results = await asyncio.gather(
-            _do_dynamic_weights(),
-            _do_platform_sim(),
-            _do_agent_sim(),
+            safe_execute("dynamic_weights", task_id, _do_dynamic_weights, fallback_value=None),
+            safe_execute("platform_sim", task_id, _do_platform_sim, fallback_value=({}, None)),
+            safe_execute("agent_sim", task_id, _do_agent_sim, fallback_value=[]),
         )
 
         # 应用动态权重到维度结果
@@ -393,22 +374,23 @@ async def run_analysis(task_id: str, text: str):
         # ═══════════════════════════════════════════════════════════════════════
         cross_modal_result = None
         await _broadcast_step(task_id, "cross_modal", 0.87, "跨模态冲突检测...")
-        try:
+
+        async def _do_cross_modal():
             detector = CrossModalConflictDetector()
-            cross_modal_result = await detector.detect_conflicts(
+            return await detector.detect_conflicts(
                 text=text,
                 visual_description=None,
                 audio_transcript=None,
             )
-            if cross_modal_result and cross_modal_result.get("conflicts"):
-                await _broadcast_step(
-                    task_id, "cross_modal", 0.90,
-                    f"发现{len(cross_modal_result['conflicts'])}个跨模态冲突",
-                )
-            else:
-                await _broadcast_step(task_id, "cross_modal", 0.90, "跨模态检测完成，无冲突")
-        except Exception as e:
-            logger.warning("跨模态检测失败(降级继续): %s", e, exc_info=True)
+
+        cross_modal_result = await safe_execute("cross_modal", task_id, _do_cross_modal, fallback_value=None)
+        if cross_modal_result and cross_modal_result.get("conflicts"):
+            await _broadcast_step(
+                task_id, "cross_modal", 0.90,
+                f"发现{len(cross_modal_result['conflicts'])}个跨模态冲突",
+            )
+        else:
+            await _broadcast_step(task_id, "cross_modal", 0.90, "跨模态检测完成，无冲突")
 
         # ═══════════════════════════════════════════════════════════════════════
         # 步骤5: 报告生成 (90% - 100%)

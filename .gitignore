@@ -148,6 +148,15 @@ src/frontend/node_modules/**/*.log
 .comaterules
 .codebuddyrules
 
+# Docker 调试临时文件
+docker_*.txt
+
+# AI 自动生成的变更摘要
+.ai_recent_changes.txt
+
+# CodeGraph 索引数据
+.codegraph/
+
 # 临时检查/调试脚本（不应提交到仓库）
 check_env.py
 check_env2.py
