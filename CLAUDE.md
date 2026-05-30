@@ -4,6 +4,22 @@
 
 ---
 
+## 📚 Rules 规范文件
+
+所有开发规范已迁移到 `.trae/rules/` 目录：
+
+| 文件 | 用途 |
+|------|------|
+| `rules/Ralph.md` | **核心**：Ralph 开发模式 - AI 行为规范 |
+| `rules/project_rules.md` | 项目概述、命令、架构、约定 |
+| `rules/git-workflow.md` | Git 双远端工作流 |
+| `rules/compile-test.md` | 编译与测试验证 |
+| `rules/code-quality.md` | 代码质量与架构约束 |
+
+> **注意**：`.trae/rules/Ralph.md` 是核心规则，AI 必须首先加载并遵循。
+
+---
+
 ## 🔒 强制 Git 工作流（最高优先级）
 
 **多人协作项目，以下步骤绝对不能跳过：**

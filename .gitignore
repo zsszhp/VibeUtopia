@@ -71,8 +71,9 @@ Thumbs.db
 # Comate 规范文件
 .comate/
 
-# Trae 项目文件
+# Trae 项目文件（rules 目录需要提交）
 .trae/
+!.trae/rules/
 
 # Monkeycode 文件（MEMORY.md 需要提交，其他可忽略）
 .monkeycode/docs/
