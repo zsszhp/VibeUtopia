@@ -919,6 +919,38 @@ async def _call_endpoint_image_gen(
         return await _urllib_call_image_gen(url, headers, payload, endpoint)
 
 
+def _parse_image_gen_response(data: dict, endpoint: ModelEndpoint) -> dict:
+    """解析 OpenAI Images API 响应格式
+
+    Args:
+        data: API 返回的 JSON 数据
+        endpoint: 模型端点信息
+
+    Returns:
+        解析后的图像生成结果
+    """
+    images = data.get("data", [])
+    if not images:
+        raise RuntimeError(f"图像生成返回空结果: {data}")
+
+    result = {
+        "model": endpoint.model_id,
+        "provider": endpoint.provider,
+        "images": [],
+    }
+    for img in images:
+        img_info = {}
+        if "url" in img:
+            img_info["url"] = img["url"]
+        if "b64_json" in img:
+            img_info["b64_json"] = img["b64_json"]
+        if "revised_prompt" in img:
+            img_info["revised_prompt"] = img["revised_prompt"]
+        result["images"].append(img_info)
+
+    return result
+
+
 async def _httpx_call_image_gen(
     url: str, headers: dict, payload: dict, endpoint: ModelEndpoint,
 ) -> dict:
@@ -938,27 +970,7 @@ async def _httpx_call_image_gen(
         resp.raise_for_status()
         data = resp.json()
 
-        # 解析 OpenAI Images API 响应格式
-        images = data.get("data", [])
-        if not images:
-            raise RuntimeError(f"图像生成返回空结果: {data}")
-
-        result = {
-            "model": endpoint.model_id,
-            "provider": endpoint.provider,
-            "images": [],
-        }
-        for img in images:
-            img_info = {}
-            if "url" in img:
-                img_info["url"] = img["url"]
-            if "b64_json" in img:
-                img_info["b64_json"] = img["b64_json"]
-            if "revised_prompt" in img:
-                img_info["revised_prompt"] = img["revised_prompt"]
-            result["images"].append(img_info)
-
-        return result
+        return _parse_image_gen_response(data, endpoint)
 
 
 async def _urllib_call_image_gen(
@@ -975,26 +987,7 @@ async def _urllib_call_image_gen(
         )
         data = json.loads(resp_data.read().decode("utf-8"))
 
-        images = data.get("data", [])
-        if not images:
-            raise RuntimeError(f"图像生成返回空结果: {data}")
-
-        result = {
-            "model": endpoint.model_id,
-            "provider": endpoint.provider,
-            "images": [],
-        }
-        for img in images:
-            img_info = {}
-            if "url" in img:
-                img_info["url"] = img["url"]
-            if "b64_json" in img:
-                img_info["b64_json"] = img["b64_json"]
-            if "revised_prompt" in img:
-                img_info["revised_prompt"] = img["revised_prompt"]
-            result["images"].append(img_info)
-
-        return result
+        return _parse_image_gen_response(data, endpoint)
     except urllib.error.HTTPError as e:
         if _is_quota_error(e.code):
             raise QuotaExhaustedError(
