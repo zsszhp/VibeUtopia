@@ -115,3 +115,10 @@ alwaysApply: true
 - Python 代码修改后必须运行 ruff check
 - 涉及数据库迁移必须测试回滚
 - 涉及并发代码必须测试竞态条件
+- LiteLLM 多模型路由配置在 `data/config/model_config.yaml`，修改后需重启服务
+- Neo4j/ChromaDB 必须先启动服务，否则数据库操作失败
+- FastAPI 路由使用 `async def`，避免阻塞事件循环
+- 耗时操作（外部 API 调用）使用 `asyncio.gather` 并发执行
+- 数据库操作使用 SQLAlchemy async session
+- 信号采集调度配置在 `data/config/signal_config.yaml`
+- 前端 API 地址配置在 `src/frontend/src/api/index.ts`

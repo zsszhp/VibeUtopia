@@ -152,6 +152,31 @@ providers:
         vision: false
         text: true
 
+  # --- Agnes AI (图像生成 + 文本) ---
+  agnes:
+    name: "Agnes AI"
+    api_key_env: "AGNES_API_KEY"
+    base_url: "https://apihub.agnes-ai.com/v1"
+    models:
+      # 图像生成模型
+      - id: "agnes-image-2.1-flash"
+        tier: advanced
+        vision: false
+        text: false
+        image_gen: true
+        image_mode: "t2i"  # 纯文生图
+      - id: "agnes-image-2.0-flash"
+        tier: standard
+        vision: false
+        text: false
+        image_gen: true
+        image_mode: "img2img"  # 图生图/图片编辑/多图合成
+      # 文本模型
+      - id: "agnes-2.0-flash"
+        tier: standard
+        vision: false
+        text: true
+
   # --- Ollama (笔记本本地 RTX 5070 Ti 12GB VRAM) ---
   # 按顺序加载策略：Phase1文本→Phase2视觉→Phase3音频→Phase4融合
   ollama:

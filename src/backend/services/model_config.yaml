@@ -63,6 +63,29 @@ providers:
         tier: advanced
         vision: true
 
+  # --- Agnes AI (图像生成 + 文本) ---
+  agnes:
+    name: "Agnes AI"
+    api_key_env: "AGNES_API_KEY"
+    base_url: "https://apihub.agnes-ai.com/v1"
+    models:
+      - id: "agnes-image-2.1-flash"
+        tier: advanced
+        vision: false
+        text: false
+        image_gen: true
+        image_mode: "t2i"
+      - id: "agnes-image-2.0-flash"
+        tier: standard
+        vision: false
+        text: false
+        image_gen: true
+        image_mode: "img2img"
+      - id: "agnes-2.0-flash"
+        tier: standard
+        vision: false
+        text: true
+
   zhipu:
     name: "智谱AI"
     base_url: "https://open.bigmodel.cn/api/paas/v4"

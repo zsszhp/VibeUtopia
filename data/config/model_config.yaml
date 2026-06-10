@@ -193,6 +193,31 @@ providers:
     # vLLM 模型通过运行时 API 动态发现，无需预配置
     # 启动后会自动从 http://localhost:8000/v1/models 获取可用模型
 
+  # --- Agnes AI (图像生成 + 文本) ---
+  agnes:
+    name: "Agnes AI"
+    api_key_env: "AGNES_API_KEY"
+    base_url: "https://apihub.agnes-ai.com/v1"
+    models:
+      # 图像生成模型
+      - id: "agnes-image-2.1-flash"
+        tier: advanced
+        vision: false
+        text: false
+        image_gen: true
+        image_mode: "t2i"  # 纯文生图
+      - id: "agnes-image-2.0-flash"
+        tier: standard
+        vision: false
+        text: false
+        image_gen: true
+        image_mode: "img2img"  # 图生图/图片编辑/多图合成
+      # 文本模型
+      - id: "agnes-2.0-flash"
+        tier: standard
+        vision: false
+        text: true
+
   # --- 阿里 Paraformer (音频转写专用) ---
   paraformer:
     name: "阿里 Paraformer"

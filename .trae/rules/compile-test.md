@@ -57,3 +57,6 @@ pnpm build          # 生产构建
 - **LiteLLM API Key** 必须配置在 `.env`，否则模型调用失败
 - **Neo4j/ChromaDB** 必须先启动服务，否则数据库操作失败
 - **ffmpeg** 必须安装并配置到 PATH，否则视频处理失败
+- **模型路由** 修改 `model_config.yaml` 后需重启后端服务
+- **Agnes AI** 图像生成模型不支持 `response_format` 参数（纯文生图时不要传 extra_body）
+- **Key 冷却** 模型 Key 限流后自动冷却 300 秒，冷却结束自动回切

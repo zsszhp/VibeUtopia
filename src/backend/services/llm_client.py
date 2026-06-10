@@ -40,6 +40,8 @@ class ModelEndpoint:
     provider_name: str = ""
     vision: bool = False  # 是否支持视觉/多模态
     text: bool = True  # 是否支持纯文本任务（Omni类模型设为False）
+    image_gen: bool = False  # 是否支持图像生成
+    image_mode: str = ""  # 图像生成模式: "t2i"(文生图) / "img2img"(图生图)
     key_index: int = 0  # 同一厂商多 Key 时的序号（从 0 开始）
     key_label: str = ""  # Key 显示标签，如 "Key2"
 
@@ -129,6 +131,8 @@ class ModelRegistry:
                         provider_name=provider_name,
                         vision=mcfg.get("vision", False),
                         text=mcfg.get("text", True),
+                        image_gen=mcfg.get("image_gen", False),
+                        image_mode=mcfg.get("image_mode", ""),
                         key_index=key_idx,
                         key_label=key_label,
                     )
@@ -205,6 +209,32 @@ class ModelRegistry:
         result = []
         for ep in self.endpoints:
             if not ep.vision:
+                continue
+            if tier and ep.tier != tier:
+                continue
+            if exclude and f"{ep.provider}:{ep.model_id}:{ep.key_index}" in exclude:
+                continue
+            result.append(ep)
+        return result
+
+    def get_image_gen_endpoints(
+        self,
+        image_mode: str | None = None,
+        tier: str | None = None,
+        exclude: set[str] | None = None,
+    ) -> list[ModelEndpoint]:
+        """获取支持图像生成的端点列表
+
+        Args:
+            image_mode: 图像生成模式过滤 ("t2i" 文生图 / "img2img" 图生图)
+            tier: 模型级别过滤
+            exclude: 排除的端点集合
+        """
+        result = []
+        for ep in self.endpoints:
+            if not ep.image_gen:
+                continue
+            if image_mode and ep.image_mode != image_mode:
                 continue
             if tier and ep.tier != tier:
                 continue
@@ -410,6 +440,7 @@ router = ModelRouter(registry, settings.MODEL_COOLDOWN_SECONDS)
 
 _llm_semaphore = asyncio.Semaphore(10)
 _vlm_semaphore = asyncio.Semaphore(5)
+_image_gen_semaphore = asyncio.Semaphore(3)
 
 
 # ---------------------------------------------------------------------------
@@ -751,6 +782,225 @@ async def _call_legacy(prompt: str, system: str) -> str:
             base_url=settings.DEEPSEEK_BASE_URL, api_key=settings.DEEPSEEK_API_KEY,
             tier="standard", provider_name="Legacy",
         ))
+
+
+# ---------------------------------------------------------------------------
+# 图像生成调用
+# ---------------------------------------------------------------------------
+
+async def call_image_gen(
+    prompt: str,
+    size: str = "1024x1024",
+    image_mode: str = "t2i",
+    image_urls: list[str] | None = None,
+    model: str | None = None,
+) -> dict:
+    """调用图像生成 API，支持文生图和图生图
+
+    Args:
+        prompt: 图像描述提示词
+        size: 图像尺寸，如 "1024x1024", "1024x768"
+        image_mode: 生成模式 "t2i"(文生图) 或 "img2img"(图生图)
+        image_urls: 图生图模式下的参考图片 URL 列表
+        model: 指定模型名称（可选，不指定则自动路由）
+
+    Returns:
+        包含 image_url 或 image_base64 的字典
+
+    Raises:
+        RuntimeError: 无可用图像生成模型时抛出
+    """
+    async with _image_gen_semaphore:
+        if not registry.is_loaded:
+            raise RuntimeError("模型配置未加载，无法调用图像生成模型")
+
+        tried: set[str] = set()
+        last_error: Exception | None = None
+
+        while True:
+            endpoint = _route_image_gen(image_mode=image_mode, model=model, exclude=tried)
+            if endpoint is None:
+                break
+
+            key = f"{endpoint.provider}:{endpoint.model_id}:{endpoint.key_index}"
+            tried.add(key)
+
+            try:
+                result = await _call_endpoint_image_gen(endpoint, prompt, size, image_urls)
+                router.record_success(endpoint.provider, endpoint.model_id, endpoint.key_index)
+                return result
+            except QuotaExhaustedError as e:
+                router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
+                logger.warning("图像生成模型 %s 配额耗尽 (%s)，触发 fallback", key, e)
+                last_error = e
+            except Exception as e:
+                for attempt in range(settings.LLM_MAX_RETRIES):
+                    try:
+                        result = await _call_endpoint_image_gen(endpoint, prompt, size, image_urls)
+                        return result
+                    except QuotaExhaustedError as eq:
+                        router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
+                        logger.warning("图像生成模型 %s 配额耗尽 (重试%d次): %s", key, attempt + 1, eq)
+                        last_error = eq
+                        break
+                    except Exception as e2:
+                        last_error = e2
+                        logger.warning("图像生成调用失败 %s (重试%d次): %s", key, attempt + 1, e2)
+                else:
+                    logger.warning("图像生成模型 %s 调用失败，尝试下一个模型", key)
+
+        if last_error:
+            raise RuntimeError(f"所有图像生成模型不可用，已尝试: {tried}，最后错误: {last_error}")
+        raise RuntimeError("无可用图像生成模型（需要配置支持 image_gen 的模型端点）")
+
+
+def _route_image_gen(
+    image_mode: str = "t2i",
+    model: str | None = None,
+    exclude: set[str] | None = None,
+) -> ModelEndpoint | None:
+    """路由到可用的图像生成模型端点"""
+    exclude = exclude or set()
+
+    # 如果指定了模型名，优先匹配
+    if model:
+        for ep in registry.get_image_gen_endpoints(exclude=exclude):
+            if ep.model_id == model and router.is_available(ep.provider, ep.model_id, ep.key_index):
+                return ep
+
+    # 按 image_mode 过滤，再按 tier 排序
+    candidates = []
+    for ep in registry.get_image_gen_endpoints(image_mode=image_mode, exclude=exclude):
+        if router.is_available(ep.provider, ep.model_id, ep.key_index):
+            candidates.append(ep)
+
+    # 如果指定模式无可用模型，尝试所有图像生成模型
+    if not candidates:
+        for ep in registry.get_image_gen_endpoints(exclude=exclude):
+            if router.is_available(ep.provider, ep.model_id, ep.key_index):
+                candidates.append(ep)
+
+    # 按 tier 优先级排序
+    tier_order = {"advanced": 0, "standard": 1, "lite": 2}
+    candidates.sort(key=lambda e: (tier_order.get(e.tier, 1), e.key_index))
+    return candidates[0] if candidates else None
+
+
+async def _call_endpoint_image_gen(
+    endpoint: ModelEndpoint,
+    prompt: str,
+    size: str = "1024x1024",
+    image_urls: list[str] | None = None,
+) -> dict:
+    """调用指定端点的图像生成模型（OpenAI Images API 兼容格式）"""
+    url = f"{endpoint.base_url}/images/generations"
+    headers = {
+        "Authorization": f"Bearer {endpoint.api_key}",
+        "Content-Type": "application/json",
+    }
+
+    payload: dict = {
+        "model": endpoint.model_id,
+        "prompt": prompt,
+        "size": size,
+    }
+
+    # 图生图模式：添加 extra_body
+    if endpoint.image_mode == "img2img" and image_urls:
+        payload["extra_body"] = {
+            "tags": ["img2img"],
+            "image": image_urls,
+            "response_format": "url",
+        }
+
+    if _HAS_HTTPX:
+        return await _httpx_call_image_gen(url, headers, payload, endpoint)
+    else:
+        return await _urllib_call_image_gen(url, headers, payload, endpoint)
+
+
+async def _httpx_call_image_gen(
+    url: str, headers: dict, payload: dict, endpoint: ModelEndpoint,
+) -> dict:
+    """httpx 异步调用图像生成"""
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(url, headers=headers, json=payload)
+
+        if _is_quota_error(resp.status_code):
+            raise QuotaExhaustedError(
+                f"{endpoint.provider_name} {endpoint.model_id} HTTP {resp.status_code}: {resp.text[:200]}"
+            )
+
+        if resp.status_code == 400:
+            logger.error("图像生成 400 错误: url=%s, model=%s, response=%s", url, endpoint.model_id, resp.text[:500])
+            raise RuntimeError(f"请求格式错误 (HTTP 400): {resp.text[:300]}")
+
+        resp.raise_for_status()
+        data = resp.json()
+
+        # 解析 OpenAI Images API 响应格式
+        images = data.get("data", [])
+        if not images:
+            raise RuntimeError(f"图像生成返回空结果: {data}")
+
+        result = {
+            "model": endpoint.model_id,
+            "provider": endpoint.provider,
+            "images": [],
+        }
+        for img in images:
+            img_info = {}
+            if "url" in img:
+                img_info["url"] = img["url"]
+            if "b64_json" in img:
+                img_info["b64_json"] = img["b64_json"]
+            if "revised_prompt" in img:
+                img_info["revised_prompt"] = img["revised_prompt"]
+            result["images"].append(img_info)
+
+        return result
+
+
+async def _urllib_call_image_gen(
+    url: str, headers: dict, payload: dict, endpoint: ModelEndpoint,
+) -> dict:
+    """urllib 同步调用图像生成（httpx 不可用时的降级方案）"""
+    payload_bytes = json.dumps(payload).encode("utf-8")
+    try:
+        req = urllib.request.Request(url, data=payload_bytes, headers=headers, method="POST")
+        loop = asyncio.get_event_loop()
+        resp_data = await loop.run_in_executor(
+            None,
+            lambda: urllib.request.urlopen(req, timeout=60),
+        )
+        data = json.loads(resp_data.read().decode("utf-8"))
+
+        images = data.get("data", [])
+        if not images:
+            raise RuntimeError(f"图像生成返回空结果: {data}")
+
+        result = {
+            "model": endpoint.model_id,
+            "provider": endpoint.provider,
+            "images": [],
+        }
+        for img in images:
+            img_info = {}
+            if "url" in img:
+                img_info["url"] = img["url"]
+            if "b64_json" in img:
+                img_info["b64_json"] = img["b64_json"]
+            if "revised_prompt" in img:
+                img_info["revised_prompt"] = img["revised_prompt"]
+            result["images"].append(img_info)
+
+        return result
+    except urllib.error.HTTPError as e:
+        if _is_quota_error(e.code):
+            raise QuotaExhaustedError(
+                f"{endpoint.provider_name} {endpoint.model_id} HTTP {e.code}"
+            )
+        raise
 
 
 # ---------------------------------------------------------------------------

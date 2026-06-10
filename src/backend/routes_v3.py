@@ -31,7 +31,7 @@ from backend.services.hardware_detector import (
     get_hardware_info,
     get_recommended_model_tier,
 )
-from backend.services.llm_client import call_llm, call_vlm, parse_llm_json
+from backend.services.llm_client import call_llm, call_vlm, call_image_gen, parse_llm_json
 from backend.services.persona.life_story_generator import PersonaFactory
 from backend.services.persona.memory_stream import MemoryStreamStore, get_memory_stream_status
 from backend.services.report_optimizer import (
@@ -1264,3 +1264,84 @@ async def analyze_fine_grained(req: FineGrainedAnalysisRequest):
         } if report.temporal_anomaly else None,
         "error": report.error,
     }
+
+
+# ==================== 图像生成 API (Agnes AI) ====================
+
+class ImageGenRequest(BaseModel):
+    """图像生成请求"""
+    prompt: str = Field(..., description="图像描述提示词")
+    size: str = Field(default="1024x1024", description="图像尺寸: 1024x1024 / 1024x768 / 768x1024")
+    image_mode: str = Field(default="t2i", description="生成模式: t2i(文生图) / img2img(图生图)")
+    image_urls: Optional[List[str]] = Field(default=None, description="图生图参考图片URL列表")
+    model: Optional[str] = Field(default=None, description="指定模型（可选，不指定自动路由）")
+
+
+class ImageGenResponse(BaseModel):
+    """图像生成响应"""
+    task_id: str
+    model: str
+    provider: str
+    images: List[Dict[str, Any]]
+
+
+@router.post("/api/v3/image/generate")
+async def generate_image(req: ImageGenRequest) -> ImageGenResponse:
+    """图像生成（支持文生图和图生图）
+
+    自动路由到 Agnes Image 2.1 Flash (文生图) 或 Agnes Image 2.0 Flash (图生图)。
+    也支持通过 model 参数指定模型。
+
+    文生图示例:
+        prompt="一只可爱的柴犬在樱花树下", image_mode="t2i"
+
+    图生图示例:
+        prompt="改成水彩画风格", image_mode="img2img", image_urls=["https://example.com/photo.png"]
+    """
+    task_id = str(uuid.uuid4())
+
+    try:
+        result = await call_image_gen(
+            prompt=req.prompt,
+            size=req.size,
+            image_mode=req.image_mode,
+            image_urls=req.image_urls,
+            model=req.model,
+        )
+
+        return ImageGenResponse(
+            task_id=task_id,
+            model=result["model"],
+            provider=result["provider"],
+            images=result["images"],
+        )
+
+    except RuntimeError as e:
+        logger.error("图像生成失败：%s", e)
+        raise HTTPException(status_code=500, detail=f"图像生成失败：{str(e)}")
+    except Exception as e:
+        logger.error("图像生成异常：%s", e)
+        raise HTTPException(status_code=500, detail=f"图像生成异常：{str(e)}")
+
+
+@router.get("/api/v3/image/models")
+async def list_image_gen_models():
+    """列出所有可用的图像生成模型"""
+    from backend.services.llm_client import registry
+
+    endpoints = registry.get_image_gen_endpoints()
+    models = []
+    seen = set()
+    for ep in endpoints:
+        key = f"{ep.provider}:{ep.model_id}"
+        if key not in seen:
+            seen.add(key)
+            models.append({
+                "provider": ep.provider,
+                "provider_name": ep.provider_name,
+                "model_id": ep.model_id,
+                "tier": ep.tier,
+                "image_mode": ep.image_mode,
+            })
+
+    return {"models": models, "total": len(models)}
