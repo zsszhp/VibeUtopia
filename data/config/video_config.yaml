@@ -1,0 +1,68 @@
+# VibeUtopia 视频分析统一配置
+# 所有视频处理模块的参数集中管理，各模块保留 DEFAULT_CONFIG 作为兜底
+
+# ─── 帧提取配置 ─────────────────────────────────────────────
+frame_extraction:
+  mode: "delta"                 # "delta"（增量提取）| "full"（全量提取）
+  delta_threshold: 0.05         # 帧差异阈值（5%像素变化视为有差异）
+  i_frame_interval: 30.0        # I帧强制插入间隔（秒）
+  scene_threshold: 27.0         # PySceneDetect 场景切换阈值
+  min_scene_length: 15          # 最短场景长度（帧数）
+  frame_width: 640              # 输出帧宽度
+  frame_height: 360             # 输出帧高度
+  image_format: "jpg"           # 输出图片格式
+  image_quality: 85             # JPEG质量
+  max_frames: null              # 最大帧数限制（null=无限制）
+  ssim_threshold: 0.95          # SSIM高于此值=跳过（非常相似）
+  hash_threshold: 8             # 感知哈希汉明距离低于此值=相似
+  dense_fps: 1.0                # 全量模式采样率
+
+# ─── 帧序列建模配置 ──────────────────────────────────────────
+frame_sequence:
+  segment_size: 6               # 每个片段包含的帧数
+  grid_layout: "2x3"            # 帧网格布局
+  grid_frame_width: 320         # 网格中每帧宽度
+  grid_frame_height: 180        # 网格中每帧高度
+  enable_causal_reasoning: true # 启用时序因果推理
+  enable_action_detection: true # 启用动作/变化检测
+  max_concurrent_vlm: 3         # 最大并发VLM调用数
+  context_window: 200           # 传递给下一段的上下文最大字符数
+
+# ─── 音频分析配置 ────────────────────────────────────────────
+audio:
+  whisper_model: "base"         # faster-whisper模型大小
+  whisper_device: "cpu"         # 推理设备
+  whisper_compute_type: "int8"  # 计算精度
+  language: null                # 语言（null=自动检测）
+  min_segment_length: 2         # 最短音频片段（秒）
+  enable_sentiment: true        # 启用情感分析
+
+# ─── OCR配置 ─────────────────────────────────────────────────
+ocr:
+  min_confidence: 0.5           # 最低置信度阈值
+  dedup_text: true              # 帧间文字去重
+  dedup_similarity: 0.85        # 去重相似度阈值
+  max_concurrent: 3             # 最大并发VLM调用数
+
+# ─── 细粒度分析配置 ──────────────────────────────────────────
+fine_grained:
+  enable_dense_scan: true       # 启用密集帧扫描
+  enable_map_audit: true        # 启用地图完整性审核
+  enable_code_trace: true       # 启用代码溯源检测
+  enable_symbol_detect: true    # 启用敏感符号检测
+  enable_temporal_anomaly: true # 启用时序异常检测
+  dense_fps: 1.0                # 密集扫描采样率
+  anomaly_threshold_high: 0.7   # 高异常阈值
+  anomaly_threshold_low: 0.3    # 低异常阈值
+  low_anomaly_sample_step: 5    # 低异常帧抽审步长
+  max_analysis_frames: 50       # 最大分析帧数
+
+# ─── 画面风险评估配置 ────────────────────────────────────────
+frame_risk:
+  max_concurrent: 3             # 最大并发VLM调用数
+  file_size_threshold: 500000   # 文件大小阈值（字节），VLM不可用时降级用
+
+# ─── 跨模态冲突检测配置 ──────────────────────────────────────
+cross_modal:
+  enable_video_text_conflict: true  # 启用视频画面与文案联合理解
+  conflict_score_boost: 15          # 发现隐藏风险时额外加分

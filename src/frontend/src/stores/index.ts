@@ -19,6 +19,47 @@ export const useReviewStore = defineStore('review', () => {
   const wsConnected = ref(false)
   const wsFallbackPolling = ref(false)
 
+  // 帧级进度
+  const frameProgress = ref<{
+    currentFrame: number
+    totalFrames: number
+    currentFrameUrl: string
+    frameType: string
+    deltaScore: number
+    currentTask: string
+  }>({
+    currentFrame: 0,
+    totalFrames: 0,
+    currentFrameUrl: '',
+    frameType: '',
+    deltaScore: 0,
+    currentTask: ''
+  })
+
+  // 序列描述
+  const sequenceDescriptions = ref<Array<{
+    segmentIndex: number
+    description: string
+    causalEvents: any[]
+    actions: any[]
+  }>>([])
+
+  // 风险预警列表
+  const riskAlerts = ref<Array<{
+    dimension: string
+    score: number
+    frameIndex?: number
+    detail: string
+    severity: string
+    timestamp: number
+  }>>([])
+
+  // 子任务列表
+  const subTasks = ref<Array<{
+    name: string
+    status: 'completed' | 'in_progress' | 'pending'
+  }>>([])
+
   function setError(msg: string | null) {
     error.value = msg
     errorTimestamp.value = msg ? Date.now() : null
@@ -92,8 +133,33 @@ export const useReviewStore = defineStore('review', () => {
           }
         }
         break
+      case 'frame_progress':
+        frameProgress.value = {
+          currentFrame: data.current_frame ?? 0,
+          totalFrames: data.total_frames ?? 0,
+          currentFrameUrl: data.current_frame_url ?? '',
+          frameType: data.frame_type ?? '',
+          deltaScore: data.delta_score ?? 0,
+          currentTask: data.current_task ?? ''
+        }
+        break
+      case 'sequence_update':
+        sequenceDescriptions.value.push({
+          segmentIndex: data.segment_index ?? 0,
+          description: data.description ?? '',
+          causalEvents: data.causal_events ?? [],
+          actions: data.actions ?? []
+        })
+        break
       case 'risk_alert':
-        console.warn('[Store] 风险预警:', data.dimension, data.score)
+        riskAlerts.value.push({
+          dimension: data.dimension ?? '',
+          score: data.score ?? 0,
+          frameIndex: data.frame_index,
+          detail: data.detail ?? '',
+          severity: data.severity ?? 'warning',
+          timestamp: Date.now()
+        })
         break
       case 'review_complete':
         fetchResult(data.task_id)
@@ -114,6 +180,10 @@ export const useReviewStore = defineStore('review', () => {
     clearError()
     wsConnected.value = false
     wsFallbackPolling.value = false
+    frameProgress.value = { currentFrame: 0, totalFrames: 0, currentFrameUrl: '', frameType: '', deltaScore: 0, currentTask: '' }
+    sequenceDescriptions.value = []
+    riskAlerts.value = []
+    subTasks.value = []
   }
 
   function clearResult() {
@@ -125,6 +195,7 @@ export const useReviewStore = defineStore('review', () => {
   return {
     currentTaskId, result, progress, loading, currentStep, progressPercent, riskLevel,
     error, errorTimestamp, wsConnected, wsFallbackPolling,
+    frameProgress, sequenceDescriptions, riskAlerts, subTasks,
     submitReview, fetchResult, fetchProgress,
     handleWsMessage, setError, clearError, reset, clearResult,
   }

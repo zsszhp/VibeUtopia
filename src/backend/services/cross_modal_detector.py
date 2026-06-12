@@ -5,6 +5,11 @@
 - 文案安全但画面有风险元素
 - 音频提及敏感词但文案未体现
 - 画面与文案情感冲突（文案积极但画面消极）
+
+V3.5增强：视频画面与文案联合理解
+- 帧序列描述与文案叙事的冲突检测
+- 因果链与文案逻辑的矛盾检测
+- 动作事件与文案描述的不一致检测
 """
 
 import logging
@@ -148,6 +153,172 @@ class CrossModalConflictDetector:
 
         # 冲突：文案安全但画面/音频有风险
         return text_safe and (visual_risky or audio_risky)
+
+    async def detect_video_text_conflicts(
+        self,
+        text: str,
+        sequence_descriptions: Optional[list] = None,
+        causal_chain: Optional[object] = None,
+        action_events: Optional[list] = None,
+    ) -> dict:
+        """视频画面与文案联合理解 - 检测帧序列分析结果与文案的冲突
+
+        Args:
+            text: 文案内容
+            sequence_descriptions: 帧序列描述列表（SequenceDescription对象）
+            causal_chain: 因果链（CausalChain对象）
+            action_events: 动作事件列表（ActionEvent对象）
+
+        Returns:
+            冲突检测结果
+        """
+        if not text or not text.strip():
+            return {
+                "conflicts": [],
+                "overall_conflict_score": 0,
+                "has_hidden_risk": False,
+                "narrative_consistency": 100,
+                "summary": "无文案内容，无法检测视频-文案冲突",
+            }
+
+        # 构建画面叙事摘要
+        sequence_narrative = self._build_sequence_narrative(sequence_descriptions)
+        causal_events_str = self._build_causal_events_str(causal_chain)
+        action_events_str = self._build_action_events_str(action_events)
+
+        # 如果没有任何画面分析结果，无法检测
+        if not sequence_narrative and not causal_events_str and not action_events_str:
+            return {
+                "conflicts": [],
+                "overall_conflict_score": 0,
+                "has_hidden_risk": False,
+                "narrative_consistency": 100,
+                "summary": "无画面分析结果，无法检测视频-文案冲突",
+            }
+
+        prompt = VIDEO_TEXT_CONFLICT_PROMPT.format(
+            text=text[:1500],
+            sequence_narrative=sequence_narrative[:1500],
+            causal_events=causal_events_str[:800],
+            action_events=action_events_str[:800],
+        )
+
+        try:
+            response = await call_llm(
+                prompt,
+                system="你是视频内容风控专家，擅长检测视频画面叙事与文案内容之间的冲突和不一致。",
+                task_type="video_text_conflict",
+            )
+
+            result = parse_llm_json(response, fallback={
+                "conflicts": [],
+                "overall_conflict_score": 0,
+                "has_hidden_risk": False,
+                "narrative_consistency": 100,
+                "summary": "LLM分析失败",
+            })
+
+            conflicts = result.get("conflicts", [])
+            overall_score = int(result.get("overall_conflict_score", 0))
+            overall_score = max(0, min(100, overall_score))
+
+            return {
+                "conflicts": conflicts,
+                "overall_conflict_score": overall_score,
+                "has_hidden_risk": result.get("has_hidden_risk", False),
+                "narrative_consistency": int(result.get("narrative_consistency", 100)),
+                "summary": result.get("summary", ""),
+            }
+
+        except Exception as e:
+            logger.warning("detect_video_text_conflicts: 检测失败 %s", e)
+            return {
+                "conflicts": [],
+                "overall_conflict_score": 0,
+                "has_hidden_risk": False,
+                "narrative_consistency": 100,
+                "summary": f"检测失败: {str(e)}",
+            }
+
+    @staticmethod
+    def _build_sequence_narrative(descriptions: Optional[list]) -> str:
+        """从帧序列描述构建叙事文本"""
+        if not descriptions:
+            return ""
+        parts = []
+        for desc in descriptions:
+            if hasattr(desc, "description") and desc.description:
+                time_range = f"[{desc.start_time:.1f}s-{desc.end_time:.1f}s]"
+                parts.append(f"{time_range} {desc.description}")
+        return "\n".join(parts)
+
+    @staticmethod
+    def _build_causal_events_str(causal_chain: Optional[object]) -> str:
+        """从因果链构建事件文本"""
+        if not causal_chain:
+            return ""
+        parts = []
+        if hasattr(causal_chain, "narrative") and causal_chain.narrative:
+            parts.append(f"叙事摘要: {causal_chain.narrative}")
+        if hasattr(causal_chain, "links") and causal_chain.links:
+            for link in causal_chain.links[:10]:
+                cause_desc = link.cause.description if hasattr(link, "cause") and hasattr(link.cause, "description") else str(link.cause)
+                effect_desc = link.effect.description if hasattr(link, "effect") and hasattr(link.effect, "description") else str(link.effect)
+                relation = link.relation_type if hasattr(link, "relation_type") else "→"
+                parts.append(f"- {cause_desc} [{relation}] {effect_desc}")
+        return "\n".join(parts)
+
+    @staticmethod
+    def _build_action_events_str(actions: Optional[list]) -> str:
+        """从动作事件构建文本"""
+        if not actions:
+            return ""
+        parts = []
+        for action in actions[:10]:
+            if hasattr(action, "description") and action.description:
+                time_range = f"[{action.start_time:.1f}s-{action.end_time:.1f}s]"
+                action_type = action.action_type if hasattr(action, "action_type") else "unknown"
+                parts.append(f"- {time_range} ({action_type}) {action.description}")
+        return "\n".join(parts)
+
+
+VIDEO_TEXT_CONFLICT_PROMPT = """你是一个视频内容风控专家。请分析视频画面叙事与文案内容之间是否存在冲突或不一致。
+
+【文案内容】
+{text}
+
+【视频画面叙事】（基于帧序列描述）
+{sequence_narrative}
+
+【画面中的因果事件链】
+{causal_events}
+
+【画面中检测到的动作/变化】
+{action_events}
+
+请分析：
+1. 画面叙事与文案内容是否一致（画面在说A，文案在说B？）
+2. 因果链与文案逻辑是否矛盾
+3. 动作事件与文案描述是否不一致
+4. 画面中出现的风险元素是否在文案中未被提及
+5. 是否存在"文案安全但画面有风险"的隐藏风险
+
+输出JSON：
+{{
+    "conflicts": [
+        {{
+            "type": "叙事冲突/因果矛盾/动作不一致/风险遗漏",
+            "description": "冲突描述",
+            "risk_score": 0-100,
+            "severity": "low/medium/high",
+            "evidence": "具体证据"
+        }}
+    ],
+    "overall_conflict_score": 0-100,
+    "has_hidden_risk": true/false,
+    "narrative_consistency": 0-100,
+    "summary": "简要总结"
+}}"""
 
 
 def integrate_cross_modal_score(overall_score: int, conflict_score: int, has_hidden_risk: bool) -> int:

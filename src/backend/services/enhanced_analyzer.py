@@ -14,7 +14,10 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict, List, Optional, Any
+
+import yaml
 
 from backend.database import SessionLocal
 from backend.models import Task, V2AnalysisResult
@@ -67,6 +70,15 @@ class EnhancedAnalysisResult:
     fine_grained_findings: list = field(default_factory=list)
     fine_grained_risk_level: str = "safe"
     fine_grained_evidence_frames: list = field(default_factory=list)
+
+    # Phase 2.7+: 帧序列建模增强 (V3.5)
+    frame_sequence_descriptions: list = field(default_factory=list)
+    frame_causal_chain: Optional[object] = None
+    frame_action_events: list = field(default_factory=list)
+    video_text_conflict_score: int = 0
+    video_text_has_hidden_risk: bool = False
+    video_text_narrative_consistency: int = 100
+    frame_compression_ratio: float = 0.0
 
     # Phase 3: 仿真增强（deep模式）
     simulation_id: str = ""
@@ -137,7 +149,7 @@ async def run_enhanced_analysis(
             phase2_6_task = _run_phase2_6(text, result, audio_transcription)
         if video_path:
             logger.info("增强分析 %s: Phase 2.7 细粒度视频理解增强开始", task_id)
-            phase2_7_task = _run_phase2_7(video_path, result)
+            phase2_7_task = _run_phase2_7(video_path, result, text)
 
         parallel_tasks = [t for t in [phase2_6_task, phase2_7_task] if t is not None]
         if parallel_tasks:
@@ -348,16 +360,18 @@ async def _run_phase2_6(text: str, result: EnhancedAnalysisResult, audio_transcr
         logger.warning("多模态分析增强失败: %s", e)
 
 
-async def _run_phase2_7(video_path: str, result: EnhancedAnalysisResult):
-    """Phase 2.7: 细粒度视频理解增强 (V3.4)
+async def _run_phase2_7(video_path: str, result: EnhancedAnalysisResult, text: str = ""):
+    """Phase 2.7: 细粒度视频理解增强 (V3.4) + 帧序列建模增强 (V3.5)
 
     对视频进行密集帧扫描+区域放大+专项检测器分析，
     补齐"几帧定生死"的检测盲区（地图缺失、代码暴露、敏感符号等）。
+    V3.5新增：增量帧提取 + 帧序列建模 + 视频画面与文案联合理解。
     """
     if not video_path or not os.path.exists(video_path):
         logger.debug("Phase 2.7: 无视频文件，跳过细粒度理解")
         return
 
+    # --- 原有细粒度管线 ---
     try:
         from backend.services.fine_grained import FineGrainedPipeline
 
@@ -383,6 +397,98 @@ async def _run_phase2_7(video_path: str, result: EnhancedAnalysisResult):
 
     except Exception as e:
         logger.warning("细粒度视频理解增强失败: %s", e)
+
+    # --- V3.5 帧序列建模增强 ---
+    try:
+        from backend.services.delta_frame_extractor import DeltaFrameExtractor
+        from backend.services.frame_sequence_analyzer import FrameSequenceAnalyzer
+        from backend.services.cross_modal_detector import CrossModalConflictDetector
+
+        # 加载 video_config.yaml 配置
+        video_cfg_path = Path(__file__).resolve().parents[2] / "data" / "config" / "video_config.yaml"
+        video_cfg: dict = {}
+        if video_cfg_path.exists():
+            with open(video_cfg_path, "r", encoding="utf-8") as f:
+                video_cfg = yaml.safe_load(f) or {}
+
+        frame_extraction_cfg = video_cfg.get("frame_extraction", {})
+        frame_sequence_cfg = video_cfg.get("frame_sequence", {})
+
+        # Step 1: 增量帧提取
+        delta_extractor = DeltaFrameExtractor(config=frame_extraction_cfg)
+        delta_result = await delta_extractor.extract(video_path, mode=frame_extraction_cfg.get("mode", "delta"))
+        result.frame_compression_ratio = delta_result.compression_ratio
+        logger.info(
+            "增量帧提取完成: 提取=%d帧, 跳过=%d帧, 压缩比=%.2f",
+            len(delta_result.extracted_frames),
+            len(delta_result.skipped_frames),
+            delta_result.compression_ratio,
+        )
+
+        # Step 2: 帧序列建模
+        if delta_result.extracted_frames:
+            sequence_analyzer = FrameSequenceAnalyzer(config=frame_sequence_cfg)
+            sequence_result = await sequence_analyzer.analyze(delta_result, context=text)
+
+            result.frame_sequence_descriptions = [
+                {
+                    "segment_index": d.segment_index,
+                    "start_time": d.start_time,
+                    "end_time": d.end_time,
+                    "description": d.description,
+                    "key_events": d.key_events,
+                }
+                for d in sequence_result.sequence_descriptions
+            ]
+            result.frame_causal_chain = sequence_result.causal_chain
+            result.frame_action_events = [
+                {
+                    "start_time": a.start_time,
+                    "end_time": a.end_time,
+                    "action_type": a.action_type,
+                    "description": a.description,
+                    "confidence": a.confidence,
+                    "risk_relevance": a.risk_relevance,
+                }
+                for a in sequence_result.action_events
+            ]
+
+            logger.info(
+                "帧序列建模完成: 片段=%d, 因果事件=%d, 动作事件=%d",
+                len(sequence_result.sequence_descriptions),
+                len(sequence_result.causal_chain.events) if sequence_result.causal_chain else 0,
+                len(sequence_result.action_events),
+            )
+
+            # Step 3: 视频画面与文案联合理解
+            if text and text.strip():
+                conflict_detector = CrossModalConflictDetector()
+                conflict_result = await conflict_detector.detect_video_text_conflicts(
+                    text=text,
+                    sequence_descriptions=sequence_result.sequence_descriptions,
+                    causal_chain=sequence_result.causal_chain,
+                    action_events=sequence_result.action_events,
+                )
+
+                result.video_text_conflict_score = conflict_result.get("overall_conflict_score", 0)
+                result.video_text_has_hidden_risk = conflict_result.get("has_hidden_risk", False)
+                result.video_text_narrative_consistency = conflict_result.get("narrative_consistency", 100)
+
+                if result.video_text_has_hidden_risk:
+                    boost = 15
+                    result.mvp_overall_score = min(result.mvp_overall_score + boost, 100)
+                    result.risk_boosts["video_text_conflict"] = boost
+                    logger.info("视频-文案冲突检测：发现隐藏风险，风险升级+%d", boost)
+
+                logger.info(
+                    "视频-文案联合理解完成: 冲突分=%d, 隐藏风险=%s, 叙事一致性=%d",
+                    result.video_text_conflict_score,
+                    result.video_text_has_hidden_risk,
+                    result.video_text_narrative_consistency,
+                )
+
+    except Exception as e:
+        logger.warning("帧序列建模增强失败: %s", e)
 
 
 def _recalculate_with_dynamic_weights(result: EnhancedAnalysisResult):

@@ -1266,6 +1266,51 @@ async def analyze_fine_grained(req: FineGrainedAnalysisRequest):
     }
 
 
+# ==================== 帧缩略图 API (V3.5) ====================
+
+@router.get("/analysis/{task_id}/frames/{frame_path:path}")
+async def get_frame_thumbnail(task_id: str, frame_path: str):
+    """获取分析帧缩略图
+
+    Args:
+        task_id: 任务ID
+        frame_path: 帧图片文件路径
+    """
+    import os
+    from fastapi.responses import FileResponse
+
+    # 安全检查：防止路径遍历
+    if ".." in frame_path or frame_path.startswith("/") or frame_path.startswith("\\"):
+        return {"error": "非法路径"}
+
+    # 尝试在临时目录中查找
+    import tempfile
+    possible_dirs = [
+        os.path.join(tempfile.gettempdir(), f"vibe_keyframes_{task_id}"),
+        os.path.join(tempfile.gettempdir(), f"vibe_dense_{task_id}"),
+        os.path.join(tempfile.gettempdir(), f"vibe_sequence_{task_id}"),
+    ]
+
+    for base_dir in possible_dirs:
+        full_path = os.path.join(base_dir, os.path.basename(frame_path))
+        if os.path.exists(full_path):
+            return FileResponse(
+                full_path,
+                media_type="image/jpeg",
+                headers={"Cache-Control": "public, max-age=3600"},
+            )
+
+    # 直接尝试完整路径（需校验在临时目录内）
+    if os.path.exists(frame_path) and tempfile.gettempdir() in os.path.abspath(frame_path):
+        return FileResponse(
+            frame_path,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
+
+    return {"error": "帧图片未找到"}
+
+
 # ==================== 图像生成 API (Agnes AI) ====================
 
 class ImageGenRequest(BaseModel):

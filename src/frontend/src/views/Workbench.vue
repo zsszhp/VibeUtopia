@@ -1,7 +1,17 @@
 <template>
   <div class="workbench">
-    <!-- 分析流水线 -->
-    <AnalysisPipeline :current-step="reviewStore.currentStep" :progress="reviewStore.progressPercent" />
+    <!-- 分析流水线 - 使用增强版 AnalysisDashboard -->
+    <AnalysisDashboard
+      :current-step="reviewStore.currentStep"
+      :progress="reviewStore.progressPercent"
+      :detail="reviewStore.progress?.detail"
+      :completed-dimensions="reviewStore.progress?.completed_dimensions"
+      :remaining-dimensions="reviewStore.progress?.remaining_dimensions"
+      :frame-progress="reviewStore.frameProgress"
+      :sequence-descriptions="reviewStore.sequenceDescriptions"
+      :risk-alerts="reviewStore.riskAlerts"
+      :sub-tasks="reviewStore.subTasks"
+    />
 
     <!-- 风险仪表盘 -->
     <div v-if="reviewStore.result" class="dashboard-grid">
@@ -29,7 +39,7 @@
 
 <script setup lang="ts">
 import { useReviewStore } from '../stores'
-import AnalysisPipeline from '../components/AnalysisPipeline.vue'
+import AnalysisDashboard from '../components/AnalysisDashboard.vue'
 import RiskGauge from '../components/RiskGauge.vue'
 import DimensionRadar from '../components/DimensionRadar.vue'
 import PlatformReactions from '../components/PlatformReactions.vue'
