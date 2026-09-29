@@ -110,9 +110,16 @@ REDLINE_DIMENSIONS = frozenset({
     "政治敏感", "法律合规", "民族宗教", "事实错误", "平台禁区",
 })
 
+# 硬红线：政治/民族/平台，触及（score≥50）即强制红档
+HARD_REDLINE_DIMENSIONS = frozenset({
+    "政治敏感", "民族宗教", "平台禁区",
+})
+# 软红线：法律/事实，需更高分才强制红档（避免投资话术等泛违规被过度升档）
+SOFT_REDLINE_TOUCH_SCORE = 70
+
 # 红线强制分数下限：severity=red 的标定区间起点（76-100 red）
 REDLINE_SCORE_FLOOR = 76
-# 红线「触及」阈值：分数≥50 即视为触碰红线（PRD 任何触及均属高风险）
+# 红线「触及」阈值：硬红线分数≥50 即视为触碰（PRD 任何触及均属高风险）
 REDLINE_TOUCH_SCORE = 50
 
 
@@ -121,28 +128,35 @@ def is_redline_dimension(name: str | None) -> bool:
     return (name or "") in REDLINE_DIMENSIONS
 
 
-def enforce_redline_dim_score(name: str, score: int, sev: str | None) -> tuple[int, bool]:
-    """红线维度：red/high 或分数≥50（orange 触及）时抬升到 76+
+def redline_touch_threshold(name: str) -> int:
+    """按红线类型返回触及阈值：硬红线 50，软红线 70"""
+    return REDLINE_TOUCH_SCORE if name in HARD_REDLINE_DIMENSIONS else SOFT_REDLINE_TOUCH_SCORE
 
-    PRD：红线维度「任何触及均属高风险」。模型对民族宗教/价值观等
-    常给 orange，导致总体停在橙档；此处代码兜底。
+
+def enforce_redline_dim_score(name: str, score: int, sev: str | None) -> tuple[int, bool]:
+    """红线维度达到触及阈值或 red/high 时抬升到 76+
+
+    硬红线（政治/民族/平台）score≥50 即触及；软红线（法律/事实）需≥70
+    或 severity 已是 red/high，避免金融营销等场景误升红档。
 
     Returns:
         (校正后分数, 是否触发强制抬升)
     """
     if not is_redline_dimension(name):
         return int(score), False
-    if is_high_severity(sev, score) or int(score) >= REDLINE_TOUCH_SCORE:
+    touch = redline_touch_threshold(name)
+    if is_high_severity(sev, score) or int(score) >= touch:
         lifted = max(int(score), REDLINE_SCORE_FLOOR)
         return lifted, lifted != int(score)
     return int(score), False
 
 
 def redline_triggers_floor(dimensions: list[dict] | None) -> bool:
-    """任一红线维度 red/high 或 score≥50 → 总体分至少 76"""
+    """任一红线维度达到触及阈值或 red/high → 总体分至少 76"""
     for d in dimensions or []:
-        if not is_redline_dimension(d.get("name")):
+        name = d.get("name")
+        if not is_redline_dimension(name):
             continue
-        if is_high_severity(d.get("severity"), d.get("score", 0)) or int(d.get("score", 0) or 0) >= REDLINE_TOUCH_SCORE:
+        if is_high_severity(d.get("severity"), d.get("score", 0)) or int(d.get("score", 0) or 0) >= redline_touch_threshold(name):
             return True
     return False
