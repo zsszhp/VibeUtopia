@@ -2,7 +2,8 @@ graph:
   neo4j:
     uri: "bolt://localhost:7687"
     user: "neo4j"
-    password: "vibeutopia2024"
+    # 口令从环境变量 NEO4J_PASSWORD 读取，禁止在本文件写入真实口令
+    password: ""
     database: "neo4j"
 
   ontology:

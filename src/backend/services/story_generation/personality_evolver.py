@@ -60,8 +60,8 @@ class PersonalityEvolver:
             events_db_path: 触发事件库路径，默认使用 data/events/trigger_events_db.json
         """
         if events_db_path is None:
-            # 使用相对路径：从 backend/services/story_generation/ 到 data/events/
-            events_db_path = str(Path(__file__).parent.parent.parent.parent / "data" / "events" / "trigger_events_db.json")
+            # src/backend/services/story_generation/ → 项目根 → data/events/
+            events_db_path = str(Path(__file__).resolve().parents[4] / "data" / "events" / "trigger_events_db.json")
         
         self.events_db_path = events_db_path
         self.events_db = self._load_events_db()

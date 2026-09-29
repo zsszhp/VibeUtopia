@@ -20,7 +20,7 @@ class GraphStore:
     """Neo4j 图存储，支持降级到关系型数据库"""
 
     def __init__(self, uri: str = "bolt://localhost:7687",
-                 user: str = "neo4j", password: str = "vibeutopia"):
+                 user: str = "neo4j", password: str = ""):
         self.uri = uri
         self.user = user
         self.password = password

@@ -35,9 +35,9 @@
             <div class="step-label">{{ step.label }}</div>
             <div v-if="step.key === currentStep" class="step-progress">
               <div class="progress-bar">
-                <div class="progress-fill" :style="{ width: `${Math.round(progress * 100)}%` }"></div>
+                <div class="progress-fill" :style="{ width: `${Math.round(progress)}%` }"></div>
               </div>
-              <span class="progress-text">{{ Math.round(progress * 100) }}%</span>
+              <span class="progress-text">{{ Math.round(progress) }}%</span>
             </div>
             <div v-else-if="stepIndex > idx" class="step-done-badge">已完成</div>
           </div>
@@ -57,10 +57,10 @@
           <div class="module-info">
             <div class="module-name-row">
               <span class="module-name">{{ currentStepLabel }}</span>
-              <span class="module-pct">{{ Math.round(progress * 100) }}%</span>
+              <span class="module-pct">{{ Math.round(progress) }}%</span>
             </div>
             <div class="module-progress-bar">
-              <div class="module-progress-fill" :style="{ width: `${Math.round(progress * 100)}%` }"></div>
+              <div class="module-progress-fill" :style="{ width: `${Math.round(progress)}%` }"></div>
             </div>
             <p v-if="detail" class="module-detail">{{ detail }}</p>
           </div>
@@ -232,6 +232,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { severityLabel } from '../utils/labels'
 
 interface FrameProgress {
   currentFrame: number
@@ -323,16 +324,6 @@ function subTaskStatusLabel(status: string): string {
     pending: '待处理',
   }
   return map[status] || status
-}
-
-function severityLabel(severity: string): string {
-  const map: Record<string, string> = {
-    critical: '严重',
-    high: '高危',
-    medium: '中危',
-    low: '低危',
-  }
-  return map[severity] || severity
 }
 
 function formatTime(ts: number): string {

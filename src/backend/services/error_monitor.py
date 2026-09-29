@@ -3,6 +3,8 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from backend.services.log_sanitizer import redact_context, redact_secrets
+
 logger = logging.getLogger(__name__)
 
 _ALERT_THRESHOLD = 10
@@ -35,7 +37,7 @@ class ErrorMonitor:
                 timestamp=time.time(),
                 task_id=task_id,
                 step=step,
-                context=error.context,
+                context=redact_context(error.context),
             )
         else:
             record = ErrorRecord(
@@ -57,7 +59,7 @@ class ErrorMonitor:
             timestamp=time.time(),
             task_id=task_id,
             step=step,
-            context={"message": str(error)},
+            context={"message": redact_secrets(str(error))},
         )
         self.errors.append(record)
         self.error_counts["UNEXPECTED"] += 1

@@ -129,7 +129,7 @@ function render() {
         .attr('fill-opacity', 0.8)
         .attr('stroke-opacity', 0.4)
     })
-    .call(d3.drag<SVGCircleElement, any>()
+    .call((d3.drag<SVGCircleElement, any>()
       .on('start', (event, d) => {
         if (!event.active) simulation?.alphaTarget(0.3).restart()
         d.fx = d.x
@@ -143,8 +143,7 @@ function render() {
         if (!event.active) simulation?.alphaTarget(0)
         d.fx = null
         d.fy = null
-      })
-    )
+      })) as any)
 
   simulation.on('tick', () => {
     link

@@ -37,13 +37,14 @@ async function render() {
       min: 0,
       max: 100,
       pointer: { show: true },
-      detail: { formatter: '{value}', fontSize: 28, color: '#e0e0e0', offsetCenter: [0, '70%'] },
+      detail: { formatter: '{value}', fontSize: 28, color: '#E6EAF2', offsetCenter: [0, '70%'] },
       data: [{ value: props.score, name: props.level.toUpperCase() }],
-      axisLine: { lineStyle: { width: 12, color: [[0.35, '#22c55e'], [0.55, '#eab308'], [0.75, '#f97316'], [1, '#ef4444']] } },
+      // 阈值与决策口径统一：30 / 60 / 80
+      axisLine: { lineStyle: { width: 12, color: [[0.3, '#22c55e'], [0.6, '#eab308'], [0.8, '#f97316'], [1, '#ef4444']] } },
       axisTick: { show: false },
       splitLine: { show: false },
       axisLabel: { show: false },
-      title: { fontSize: 14, color: colorMap[props.level] || '#888', offsetCenter: [0, '90%'] },
+      title: { fontSize: 14, color: colorMap[props.level] || '#8B94A8', offsetCenter: [0, '90%'] },
     }],
   })
 }

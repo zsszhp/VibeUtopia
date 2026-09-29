@@ -92,7 +92,7 @@ const events = ref<any[]>([])
 const schedulerStatus = ref<any>({ is_running: false, current_mode: 'manual' })
 
 const platformOptions = [
-  { label: '全部', value: null },
+  { label: '全部', value: '' },
   { label: '微博', value: 'weibo' },
   { label: '抖音', value: 'douyin' },
   { label: '小红书', value: 'xiaohongshu' },

@@ -164,24 +164,40 @@ async def submit_review(
     """
     # 收集所有文本内容
     texts_to_analyze: list[str] = []
+    # 分模态文本：画面OCR 与 音频转写（供跨模态冲突检测）
+    visual_parts: list[str] = []
+    audio_parts: list[str] = []
 
     # 处理文本输入
     if req.texts:
         for item in req.texts:
             if item.get("type") == "text" and item.get("content"):
                 texts_to_analyze.append(item["content"])
+            elif item.get("type") == "visual" and item.get("content"):
+                visual_parts.append(item["content"])
+            elif item.get("type") == "audio" and item.get("content"):
+                audio_parts.append(item["content"])
 
     # 处理视频文件（提取文案 + Paraformer音频转写）
     audio_transcriptions: list[str] = []
     if req.video_files:
         for video_path in req.video_files:
-            if os.path.exists(video_path):
+            # 路径校验：限制在上传目录内，拒绝路径穿越/绝对路径越权
+            safe_path = _validate_video_path(video_path)
+            if not safe_path:
+                logger.warning("拒绝非法视频路径: %s", video_path)
+                raise HTTPException(status_code=400, detail="视频文件路径非法或不在上传目录内")
+            if os.path.exists(safe_path):
                 # 提取视频文案（OCR + 本地音频转写）
-                extract_result = await extract_video_text(video_path)
+                extract_result = await extract_video_text(safe_path)
                 if not extract_result.get("error"):
                     text = extract_result.get("text", "").strip()
                     if len(text) >= 10:
                         texts_to_analyze.append(text)
+                    if extract_result.get("ocr_text"):
+                        visual_parts.append(extract_result["ocr_text"])
+                    if extract_result.get("audio_text"):
+                        audio_parts.append(extract_result["audio_text"])
 
                 # Paraformer 云端音频转写（降级：API Key未配置时跳过）
                 try:
@@ -189,12 +205,13 @@ async def submit_review(
                     transcriber = ParaformerTranscriber()
                     if transcriber.api_key:
                         paraformer_result = await transcriber.transcribe(
-                            audio_file_path=video_path,
+                            audio_file_path=safe_path,
                             speaker_separation=True,
                         )
                         para_text = paraformer_result.get("text", "").strip()
                         if para_text:
                             audio_transcriptions.append(para_text)
+                            audio_parts.append(para_text)
                             logger.info("Paraformer音频转写成功: %d字", len(para_text))
                     else:
                         logger.info("Paraformer API Key未配置，跳过云端音频转写")
@@ -227,11 +244,17 @@ async def submit_review(
     db.add(task)
     db.commit()
 
-    # 启动后台分析
-    background_tasks.add_task(run_analysis, task_id, combined_text)
+    # 启动后台分析（传入 depth 档位 + 分模态文本）
+    depth = req.options.get("depth", "standard") if req.options else "standard"
+    visual_description = "\n".join(visual_parts).strip() or None
+    audio_transcript = "\n".join(audio_parts).strip() or None
+    background_tasks.add_task(
+        run_analysis, task_id, combined_text, depth,
+        visual_description=visual_description,
+        audio_transcript=audio_transcript,
+    )
 
     # 计算预估时间
-    depth = req.options.get("depth", "standard") if req.options else "standard"
     estimated_depth, estimated_seconds = _get_estimated_duration(depth)
 
     return ReviewResponse(
@@ -383,17 +406,53 @@ async def get_review_result(task_id: str, db: Session = Depends(get_db)):
                 pass
         result["cross_effects"] = cross_effects
 
-        # 改写建议
+        # 改写建议（表达优化建议，保留风险说明，不伪装原文）
         suggestions = []
         if summary.rewrites_json:
             try:
                 rewrites = json.loads(summary.rewrites_json)
                 for rw in rewrites:
-                    if isinstance(rw, dict):
+                    if not isinstance(rw, dict):
+                        continue
+                    original = rw.get("original", "")
+                    # 红线维度：仅输出「建议不予发布」，不提供改写版本
+                    if rw.get("is_redline"):
                         suggestions.append({
-                            "original": rw.get("original", ""),
+                            "original": original,
+                            "suggestion": rw.get("redline_note", "该内容建议不予发布"),
+                            "dimension": "",
+                            "rewrite_note": "",
+                            "is_redline": True,
+                        })
+                        continue
+                    # 新格式 rewrites 为 [{text, rewrite_note}] 列表
+                    rewrites_list = rw.get("rewrites", [])
+                    if isinstance(rewrites_list, list) and rewrites_list:
+                        for item in rewrites_list:
+                            if isinstance(item, dict):
+                                suggestions.append({
+                                    "original": original,
+                                    "suggestion": item.get("text", ""),
+                                    "dimension": rw.get("dimension", ""),
+                                    "rewrite_note": item.get("rewrite_note", ""),
+                                    "is_redline": False,
+                                })
+                            elif isinstance(item, str):
+                                suggestions.append({
+                                    "original": original,
+                                    "suggestion": item,
+                                    "dimension": rw.get("dimension", ""),
+                                    "rewrite_note": "",
+                                    "is_redline": False,
+                                })
+                    else:
+                        # 兼容旧格式单条 suggestion 字段
+                        suggestions.append({
+                            "original": original,
                             "suggestion": rw.get("suggestion", ""),
                             "dimension": rw.get("dimension", ""),
+                            "rewrite_note": rw.get("rewrite_note", ""),
+                            "is_redline": False,
                         })
             except json.JSONDecodeError:
                 pass
@@ -650,6 +709,56 @@ ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".webm"}
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 
 
+def _get_upload_dir() -> str:
+    """获取上传目录绝对路径"""
+    upload_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+    return upload_dir
+
+
+def _sanitize_filename(filename: str) -> str:
+    """消毒文件名：去除路径分隔符与危险字符，仅保留安全字符"""
+    import re
+    # 仅取 basename，防止 ../ 或绝对路径注入
+    name = os.path.basename(filename or "video.mp4")
+    # 替换危险字符，保留字母数字中文下划线连字符点
+    name = re.sub(r'[^\w\u4e00-\u9fff.\-]', '_', name)
+    # 防止隐藏文件或空名
+    name = name.strip('.').lstrip('.') or 'video.mp4'
+    return name[:120]
+
+
+def _validate_video_path(video_path: str) -> str | None:
+    """校验视频文件路径：必须位于上传目录内，拒绝路径穿越
+
+    Returns:
+        校验通过的绝对路径；不合法时返回 None
+    """
+    if not video_path or not isinstance(video_path, str):
+        return None
+
+    upload_dir = os.path.realpath(_get_upload_dir())
+
+    # 拒绝含 null 字节的路径
+    if "\x00" in video_path:
+        return None
+
+    # 解析为绝对路径并 realpath 消除符号链接/..穿越
+    try:
+        resolved = os.path.realpath(video_path)
+    except (OSError, ValueError):
+        return None
+
+    # 必须位于上传目录内（防止读取系统任意文件）
+    if not resolved.startswith(upload_dir + os.sep) and resolved != upload_dir:
+        return None
+
+    if not os.path.isfile(resolved):
+        return None
+
+    return resolved
+
+
 @router.post("/upload", response_model=UploadResponse)
 async def upload_file(file: UploadFile = File(...)):
     """上传视频文件
@@ -668,13 +777,17 @@ async def upload_file(file: UploadFile = File(...)):
         )
 
     # 创建上传目录
-    upload_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
-    os.makedirs(upload_dir, exist_ok=True)
+    upload_dir = _get_upload_dir()
 
-    # 生成唯一文件名
+    # 生成唯一文件名；消毒原文件名，防路径遍历写到上传目录之外
     file_id = str(uuid.uuid4())[:8]
-    safe_filename = f"{file_id}_{file.filename or 'video.mp4'}"
+    original_name = _sanitize_filename(file.filename or "video.mp4")
+    safe_filename = f"{file_id}_{original_name}"
     file_path = os.path.join(upload_dir, safe_filename)
+
+    # 双保险：确认最终路径仍在上传目录内
+    if os.path.commonpath([os.path.abspath(file_path), os.path.abspath(upload_dir)]) != os.path.abspath(upload_dir):
+        raise HTTPException(status_code=400, detail="非法文件名")
 
     # 保存文件
     try:

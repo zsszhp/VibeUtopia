@@ -3,11 +3,17 @@ import { ref, computed } from 'vue'
 import { api } from '../api'
 import type { ReviewRequest, ReviewResult, ProgressResponse, HistoryItem, ModelsResponse } from '../api'
 
+/** 任务生命周期：idle → submitting → analyzing → done | error */
+export type TaskStatus = 'idle' | 'submitting' | 'analyzing' | 'done' | 'error'
+
 export const useReviewStore = defineStore('review', () => {
   const currentTaskId = ref('')
   const result = ref<ReviewResult | null>(null)
   const progress = ref<ProgressResponse | null>(null)
   const loading = ref(false)
+  const status = ref<TaskStatus>('idle')
+  /** 提交时的原文，供反事实改写预估等下游使用 */
+  const submittedText = ref('')
   const currentStep = ref<'understanding' | 'assessment' | 'signal' | 'simulation' | 'report'>('understanding')
   const progressPercent = ref(0)
 
@@ -72,20 +78,24 @@ export const useReviewStore = defineStore('review', () => {
 
   async function submitReview(req: ReviewRequest) {
     loading.value = true
+    status.value = 'submitting'
     currentStep.value = 'understanding'
     progressPercent.value = 0
     result.value = null
+    submittedText.value = (req.texts ?? []).map(t => t.content).join('\n').trim()
     clearError()
     try {
       const resp = await api.submitReview(req)
       currentTaskId.value = resp.data.task_id
+      // 提交成功后进入分析中，loading 保持到分析完成（或失败）
+      status.value = 'analyzing'
       return resp.data
     } catch (e: any) {
       const msg = e?.response?.data?.detail || e?.message || '提交预审失败'
       setError(msg)
-      throw e
-    } finally {
+      status.value = 'error'
       loading.value = false
+      throw e
     }
   }
 
@@ -94,10 +104,18 @@ export const useReviewStore = defineStore('review', () => {
       const resp = await api.getReviewResult(taskId)
       result.value = resp.data
       clearError()
+      if (status.value === 'analyzing' || status.value === 'submitting') {
+        status.value = 'done'
+        loading.value = false
+      }
       return resp.data
     } catch (e: any) {
       const msg = e?.response?.data?.detail || e?.message || '获取预审结果失败'
       setError(msg)
+      if (status.value === 'analyzing' || status.value === 'submitting') {
+        status.value = 'error'
+        loading.value = false
+      }
       return null
     }
   }
@@ -165,6 +183,8 @@ export const useReviewStore = defineStore('review', () => {
         fetchResult(data.task_id)
         progressPercent.value = 100
         currentStep.value = 'report'
+        status.value = 'done'
+        loading.value = false
         break
     }
   }
@@ -175,6 +195,8 @@ export const useReviewStore = defineStore('review', () => {
     result.value = null
     progress.value = null
     loading.value = false
+    status.value = 'idle'
+    submittedText.value = ''
     currentStep.value = 'understanding'
     progressPercent.value = 0
     clearError()
@@ -193,7 +215,7 @@ export const useReviewStore = defineStore('review', () => {
   const riskLevel = computed(() => result.value?.risk_level ?? 'green')
 
   return {
-    currentTaskId, result, progress, loading, currentStep, progressPercent, riskLevel,
+    currentTaskId, result, progress, loading, status, submittedText, currentStep, progressPercent, riskLevel,
     error, errorTimestamp, wsConnected, wsFallbackPolling,
     frameProgress, sequenceDescriptions, riskAlerts, subTasks,
     submitReview, fetchResult, fetchProgress,
@@ -242,6 +264,10 @@ export const useHistoryStore = defineStore('history', () => {
     detailCache.value = {}
   }
 
+  function clearError() {
+    error.value = null
+  }
+
   function reset() {
     items.value = []
     total.value = 0
@@ -251,7 +277,7 @@ export const useHistoryStore = defineStore('history', () => {
     clearCache()
   }
 
-  return { items, total, page, loading, error, detailCache, fetchHistory, fetchHistoryDetail, clearCache, reset }
+  return { items, total, page, loading, error, detailCache, fetchHistory, fetchHistoryDetail, clearCache, clearError, reset }
 })
 
 export const useModelsStore = defineStore('models', () => {

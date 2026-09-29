@@ -5,7 +5,7 @@
 
 平台分级:
 - P0(权重1.0): 微博、B站、小红书、抖音、知乎 — 核心平台，影响占比≥70%
-- P1(权重0.7): 快手、贴吧、豆瓣、微信视频号、Twitter/X、Facebook、Instagram、YouTube、Telegram、Reddit — 次核心平台
+- P1(权重0.7): 快手、贴吧、豆瓣、微信视频号、虎扑、今日头条、TapTap、微信公众号、Twitter/X、Facebook、Instagram、YouTube、Telegram、Reddit — 次核心平台
 - P2(权重0.4): TikTok国际版、LinkedIn、NGA、V2EX、脉脉、Boss直聘、什么值得买、知乎专栏、即刻 — 其他长尾平台
 """
 from dataclasses import dataclass, field

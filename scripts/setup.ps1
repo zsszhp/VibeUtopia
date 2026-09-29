@@ -81,20 +81,23 @@ try {
 Write-Host ""
 Write-Host "[6/7] 配置数据库..." -ForegroundColor Yellow
 if ($dockerOk) {
-    if (Test-Path "docker-compose.yml") {
-        docker compose up -d 2>$null
+    $composeFile = Join-Path $ProjectRoot "scripts\docker-compose.yml"
+    if (Test-Path $composeFile) {
+        docker compose -f $composeFile up -d 2>$null
         if ($LASTEXITCODE -eq 0) {
             Write-Host "  OK MySQL + Neo4j 已通过 Docker Compose 启动" -ForegroundColor Green
-            Write-Host "    MySQL: localhost:3306 (vibe_user/vibe_password)" -ForegroundColor Gray
-            Write-Host "    Neo4j:  localhost:7687 (neo4j/vibeutopia2024)" -ForegroundColor Gray
+            Write-Host "    MySQL: localhost:3306 (user: vibe_user, password: 见 .env)" -ForegroundColor Gray
+            Write-Host "    Neo4j:  localhost:7687 (user: neo4j, password: 见 .env)" -ForegroundColor Gray
             Write-Host "    Neo4j Browser: http://localhost:7474" -ForegroundColor Gray
         } else {
             Write-Host "  ! Docker Compose 启动失败，将使用 SQLite 降级方案" -ForegroundColor DarkYellow
         }
+    } else {
+        Write-Host "  ! 未找到 $composeFile，跳过数据库启动" -ForegroundColor DarkYellow
     }
 } else {
     Write-Host "  ! 使用 SQLite 降级方案" -ForegroundColor DarkYellow
-    Write-Host "    如需使用 MySQL + Neo4j，请安装 Docker Desktop 后运行: docker compose up -d" -ForegroundColor Gray
+    Write-Host "    如需使用 MySQL + Neo4j，请安装 Docker Desktop 后运行: docker compose -f scripts\docker-compose.yml up -d" -ForegroundColor Gray
 }
 
 # ---- 7. 配置 .env ----

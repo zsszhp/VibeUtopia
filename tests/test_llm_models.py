@@ -69,11 +69,16 @@ MODELS = [
 # API Keys - 从环境变量读取
 def get_api_keys():
     keys_str = os.getenv("LONGCAT_API_KEY", "")
-    if not keys_str:
-        raise RuntimeError("LONGCAT_API_KEY 未配置，请在 .env 文件中设置")
     return [k.strip() for k in keys_str.split(",") if k.strip()]
 
 API_KEYS = get_api_keys()
+
+if not API_KEYS and __name__ != "__main__":
+    import pytest
+    pytest.skip("LONGCAT_API_KEY 未配置，跳过真实模型调用测试", allow_module_level=True)
+
+if not API_KEYS:
+    raise RuntimeError("LONGCAT_API_KEY 未配置，请在 .env 文件中设置")
 
 # LongCat API 端点
 LONGCAT_BASE_URL = "https://api.longcat.chat/openai/v1"

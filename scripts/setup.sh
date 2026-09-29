@@ -1,9 +1,13 @@
 #!/bin/bash
 # VibeUtopia 环境一键配置脚本
-# 使用方法: bash setup.sh
+# 使用方法: bash scripts/setup.sh
 # 支持: macOS / Linux (Ubuntu 22.04+)
 
 set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_ROOT"
 
 echo "========================================="
 echo "  VibeUtopia 环境配置"
@@ -78,16 +82,19 @@ echo ""
 echo "[6/7] 配置数据库..."
 
 if [ "$DOCKER_OK" = true ]; then
-    if [ -f "docker-compose.yml" ]; then
-        docker-compose up -d 2>/dev/null
+    COMPOSE_FILE="scripts/docker-compose.yml"
+    if [ -f "$COMPOSE_FILE" ]; then
+        docker compose -f "$COMPOSE_FILE" up -d
         echo "✅ MySQL + Neo4j 已通过 Docker Compose 启动"
-        echo "   MySQL: localhost:3306 (vibe_user/vibe_password)"
-        echo "   Neo4j: localhost:7687 (neo4j/vibeutopia2024)"
+        echo "   MySQL: localhost:3306 (user: vibe_user, password: 见 .env)"
+        echo "   Neo4j: localhost:7687 (user: neo4j, password: 见 .env)"
         echo "   Neo4j Browser: http://localhost:7474"
+    else
+        echo "⚠️  未找到 $COMPOSE_FILE，跳过数据库启动"
     fi
 else
     echo "⚠️  使用 SQLite 降级方案"
-    echo "   如需使用 MySQL + Neo4j，请安装 Docker 后运行: docker-compose up -d"
+    echo "   如需使用 MySQL + Neo4j，请安装 Docker 后运行: docker compose -f scripts/docker-compose.yml up -d"
 fi
 
 # ---- 7. 配置 .env ----
@@ -113,9 +120,9 @@ echo ""
 echo "下一步："
 echo "  1. 编辑 .env 填入 LLM API Key"
 echo "  2. 激活虚拟环境: source .venv/bin/activate"
-echo "  3. 启动后端: uvicorn backend.main:app --reload"
-echo "  4. 浏览器打开: http://localhost:8000/docs"
+echo "  3. 启动后端: PYTHONPATH=src python -m uvicorn backend.main:app --reload"
+echo "  4. 浏览器打开: http://localhost:8000/docs  （健康检查: /health）"
 echo ""
 echo "前端（可选）："
-echo "  cd frontend && npm install && npm run dev"
+echo "  cd src/frontend && npm install && npm run dev"
 echo ""

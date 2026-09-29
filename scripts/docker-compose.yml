@@ -1,4 +1,6 @@
 version: '3.8'
+# 敏感口令通过 .env 注入，禁止写入本文件。
+# 复制根目录 .env.example 为 .env 并填写 MYSQL_ROOT_PASSWORD / MYSQL_PASSWORD / NEO4J_PASSWORD
 services:
   neo4j:
     image: neo4j:5-community
@@ -7,7 +9,7 @@ services:
       - "7474:7474"
       - "7687:7687"
     environment:
-      NEO4J_AUTH: neo4j/vibeutopia2024
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?NEO4J_PASSWORD 未设置}
       NEO4J_PLUGINS: '["apoc"]'
     volumes:
       - neo4j_data:/data
@@ -20,16 +22,16 @@ services:
     ports:
       - "3306:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_DATABASE: vibeutopia
-      MYSQL_USER: vibe_user
-      MYSQL_PASSWORD: vibe_password
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD 未设置}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-vibeutopia}
+      MYSQL_USER: ${MYSQL_USER:-vibe_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD 未设置}
     volumes:
       - mysql_data:/var/lib/mysql
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uvibe_user", "-pvibe_password"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$${MYSQL_USER} -p$${MYSQL_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 5

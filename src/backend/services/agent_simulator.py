@@ -49,7 +49,81 @@ PLATFORM_NAMES = {
 
 logger = logging.getLogger(__name__)
 
-AGENTS_PER_PLATFORM = 5  # 每个平台生成的Agent数量
+AGENTS_PER_PLATFORM = 5  # 每个平台生成的Agent数量（standard 档默认）
+
+# 深度档位 → 每平台 Agent 数（quick 纯静态、deep/large_scale 提高仿真规模）
+DEPTH_AGENTS = {
+    "quick": 0,
+    "standard": 5,
+    "deep": 15,
+    "large_scale": 30,
+}
+
+
+async def simulate_platform_with_agents(text: str, platform: str, agents_count: int | None = None) -> dict:
+    """使用多Agent模拟单个平台的用户反应
+
+    Args:
+        text: 待分析文案
+        platform: 平台标识
+        agents_count: 本次仿真每平台 Agent 数；None 时用 AGENTS_PER_PLATFORM
+
+    Returns:
+        聚合后的平台反应dict
+    """
+    platform_name = PLATFORM_NAMES.get(platform, platform)
+
+    count = AGENTS_PER_PLATFORM if agents_count is None else agents_count
+    if count <= 0:
+        return {
+            "platform": platform,
+            "platform_name": platform_name,
+            "focus": "快速模式跳过Agent仿真",
+            "comment": "",
+            "positive": 0.33,
+            "neutral": 0.34,
+            "negative": 0.33,
+            "sentiment": "neutral",
+            "reason": "quick 深度档位不执行 Agent 仿真",
+            "sub_reactions": [],
+            "agent_details": [],
+        }
+
+    # 1. 生成Agent人格
+    personas = await generate_personas_batch(platform, count)
+
+    if not personas:
+        # 降级：如果人格生成全部失败，返回基础反应
+        logger.warning("平台 %s Agent人格生成失败，使用降级反应", platform)
+        return {
+            "platform": platform,
+            "platform_name": platform_name,
+            "focus": "模拟降级",
+            "comment": "",
+            "positive": 0.33,
+            "neutral": 0.34,
+            "negative": 0.33,
+            "sentiment": "neutral",
+            "reason": "Agent人格生成失败，使用默认反应",
+            "sub_reactions": [],
+            "agent_details": [],
+        }
+
+    # 2. 并行获取各Agent反应
+    react_tasks = [_agent_react(p, text, platform_name) for p in personas]
+    reactions = await asyncio.gather(*react_tasks, return_exceptions=True)
+
+    valid_reactions = []
+    for r in reactions:
+        if isinstance(r, Exception):
+            logger.error("Agent反应异常: %s", r)
+            continue
+        if r is not None:
+            valid_reactions.append(r)
+
+    # 3. 聚合反应
+    result = _aggregate_agent_reactions(valid_reactions, platform, platform_name)
+    return result
 
 
 async def _agent_react(persona: dict, text: str, platform_name: str) -> Optional[dict]:
@@ -197,67 +271,20 @@ def _aggregate_agent_reactions(
     }
 
 
-async def simulate_platform_with_agents(text: str, platform: str) -> dict:
-    """使用多Agent模拟单个平台的用户反应
-
-    Args:
-        text: 待分析文案
-        platform: 平台标识
-
-    Returns:
-        聚合后的平台反应dict
-    """
-    platform_name = PLATFORM_NAMES.get(platform, platform)
-
-    # 1. 生成Agent人格
-    personas = await generate_personas_batch(platform, AGENTS_PER_PLATFORM)
-
-    if not personas:
-        # 降级：如果人格生成全部失败，返回基础反应
-        logger.warning("平台 %s Agent人格生成失败，使用降级反应", platform)
-        return {
-            "platform": platform,
-            "platform_name": platform_name,
-            "focus": "模拟降级",
-            "comment": "",
-            "positive": 0.33,
-            "neutral": 0.34,
-            "negative": 0.33,
-            "sentiment": "neutral",
-            "reason": "Agent人格生成失败，使用默认反应",
-            "sub_reactions": [],
-            "agent_details": [],
-        }
-
-    # 2. 并行获取各Agent反应
-    react_tasks = [_agent_react(p, text, platform_name) for p in personas]
-    reactions = await asyncio.gather(*react_tasks, return_exceptions=True)
-
-    valid_reactions = []
-    for r in reactions:
-        if isinstance(r, Exception):
-            logger.error("Agent反应异常: %s", r)
-            continue
-        if r is not None:
-            valid_reactions.append(r)
-
-    # 3. 聚合反应
-    result = _aggregate_agent_reactions(valid_reactions, platform, platform_name)
-    return result
-
-
-async def simulate_all_platforms_with_agents(text: str) -> list[dict]:
+async def simulate_all_platforms_with_agents(text: str, depth: str = "standard") -> list[dict]:
     """并行模拟所有平台的Agent反应
 
     Args:
         text: 待分析文案
+        depth: 分析深度档位 quick/standard/deep/large_scale，决定每平台 Agent 数
 
     Returns:
         各平台聚合反应列表
     """
     from backend.services.persona_simulator import PLATFORMS
 
-    tasks = [simulate_platform_with_agents(text, p) for p in PLATFORMS]
+    agents_count = DEPTH_AGENTS.get(depth, AGENTS_PER_PLATFORM)
+    tasks = [simulate_platform_with_agents(text, p, agents_count) for p in PLATFORMS]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     processed = []

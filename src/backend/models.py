@@ -448,3 +448,36 @@ class BacktestComparisonRecord(Base):
     v2_accuracy = Column(Float, default=0.0)
     improvement = Column(Float, default=0.0)
     created_at = Column(DateTime, default=utcnow)
+
+
+class HotTopic(Base):
+    """平台热点话题（平台浸泡系统输入）"""
+    __tablename__ = "hot_topics"
+
+    topic_id = Column(String(64), primary_key=True)
+    title = Column(String(500), index=True)
+    platform = Column(String(50), index=True)
+    category = Column(String(100), nullable=True)
+    tags = Column(MySQLText, default="[]")
+    keywords = Column(MySQLText, default="[]")
+    sentiment = Column(String(20), default="neutral")
+    created_at = Column(DateTime, default=utcnow)
+
+
+class ImmersionRecord(Base):
+    """平台浸泡记录（Agent 初始化时吸收热点）"""
+    __tablename__ = "immersion_records"
+
+    immersion_id = Column(String(64), primary_key=True)
+    agent_id = Column(String(64), index=True)
+    immersion_config = Column(MySQLText, default="{}")
+    absorbed_topics = Column(MySQLText, default="[]")
+    initial_attitudes = Column(MySQLText, default="[]")
+    attention_distribution = Column(MySQLText, default="{}")
+    immersion_days = Column(Integer, default=7)
+    posts_per_day = Column(Integer, default=20)
+    immersion_score = Column(Float, default=0.0)
+    status = Column(String(20), default="running")
+    error = Column(MySQLText, nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+    completed_at = Column(DateTime, nullable=True)

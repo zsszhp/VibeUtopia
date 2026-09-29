@@ -3,7 +3,7 @@
     <div v-if="!entities?.length" class="empty-state">
       <span>暂无实体风险链数据</span>
     </div>
-    <NTimeline v-else size="small">
+    <NTimeline v-else size="medium">
       <NTimelineItem
         v-for="entity in entities"
         :key="entity.id"

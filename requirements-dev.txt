@@ -1,0 +1,6 @@
+# 开发与测试增强依赖（生产运行不必须）
+# 安装: pip install -r requirements-dev.txt
+
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0

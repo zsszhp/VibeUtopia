@@ -1,7 +1,11 @@
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.database import init_db
 from backend.routes import router
@@ -10,6 +14,8 @@ from backend.services.graph.graph_store import GraphStore
 from backend.services.analyzer import set_broadcast_func
 from backend.config import settings
 from backend.services.chroma_model_warmup import initialize_on_startup
+
+logger = logging.getLogger(__name__)
 
 # 全局调度器实例
 signal_scheduler = SignalScheduler()
@@ -46,15 +52,81 @@ app = FastAPI(title="VibeUtopia", version="0.5.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ALLOW_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
+# ─── 统一错误响应（前端固定解析 response.data.detail） ──────────────
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """4xx/5xx 统一为 {"detail": "<可读消息>"}，保证前端可解析。"""
+    detail = exc.detail
+    if not isinstance(detail, str):
+        detail = str(detail)
+    return JSONResponse(status_code=exc.status_code, content={"detail": detail})
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """参数校验失败 422，detail 收敛为可展示字符串而非对象数组。"""
+    parts = []
+    for err in exc.errors():
+        loc = ".".join(str(x) for x in err.get("loc", []) if x != "body")
+        msg = str(err.get("msg", "参数无效"))
+        parts.append(f"{loc}: {msg}" if loc else msg)
+    return JSONResponse(status_code=422, content={"detail": "请求参数校验失败: " + "; ".join(parts)})
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """兜底 5xx：服务端记完整堆栈，客户端只拿到通用消息，避免内部信息外泄。"""
+    logger.exception("未处理异常: %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "服务器内部错误"})
+
+
+@app.get("/health", tags=["ops"])
+async def health():
+    """存活探活端点：供 Docker/K8s/SLB 与一键启动脚本探测服务状态"""
+    return {"status": "ok", "service": "vibeutopia", "version": app.version}
+
+
+@app.get("/healthz", tags=["ops"], include_in_schema=False)
+async def healthz():
+    return {"status": "ok"}
+
+
+@app.get("/api/v1/health", tags=["ops"])
+async def health_v1():
+    """文档与运维脚本约定的健康检查路径（与 /health 等价）。"""
+    return {"status": "ok", "service": "vibeutopia", "version": app.version}
+
+
+@app.get("/ready", tags=["ops"])
+async def ready():
+    """就绪探针（readiness）：检查数据库连接是否可用。"""
+    from sqlalchemy import text
+
+    from backend.database import engine
+
+    checks: dict[str, str] = {}
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        checks["database"] = "ok"
+    except Exception as e:
+        logger.warning("就绪检查失败: database 不可用: %s", e)
+        checks["database"] = "unavailable"
+        return JSONResponse(status_code=503, content={"status": "degraded", "checks": checks})
+    return {"status": "ok", "checks": checks}
+
+
 app.include_router(router, prefix="/api/v1")
 
-# 注册阶段 3 新增路由
+# 注册阶段 3 新增路由（装饰器为相对路径，前缀在此统一挂载，避免双重前缀）
 from backend.routes_v3 import router as router_v3
 app.include_router(router_v3, prefix="/api/v3")
 
@@ -69,6 +141,10 @@ app.include_router(router_local_models)
 # 注册断点续传路由
 from backend.routes_resume import router as router_resume
 app.include_router(router_resume, prefix="/api/v1")
+
+# 注册人生故事生成路由（路由自身携带 prefix=/api/v1/story，此处不叠加前缀）
+from backend.routes_story import router as router_story
+app.include_router(router_story)
 
 
 # ─── WebSocket端点 ────────────────────────────────────────────────

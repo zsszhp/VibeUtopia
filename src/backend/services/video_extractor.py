@@ -28,6 +28,8 @@ async def extract_video_text(video_path: str) -> dict:
             "subtitles": str | None,
             "text": str,          # 最终可用文案
             "source": str,        # "ocr" | "audio" | "filename"
+            "ocr_text": str,      # 画面OCR文字（供跨模态检测）
+            "audio_text": str,    # 音频转写文字（供跨模态检测）
         }
     """
     if not os.path.exists(video_path):
@@ -38,11 +40,15 @@ async def extract_video_text(video_path: str) -> dict:
             "text": "",
             "source": "",
             "error": f"视频文件不存在: {video_path}（仅支持本地视频文件）",
+            "ocr_text": "",
+            "audio_text": "",
         }
 
     title = os.path.splitext(os.path.basename(video_path))[0]
     combined_texts = []
     sources = []
+    ocr_text = ""
+    audio_text = ""
 
     # 尝试通过关键帧OCR提取文字
     try:
@@ -59,6 +65,7 @@ async def extract_video_text(video_path: str) -> dict:
             if ocr_result.all_text:
                 combined_texts.append(ocr_result.all_text)
                 sources.append("ocr")
+                ocr_text = ocr_result.all_text
                 logger.info("OCR提取文字: %d字", len(ocr_result.all_text))
     except Exception as e:
         logger.warning("关键帧OCR提取失败: %s", e)
@@ -77,6 +84,7 @@ async def extract_video_text(video_path: str) -> dict:
         if transcription and transcription.full_text:
             combined_texts.append(transcription.full_text)
             sources.append("audio")
+            audio_text = transcription.full_text
             logger.info("音频转写文字: %d字 (输入: %s)", len(transcription.full_text), "已有音频" if audio_input else "视频提取")
     except Exception as e:
         logger.warning("音频转写失败: %s", e)
@@ -95,6 +103,8 @@ async def extract_video_text(video_path: str) -> dict:
         "subtitles": None,
         "text": text,
         "source": source,
+        "ocr_text": ocr_text,
+        "audio_text": audio_text,
     }
 
 

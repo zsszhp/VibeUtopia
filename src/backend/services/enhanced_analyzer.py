@@ -192,6 +192,7 @@ async def _run_phase1(text: str, result: EnhancedAnalysisResult):
     )
 
     risk_sentences = risk_results.get("risk_sentences", [])
+    from backend.services.severity import needs_rewrite as _needs_rewrite
     rewrite_tasks = [
         rewrite_sentence(
             rs.get("sentence", ""),
@@ -200,7 +201,7 @@ async def _run_phase1(text: str, result: EnhancedAnalysisResult):
             is_transcript_noise=is_noise_sentence(rs.get("sentence", ""), transcript_quality),
         )
         for rs in risk_sentences
-        if rs.get("severity") in ("high", "medium")
+        if _needs_rewrite(rs.get("severity"))
     ]
     rewrites = await asyncio.gather(*rewrite_tasks, return_exceptions=True)
     rewrites = [r for r in rewrites if not isinstance(r, Exception)]
@@ -278,10 +279,23 @@ async def _run_phase2(
 
 
 async def _run_phase3(text: str, result: EnhancedAnalysisResult):
-    """Phase 3: 仿真增强"""
+    """Phase 3: 仿真增强
+
+    引擎可用时真实执行轻量 Tick 仿真；不可用时明确降级并记录原因，
+    不再静默落入笼统异常。
+    """
     try:
         from backend.services.simulation.engine import SimulationEngine
+    except Exception as e:
+        logger.error("仿真引擎导入失败，本次分析跳过仿真阶段: %s", e)
+        result.simulation_summary = {
+            "error": f"仿真引擎不可用: {e}",
+            "degraded": True,
+            "degraded_reason": "engine_import_failed",
+        }
+        return
 
+    try:
         sim_id = f"sim_v2r1_{uuid.uuid4().hex[:8]}"
         engine = SimulationEngine.create_lightweight(
             sim_id=sim_id,
@@ -302,13 +316,18 @@ async def _run_phase3(text: str, result: EnhancedAnalysisResult):
             "propagation": status.get("propagation", {}),
             "platforms": status.get("platforms", {}),
             "monitor": status.get("monitor", {}),
+            "engine_mode": "lightweight_tick_simulation",
         }
 
         logger.info("仿真增强完成: %s, %d ticks, %d agents", sim_id, status.get("current_tick", 0), status.get("total_agents", 0))
 
     except Exception as e:
-        logger.error("仿真增强失败: %s", e)
-        result.simulation_summary = {"error": str(e)}
+        logger.error("仿真增强执行失败: %s", e)
+        result.simulation_summary = {
+            "error": str(e),
+            "degraded": True,
+            "degraded_reason": "engine_runtime_failed",
+        }
 
 
 async def _run_phase2_6(text: str, result: EnhancedAnalysisResult, audio_transcription: str):

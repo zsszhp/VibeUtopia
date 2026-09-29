@@ -13,6 +13,7 @@ from pathlib import Path
 import yaml
 
 from backend.config import settings
+from backend.services.log_sanitizer import redact_secrets
 
 logger = logging.getLogger(__name__)
 
@@ -545,7 +546,7 @@ async def call_vlm(prompt: str, image_base64: str, system: str = "你是一个�
                 return result
             except QuotaExhaustedError as e:
                 router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
-                logger.warning("视觉模型 %s 配额耗尽 (%s)，触发 fallback", key, e)
+                logger.warning("视觉模型 %s 配额耗尽 (%s)，触发 fallback", key, redact_secrets(str(e)))
                 last_error = e
             except Exception as e:
                 retried = False
@@ -555,19 +556,19 @@ async def call_vlm(prompt: str, image_base64: str, system: str = "你是一个�
                         return result
                     except QuotaExhaustedError as eq:
                         router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
-                        logger.warning("视觉模型 %s 配额耗尽 (重试%d次): %s", key, attempt + 1, eq)
+                        logger.warning("视觉模型 %s 配额耗尽 (重试%d次): %s", key, attempt + 1, redact_secrets(str(eq)))
                         last_error = eq
                         retried = True
                         break
                     except Exception as e2:
                         last_error = e2
-                        logger.warning("VLM 调用失败 %s (重试%d次): %s", key, attempt + 1, e2)
+                        logger.warning("VLM 调用失败 %s (重试%d次): %s", key, attempt + 1, redact_secrets(str(e2)))
 
                 if not retried:
                     logger.warning("视觉模型 %s 调用失败，尝试下一个模型", key)
 
         if last_error:
-            raise RuntimeError(f"所有视觉模型不可用，已尝试: {tried}，最后错误: {last_error}")
+            raise RuntimeError(f"所有视觉模型不可用，已尝试: {tried}，最后错误: {redact_secrets(str(last_error))}")
         raise RuntimeError(f"无可用视觉模型（需要配置支持 vision 的模型端点）")
 
 
@@ -658,7 +659,7 @@ async def _call_with_routing(prompt: str, system: str, task_type: str) -> str:
             return result
         except QuotaExhaustedError as e:
             router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
-            logger.warning("模型 %s 配额耗尽 (%s)，触发 fallback", key, e)
+            logger.warning("模型 %s 配额耗尽 (%s)，触发 fallback", key, redact_secrets(str(e)))
             last_error = e
         except Exception as e:
             # 非配额错误：重试当前模型
@@ -669,19 +670,19 @@ async def _call_with_routing(prompt: str, system: str, task_type: str) -> str:
                     return result
                 except QuotaExhaustedError as eq:
                     router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
-                    logger.warning("模型 %s 配额耗尽 (重试%d次): %s", key, attempt + 1, eq)
+                    logger.warning("模型 %s 配额耗尽 (重试%d次): %s", key, attempt + 1, redact_secrets(str(eq)))
                     last_error = eq
                     retried = True
                     break
                 except Exception as e2:
                     last_error = e2
-                    logger.warning("LLM 调用失败 %s (重试%d次): %s", key, attempt + 1, e2)
+                    logger.warning("LLM 调用失败 %s (重试%d次): %s", key, attempt + 1, redact_secrets(str(e2)))
 
             if not retried:
                 # 非配额错误重试后仍失败，尝试下一个模型
                 logger.warning("模型 %s 调用失败，尝试下一个模型", key)
 
-    raise RuntimeError(f"所有模型不可用，已尝试: {tried}" + (f"，最后错误: {last_error}" if last_error else ""))
+    raise RuntimeError(f"所有模型不可用，已尝试: {tried}" + (f"，最后错误: {redact_secrets(str(last_error))}" if last_error else ""))
 
 
 async def _call_endpoint(endpoint: ModelEndpoint, prompt: str, system: str) -> str:
@@ -714,12 +715,12 @@ async def _httpx_call(url: str, headers: dict, payload: dict, endpoint: ModelEnd
 
         if _is_quota_error(resp.status_code):
             raise QuotaExhaustedError(
-                f"{endpoint.provider_name} {endpoint.model_id} HTTP {resp.status_code}: {resp.text[:200]}"
+                f"{endpoint.provider_name} {endpoint.model_id} HTTP {resp.status_code}: {redact_secrets(resp.text[:200])}"
             )
 
         if resp.status_code == 400:
-            logger.error("LLM 400 错误详情: url=%s, model=%s, response=%s", url, endpoint.model_id, resp.text[:500])
-            raise RuntimeError(f"请求格式错误 (HTTP 400): {resp.text[:300]}")
+            logger.error("LLM 400 错误详情: url=%s, model=%s, response=%s", url, endpoint.model_id, redact_secrets(resp.text[:500]))
+            raise RuntimeError(f"请求格式错误 (HTTP 400): {redact_secrets(resp.text[:300])}")
 
         resp.raise_for_status()
         data = resp.json()
@@ -831,7 +832,7 @@ async def call_image_gen(
                 return result
             except QuotaExhaustedError as e:
                 router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
-                logger.warning("图像生成模型 %s 配额耗尽 (%s)，触发 fallback", key, e)
+                logger.warning("图像生成模型 %s 配额耗尽 (%s)，触发 fallback", key, redact_secrets(str(e)))
                 last_error = e
             except Exception as e:
                 for attempt in range(settings.LLM_MAX_RETRIES):
@@ -840,17 +841,17 @@ async def call_image_gen(
                         return result
                     except QuotaExhaustedError as eq:
                         router.mark_unavailable(endpoint.provider, endpoint.model_id, endpoint.key_index)
-                        logger.warning("图像生成模型 %s 配额耗尽 (重试%d次): %s", key, attempt + 1, eq)
+                        logger.warning("图像生成模型 %s 配额耗尽 (重试%d次): %s", key, attempt + 1, redact_secrets(str(eq)))
                         last_error = eq
                         break
                     except Exception as e2:
                         last_error = e2
-                        logger.warning("图像生成调用失败 %s (重试%d次): %s", key, attempt + 1, e2)
+                        logger.warning("图像生成调用失败 %s (重试%d次): %s", key, attempt + 1, redact_secrets(str(e2)))
                 else:
                     logger.warning("图像生成模型 %s 调用失败，尝试下一个模型", key)
 
         if last_error:
-            raise RuntimeError(f"所有图像生成模型不可用，已尝试: {tried}，最后错误: {last_error}")
+            raise RuntimeError(f"所有图像生成模型不可用，已尝试: {tried}，最后错误: {redact_secrets(str(last_error))}")
         raise RuntimeError("无可用图像生成模型（需要配置支持 image_gen 的模型端点）")
 
 
@@ -931,7 +932,7 @@ def _parse_image_gen_response(data: dict, endpoint: ModelEndpoint) -> dict:
     """
     images = data.get("data", [])
     if not images:
-        raise RuntimeError(f"图像生成返回空结果: {data}")
+        raise RuntimeError(f"图像生成返回空结果: {redact_secrets(str(data))}")
 
     result = {
         "model": endpoint.model_id,
@@ -960,12 +961,12 @@ async def _httpx_call_image_gen(
 
         if _is_quota_error(resp.status_code):
             raise QuotaExhaustedError(
-                f"{endpoint.provider_name} {endpoint.model_id} HTTP {resp.status_code}: {resp.text[:200]}"
+                f"{endpoint.provider_name} {endpoint.model_id} HTTP {resp.status_code}: {redact_secrets(resp.text[:200])}"
             )
 
         if resp.status_code == 400:
-            logger.error("图像生成 400 错误: url=%s, model=%s, response=%s", url, endpoint.model_id, resp.text[:500])
-            raise RuntimeError(f"请求格式错误 (HTTP 400): {resp.text[:300]}")
+            logger.error("图像生成 400 错误: url=%s, model=%s, response=%s", url, endpoint.model_id, redact_secrets(resp.text[:500]))
+            raise RuntimeError(f"请求格式错误 (HTTP 400): {redact_secrets(resp.text[:300])}")
 
         resp.raise_for_status()
         data = resp.json()

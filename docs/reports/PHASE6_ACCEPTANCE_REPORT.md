@@ -61,7 +61,7 @@
 
 ### 1. 博主历史分析
 
-- 风险趋势追踪：按时间线追踪7维风险分数变化
+- 风险趋势追踪：按时间线追踪11维风险分数变化
 - 风险画像生成：长期风险偏好分析
 - 风险预测：基于历史趋势预测未来风险
 - API: `GET /api/v3/blogger/{blogger_id}/history`, `GET /api/v3/blogger/{blogger_id}/risk-profile`

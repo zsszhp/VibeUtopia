@@ -37,6 +37,8 @@ class FineGrainedRiskReport:
     max_risk_level: str = "safe"
     key_findings: list = field(default_factory=list)
     evidence_frames: list = field(default_factory=list)
+    # 失败策略：检测器失败/解析异常时置 True，提示结果未知需人工复核
+    needs_review: bool = False
     error: Optional[str] = None
 
 
@@ -94,8 +96,10 @@ class FineGrainedPipeline:
         key_findings = []
         evidence_frames = []
         risk_upgrade = 0
-        risk_order = {"safe": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
+        # unknown 表示检测失败/结果未知，不参与风险升级，但会置 needs_review
+        risk_order = {"unknown": 0, "safe": 1, "low": 2, "medium": 3, "high": 4, "critical": 5}
         max_risk_level = "safe"
+        needs_review = False
 
         # Step 1: 密集帧扫描
         if self.config["enable_dense_scan"]:
@@ -151,6 +155,10 @@ class FineGrainedPipeline:
                 map_result = await self.map_auditor.audit_video_frames(frame_paths, timestamps)
                 report.map_audit = map_result
 
+                if getattr(map_result, "needs_review", False):
+                    needs_review = True
+                    key_findings.append("地图审核部分帧检测失败，结果未知需人工复核")
+
                 if map_result.has_map_risk:
                     key_findings.append(f"地图审核发现风险: 缺失区域={map_result.audit_results}")
                     risk_upgrade += 30
@@ -163,6 +171,7 @@ class FineGrainedPipeline:
 
             except Exception as e:
                 logger.warning("地图审核失败: %s", e)
+                needs_review = True
 
         # 3b. 代码溯源检测
         if self.config["enable_code_trace"]:
@@ -245,13 +254,15 @@ class FineGrainedPipeline:
         report.max_risk_level = max_risk_level
         report.key_findings = key_findings
         report.evidence_frames = list(set(evidence_frames))
+        report.needs_review = needs_review
 
         logger.info(
-            "细粒度分析完成: has_risk=%s, risk_upgrade=%d, max_level=%s, findings=%d",
+            "细粒度分析完成: has_risk=%s, risk_upgrade=%d, max_level=%s, findings=%d, needs_review=%s",
             report.has_fine_grained_risk,
             report.risk_upgrade,
             report.max_risk_level,
             len(key_findings),
+            needs_review,
         )
 
         return report

@@ -54,13 +54,13 @@ class Settings:
     # 知识图谱配置 (Neo4j)
     NEO4J_URI: str = os.getenv("NEO4J_URI", "bolt://localhost:7687")
     NEO4J_USER: str = os.getenv("NEO4J_USER", "neo4j")
-    NEO4J_PASSWORD: str = os.getenv("NEO4J_PASSWORD", "vibeutopia2024")
+    NEO4J_PASSWORD: str = os.getenv("NEO4J_PASSWORD", "")
 
     # MySQL 独立配置 (用于构建 DATABASE_URL)
     MYSQL_HOST: str = os.getenv("MYSQL_HOST", "")
     MYSQL_PORT: int = int(os.getenv("MYSQL_PORT", "3306"))
     MYSQL_USER: str = os.getenv("MYSQL_USER", "vibe_user")
-    MYSQL_PASSWORD: str = os.getenv("MYSQL_PASSWORD", "vibe_password")
+    MYSQL_PASSWORD: str = os.getenv("MYSQL_PASSWORD", "")
     MYSQL_DATABASE: str = os.getenv("MYSQL_DATABASE", "vibeutopia")
 
     # 仿真引擎配置
@@ -80,6 +80,19 @@ class Settings:
     OCR_MIN_CONFIDENCE: float = float(os.getenv("OCR_MIN_CONFIDENCE", "0.5"))
     WHISPER_MODEL: str = os.getenv("WHISPER_MODEL", "base")
     WHISPER_DEVICE: str = os.getenv("WHISPER_DEVICE", "cpu")
+
+    # CORS 配置：逗号分隔的来源白名单，默认仅放行本地开发端口（Vite dev: 3000/5173）
+    # 生产环境必须通过 CORS_ALLOW_ORIGINS 显式配置，禁止使用 *
+    CORS_ALLOW_ORIGINS: list[str] = [
+        o.strip()
+        for o in os.getenv(
+            "CORS_ALLOW_ORIGINS",
+            "http://localhost:3000,http://127.0.0.1:3000,"
+            "http://localhost:5173,http://127.0.0.1:5173,"
+            "http://localhost:8080,http://127.0.0.1:8080",
+        ).split(",")
+        if o.strip()
+    ]
 
 
 settings = Settings()

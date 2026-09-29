@@ -138,7 +138,11 @@ cd VibeUtopia
 ### 1.5 一键环境配置（推荐新机器使用）
 
 ```bash
-bash setup.sh
+# Linux / macOS
+bash scripts/setup.sh
+
+# Windows PowerShell
+powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
 ```
 
 脚本将自动完成：检查 Python、创建虚拟环境、安装依赖、检查 Docker、启动数据库、配置 .env。
@@ -172,15 +176,15 @@ pip install -r requirements.txt
 ### 4. 安装前端依赖
 
 ```bash
-cd frontend
+cd src/frontend
 npm install
-cd ..
+cd ../..
 ```
 
 ### 5. 启动基础设施（可选，V2 知识图谱功能需要）
 
 ```bash
-docker compose up -d neo4j
+docker compose -f scripts/docker-compose.yml up -d neo4j
 ```
 
 ### 6. 启动应用
@@ -188,18 +192,25 @@ docker compose up -d neo4j
 **方式一：分别启动（推荐开发时使用）**
 
 ```bash
-# 终端1 - 启动后端
-conda activate vibeutopia
-python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+# 终端1 - 启动后端（根目录）
+python run_backend.py
+# 等价命令: $env:PYTHONPATH="src"; python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+# Linux/macOS: PYTHONPATH=src python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 
 # 终端2 - 启动 Vue3 前端
-cd frontend
+cd src/frontend
 npm run dev
 ```
 
 **方式二：一键启动**
 
-双击 `start.bat`，自动启动后端和前端。
+```bash
+# Windows
+powershell -ExecutionPolicy Bypass -File scripts\start.ps1
+
+# Linux / macOS
+bash scripts/start.sh
+```
 
 ### 7. 访问应用
 
@@ -207,6 +218,7 @@ npm run dev
 |------|------|
 | Vue3 前端 | http://localhost:3000 |
 | 后端 API 文档 | http://localhost:8000/docs |
+| 健康检查 | http://localhost:8000/health |
 | Neo4j 浏览器 | http://localhost:7474 |
 
 ---
@@ -343,36 +355,41 @@ curl -X POST http://localhost:8000/api/v1/agents/generate \
 
 ```
 VibeUtopia/
-├── backend/                        # FastAPI 后端
-│   ├── main.py                     # 应用入口 + 生命周期 + WebSocket
-│   ├── config.py                   # 配置管理（读取 .env）
-│   ├── database.py                 # 数据库连接
-│   ├── models.py                   # 数据模型（V1 + V2 全量模型）
-│   ├── routes.py                   # API 路由（5核心端点 + 71功能端点）
-│   ├── prompts/                    # LLM 提示词模板
-│   │   ├── risk_assessment.txt     # 十一维风险评估
-│   │   ├── rewrite.txt             # 安全改写
-│   │   ├── persona_bilibili.txt    # B站人格
-│   │   ├── persona_xiaohongshu.txt # 小红书人格
-│   │   ├── persona_zhihu.txt       # 知乎人格
-│   │   ├── persona_douyin.txt      # 抖音人格
-│   │   └── ...                     # V2 新增模板
-│   └── services/                   # 业务逻辑层
-│       ├── analyzer.py             # 核心分析编排
-│       ├── llm_client.py           # LLM 调用 + JSON 解析
-│       ├── persona_simulator.py    # 人格模拟
-│       ├── risk_assessor.py        # 风险评估
-│       ├── rewriter.py             # 安全改写
-│       ├── video_extractor.py      # 视频文案提取
-│       └── ...                     # V2 新增服务
-├── frontend/                       # Vue3 + Naive UI 前端
-│   ├── src/
-│   │   ├── views/                  # 页面组件
-│   │   ├── components/             # 通用组件
-│   │   ├── stores/                 # Pinia 状态管理
-│   │   ├── api/                    # API 调用封装
-│   │   └── router/                 # 路由配置
-│   └── package.json
+├── src/
+│   ├── backend/                    # FastAPI 后端
+│   │   ├── main.py                 # 应用入口 + 生命周期 + WebSocket + /health
+│   │   ├── config.py               # 配置管理（读取 .env）
+│   │   ├── database.py             # 数据库连接
+│   │   ├── models.py               # 数据模型（V1 + V2 全量模型）
+│   │   ├── routes.py               # API 路由（5核心端点 + 71功能端点）
+│   │   ├── prompts/                # LLM 提示词模板
+│   │   │   ├── risk_assessment.txt     # 十一维风险评估
+│   │   │   ├── rewrite.txt             # 安全改写
+│   │   │   ├── persona_bilibili.txt    # B站人格
+│   │   │   ├── persona_xiaohongshu.txt # 小红书人格
+│   │   │   ├── persona_zhihu.txt       # 知乎人格
+│   │   │   ├── persona_douyin.txt      # 抖音人格
+│   │   │   └── ...                     # V2 新增模板
+│   │   └── services/               # 业务逻辑层
+│   │       ├── analyzer.py             # 核心分析编排
+│   │       ├── llm_client.py           # LLM 调用 + JSON 解析
+│   │       ├── persona_simulator.py    # 人格模拟
+│   │       ├── risk_assessor.py        # 风险评估
+│   │       ├── rewriter.py             # 安全改写
+│   │       ├── video_extractor.py      # 视频文案提取
+│   │       └── ...                     # V2 新增服务
+│   └── frontend/                   # Vue3 + Naive UI 前端
+│       ├── src/
+│       │   ├── views/                  # 页面组件
+│       │   ├── components/             # 通用组件
+│       │   ├── stores/                 # Pinia 状态管理
+│       │   ├── api/                    # API 调用封装
+│       │   └── router/                 # 路由配置
+│       └── package.json
+├── scripts/                        # 运维脚本
+│   ├── docker-compose.yml          # 基础设施编排（MySQL + Neo4j）
+│   ├── setup.ps1 / setup.sh        # 环境配置
+│   └── start.ps1 / start.sh        # 一键启动前后端
 ├── docs/                           # 设计文档
 │   └── guides/                     # 开发指南
 ├── tests/                          # 测试脚本与用例
@@ -381,8 +398,9 @@ VibeUtopia/
 │   ├── analysis/                   # 22个参考项目深度技术分析
 │   ├── projects/                   # 开源项目源码（本地保留）
 │   └── papers/                     # PDF论文（本地保留）
-├── docker-compose.yml              # 基础设施编排
-├── setup.sh                        # 一键环境配置脚本
+├── run_backend.py                  # 根目录后端启动入口
+├── pytest.ini                      # pytest 配置（pythonpath=src）
+├── setup.sh                        # 转发到 scripts/setup.sh
 ├── .env.example                    # 环境变量模板
 ├── requirements.txt                # Python 依赖
 ├── LICENSE                         # AGPL-3.0

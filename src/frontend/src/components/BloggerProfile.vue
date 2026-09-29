@@ -215,10 +215,6 @@ async function fetchProfile() {
   } catch {}
 }
 
-async function fetchCompetitor() {
-  if (!props.bloggerId) return
-}
-
 async function fetchKnowledgeProfile() {
   if (!props.bloggerId) return
   try {

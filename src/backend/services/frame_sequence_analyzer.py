@@ -235,7 +235,7 @@ class FrameSequenceAnalyzer:
         """对 DeltaFrameResult 执行完整的帧序列分析
 
         Args:
-            delta_result: DeltaFrameResult 对象，需包含 frames 属性
+            delta_result: DeltaFrameResult 对象，帧列表在 extracted_frames 属性
                           （每帧需有 file_path, timestamp, frame_type, delta_score 等属性）
             context: 额外上下文信息
 
@@ -243,7 +243,12 @@ class FrameSequenceAnalyzer:
             FrameSequenceResult
         """
         try:
-            frames = getattr(delta_result, "frames", [])
+            # DeltaFrameResult 的帧列表属性为 extracted_frames；
+            # 兼容仍使用 frames 命名的调用方
+            frames = getattr(delta_result, "extracted_frames", None)
+            if frames is None:
+                frames = getattr(delta_result, "frames", [])
+            frames = frames or []
             if not frames:
                 return FrameSequenceResult(
                     sequence_descriptions=[],

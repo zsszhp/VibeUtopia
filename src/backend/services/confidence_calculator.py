@@ -38,7 +38,7 @@ class ConfidenceCalculator:
         """计算总体置信度
         
         Args:
-            dimensions: 七维评估结果
+            dimensions: 11维评估结果
             risk_sentences: 风险句子列表
             transcript_quality: 转写质量信息
             evidence_chains: 证据链列表

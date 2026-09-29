@@ -1,7 +1,8 @@
 <template>
   <div class="counterfactual-panel">
     <div class="panel-header">
-      <h3 class="section-title">反事实仿真</h3>
+      <h3 class="section-title">反事实改写预估</h3>
+      <div class="disclaimer-badge">启发式预估，非全量仿真</div>
     </div>
 
     <!-- 修改策略选择 -->
@@ -21,7 +22,7 @@
       </div>
     </div>
 
-    <!-- 执行仿真按钮 -->
+    <!-- 执行预估按钮 -->
     <NButton
       type="primary"
       size="small"
@@ -30,10 +31,15 @@
       :disabled="!canSimulate"
       @click="runSimulation"
     >
-      运行仿真
+      运行改写预估
     </NButton>
 
-    <!-- 仿真结果 -->
+    <!-- 预估/改写失败 -->
+    <NAlert v-if="errorMsg" type="error" title="预估未完成" closable @close="errorMsg = ''">
+      {{ errorMsg }}
+    </NAlert>
+
+    <!-- 预估结果 -->
     <div v-if="result" class="result-section">
       <!-- 修改前后对比 -->
       <div class="comparison-section">
@@ -52,17 +58,23 @@
             <div class="block-content">{{ result.modified_text?.slice(0, 200) }}</div>
             <div class="block-score">
               风险分: <span :class="scoreClass(result.after?.overall_risk_score || 0)">{{ result.after?.overall_risk_score }}</span>
+              <span v-if="result.improvement_range" class="range-hint">
+                （变化约 {{ result.improvement_range.low }} ~ {{ result.improvement_range.high }} 分，正值=风险下降）
+              </span>
             </div>
           </div>
         </div>
+        <div v-if="result.strategy?.rewrite_note" class="rewrite-note">
+          改写说明：{{ result.strategy.rewrite_note }}
+        </div>
       </div>
 
-      <!-- 风险变化指示 -->
+      <!-- 风险面方向性预估（不承诺必降） -->
       <div class="change-section">
-        <div class="sub-title">风险变化</div>
+        <div class="sub-title">风险面方向性预估</div>
         <div class="improvement-badge" :class="improvementClass">
           <span class="improvement-icon">{{ improvementIcon }}</span>
-          <span class="improvement-value">{{ result.overall_improvement > 0 ? '+' : '' }}{{ result.overall_improvement }}分</span>
+          <span class="improvement-value">{{ directionLabel }}</span>
         </div>
         <div v-if="result.comparisons?.length" class="dimension-changes">
           <div v-for="c in result.comparisons" :key="c.dimension" class="dim-change">
@@ -83,18 +95,21 @@
       <div v-if="result.recommendation" class="recommendation-section">
         <div class="recommendation-text">{{ result.recommendation }}</div>
       </div>
+
+      <div v-if="result.disclaimer" class="disclaimer-text">{{ result.disclaimer }}</div>
     </div>
 
     <!-- 空状态 -->
-    <div v-if="!result && !simulating" class="empty-state">
-      <p>选择修改策略并运行仿真，查看"如果修改了高风险句子，舆论反应会怎样变化"</p>
+    <div v-if="!result && !simulating && !errorMsg" class="empty-state">
+      <p>选择修改策略并运行改写预估，查看"如果修改了高风险句子，风险面可能怎样变化"</p>
+      <p class="empty-note">启发式预估，非全量仿真；结果为区间与方向性参考，不代表真实舆论传播结果。</p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { NButton } from 'naive-ui'
+import { NButton, NAlert } from 'naive-ui'
 import { v3Api } from '../api'
 
 const props = defineProps<{
@@ -105,6 +120,7 @@ const props = defineProps<{
 const selectedStrategy = ref('soften')
 const simulating = ref(false)
 const result = ref<any>(null)
+const errorMsg = ref('')
 
 const strategies = [
   { value: 'delete', label: '删除', desc: '直接删除高风险句子' },
@@ -117,20 +133,32 @@ const canSimulate = computed(() => props.text && props.riskItems?.length)
 
 const improvementClass = computed(() => {
   if (!result.value) return ''
-  return result.value.overall_improvement > 0 ? 'improved' : result.value.overall_improvement < 0 ? 'worsened' : 'neutral'
+  const hint = result.value.direction_hint
+  if (hint === 'likely_down') return 'improved'
+  if (hint === 'likely_up') return 'worsened'
+  return 'neutral'
 })
 
 const improvementIcon = computed(() => {
   if (!result.value) return ''
-  if (result.value.overall_improvement > 0) return '✓'
-  if (result.value.overall_improvement < 0) return '✗'
+  const hint = result.value.direction_hint
+  if (hint === 'likely_down') return '↓'
+  if (hint === 'likely_up') return '↑'
   return '—'
+})
+
+const directionLabel = computed(() => {
+  if (!result.value) return ''
+  const hint = result.value.direction_hint
+  if (hint === 'likely_down') return '风险面可能下降'
+  if (hint === 'likely_up') return '风险面可能升高'
+  return '方向不确定'
 })
 
 function scoreClass(score: number) {
   if (score >= 80) return 'score-red'
   if (score >= 60) return 'score-orange'
-  if (score >= 40) return 'score-yellow'
+  if (score >= 30) return 'score-yellow'
   return 'score-green'
 }
 
@@ -145,6 +173,7 @@ async function runSimulation() {
 
   simulating.value = true
   result.value = null
+  errorMsg.value = ''
 
   try {
     const resp = await v3Api.counterfactualSimulate({
@@ -152,9 +181,16 @@ async function runSimulation() {
       risk_items: props.riskItems!,
       strategy_type: selectedStrategy.value,
     })
-    result.value = resp.data
-  } catch {
+    const data = resp.data
+    if (data?.error) {
+      errorMsg.value = data.error
+      result.value = null
+    } else {
+      result.value = data
+    }
+  } catch (e: any) {
     result.value = null
+    errorMsg.value = e?.response?.data?.detail || e?.message || '改写预估失败，请稍后重试'
   } finally {
     simulating.value = false
   }
@@ -173,6 +209,48 @@ async function runSimulation() {
   color: #888;
   font-weight: 600;
   margin: 0;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.disclaimer-badge {
+  font-size: 10px;
+  color: #b45309;
+  background: rgba(180, 83, 9, 0.12);
+  border: 1px solid rgba(180, 83, 9, 0.3);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.range-hint {
+  color: #888;
+  font-size: 10px;
+}
+
+.rewrite-note {
+  margin-top: 6px;
+  font-size: 10px;
+  color: #888;
+  line-height: 1.5;
+}
+
+.disclaimer-text {
+  margin-top: 8px;
+  font-size: 10px;
+  color: #b45309;
+  line-height: 1.5;
+}
+
+.empty-note {
+  margin-top: 6px;
+  font-size: 10px;
+  color: #b45309;
 }
 
 .sub-title {

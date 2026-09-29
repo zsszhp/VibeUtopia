@@ -4,6 +4,7 @@ T6 平台信息浸泡系统测试
 
 import asyncio
 import json
+import random
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -12,15 +13,31 @@ from backend.models import HotTopic, ImmersionRecord
 from backend.database import SessionLocal, engine, Base
 
 
+@pytest.fixture(autouse=True)
+def _deterministic_random():
+    """浸泡吸收过程使用 random，固定种子保证断言可复现"""
+    random.seed(42)
+
+
 @pytest.fixture
-def db_session():
-    Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
+def db_session(tmp_path):
+    """独立的临时 SQLite 会话，避免测试污染真实业务库"""
+    from sqlalchemy import create_engine as _create_engine
+    from sqlalchemy.orm import sessionmaker as _sessionmaker
+
+    test_engine = _create_engine(
+        f"sqlite:///{tmp_path / 'test_immersion.db'}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(bind=test_engine)
+    TestSession = _sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+    db = TestSession()
     try:
         yield db
     finally:
         db.close()
-        Base.metadata.drop_all(bind=engine)
+        Base.metadata.drop_all(bind=test_engine)
+        test_engine.dispose()
 
 
 @pytest.fixture
@@ -156,18 +173,23 @@ def test_attention_probability_calculation(sample_persona, sample_hot_topics):
 async def test_initial_stance_inference(sample_persona, sample_hot_topics):
     """测试初始态度推理"""
     immersion = PlatformImmersion()
-    
-    with patch.object(immersion.llm_client, 'chat', new_callable=AsyncMock) as mock_chat:
-        mock_chat.return_value = MagicMock(
-            choices=[MagicMock(
-                message=MagicMock(
-                    content='{"attitude": "concerned", "reasoning": "测试原因", "emotional_intensity": 0.7}'
-                )
-            )]
-        )
-        
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = (
+        '{"attitude": "concerned", "reasoning": "测试原因", "emotional_intensity": 0.7}'
+    )
+
+    mock_endpoint = MagicMock()
+    mock_endpoint.model = "test-model"
+    mock_endpoint.client.chat.completions.create = AsyncMock(return_value=mock_response)
+
+    mock_router = MagicMock()
+    mock_router.route.return_value = mock_endpoint
+
+    with patch("backend.services.platform_immersion.model_router", mock_router):
         result = await immersion._infer_initial_stance(sample_persona, sample_hot_topics[0])
-        
+
         assert "attitude" in result
         assert "reasoning" in result
         assert "emotional_intensity" in result

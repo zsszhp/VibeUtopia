@@ -8,13 +8,13 @@
         <div class="comparison-col current">
           <span class="col-label">当前报告</span>
           <NTag v-if="currentResult?.risk_level" :type="riskTagType(currentResult.risk_level)" size="small" round>
-            {{ currentResult.risk_level.toUpperCase() }}
+            {{ riskLevelLabel(currentResult.risk_level) }}
           </NTag>
         </div>
         <div class="comparison-col history">
           <span class="col-label">历史报告</span>
           <NTag v-if="historyResult?.risk_level" :type="riskTagType(historyResult.risk_level)" size="small" round>
-            {{ historyResult.risk_level.toUpperCase() }}
+            {{ riskLevelLabel(historyResult.risk_level) }}
           </NTag>
         </div>
       </div>
@@ -81,6 +81,7 @@
 import { computed } from 'vue'
 import { NTag } from 'naive-ui'
 import type { ReviewResult } from '../api'
+import { riskLevelLabel } from '../utils/labels'
 
 const props = defineProps<{
   currentResult?: ReviewResult | null

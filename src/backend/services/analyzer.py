@@ -16,6 +16,12 @@ from backend.services.cross_modal_detector import CrossModalConflictDetector, in
 from backend.services.evidence_chain import EvidenceChainBuilder
 from backend.services.confidence_calculator import ConfidenceCalculator
 from backend.services.error_handler import safe_execute
+from backend.services.severity import (
+    is_high_severity,
+    needs_rewrite,
+    normalize_severity,
+    score_from_severity,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +138,8 @@ def calculate_overall_score(dimensions: list[dict]) -> tuple[int, dict, list[dic
         weight_total += weight
         max_score = max(max_score, score)
 
-        if severity == "high":
+        # 统一 severity 词表后判定高档（Prompt red/orange/yellow/green 与旧 high/medium/low 均可识别）
+        if is_high_severity(severity, score):
             high_dims.append(name)
 
     # 加权平均
@@ -203,8 +210,34 @@ def _compute_sentiment_ratios(pr: dict) -> tuple[float, float, float]:
         return 0.25, 0.50, 0.25
 
 
-async def run_analysis(task_id: str, text: str):
-    """编排整个分析流程 - 集成WebSocket进度推送"""
+async def run_analysis(
+    task_id: str,
+    text: str,
+    depth: str = "standard",
+    visual_description: str | None = None,
+    audio_transcript: str | None = None,
+):
+    """编排整个分析流程 - 集成WebSocket进度推送
+
+    Args:
+        task_id: 任务ID
+        text: 待分析文本
+        depth: 分析深度 quick/standard/deep/large_scale
+            - quick: 纯静态11维评估，跳过 Agent 仿真，超时 60s
+            - standard: 完整流程，每平台 5 Agent，超时 180s
+            - deep: 提高 Agent 规模（15/平台），超时 600s
+            - large_scale: 最大 Agent 规模（30/平台），超时 1800s
+        visual_description: 画面描述/OCR文字（多模态输入时传入，供跨模态冲突检测）
+        audio_transcript: 音频转写文本（多模态输入时传入，供跨模态冲突检测）
+    """
+    depth_config = {
+        "quick": {"agent_sim": False, "platform_sim": True, "timeout": 60},
+        "standard": {"agent_sim": True, "platform_sim": True, "timeout": 180},
+        "deep": {"agent_sim": True, "platform_sim": True, "timeout": 600},
+        "large_scale": {"agent_sim": True, "platform_sim": True, "timeout": 1800},
+    }
+    cfg = depth_config.get(depth, depth_config["standard"])
+    logger.info("任务 %s: 分析深度=%s, 超时=%ds", task_id, depth, cfg["timeout"])
     db: Session = SessionLocal()
     try:
         # ═══════════════════════════════════════════════════════════════════════
@@ -266,7 +299,7 @@ async def run_analysis(task_id: str, text: str):
             )
             completed_dims.append(dim_name)
 
-            if dim.get("severity") in ("high", "critical"):
+            if is_high_severity(dim.get("severity"), dim.get("score", 0)):
                 await _broadcast_risk_alert(
                     task_id,
                     dim_name,
@@ -305,7 +338,8 @@ async def run_analysis(task_id: str, text: str):
         # ═══════════════════════════════════════════════════════════════════════
         # 步骤3: 动态权重 + 平台权重仿真 + Agent仿真 并行执行 (65% - 85%)
         # ═══════════════════════════════════════════════════════════════════════
-        await _broadcast_step(task_id, "dynamic_weights", 0.66, "正在并行执行动态权重调整、平台仿真...")
+        await _broadcast_step(task_id, "dynamic_weights", 0.66,
+                             f"正在执行动态权重与平台仿真（深度: {depth}）...")
 
         async def _do_dynamic_weights():
             from backend.services.dynamic_weights import DynamicWeights
@@ -330,11 +364,19 @@ async def run_analysis(task_id: str, text: str):
             return {}, None
 
         async def _do_agent_sim():
-            return await simulate_all_platforms_with_agents(text)
+            if not cfg["agent_sim"]:
+                logger.info("任务 %s: quick 深度跳过 Agent 仿真", task_id)
+                return []
+            return await simulate_all_platforms_with_agents(text, depth=depth)
+
+        async def _do_platform_sim_guarded():
+            if not cfg["platform_sim"]:
+                return {}, None
+            return await _do_platform_sim()
 
         weights_result, (platform_sim_reactions, sim_summary), platform_results = await asyncio.gather(
             safe_execute("dynamic_weights", task_id, _do_dynamic_weights, fallback_value=None),
-            safe_execute("platform_sim", task_id, _do_platform_sim, fallback_value=({}, None)),
+            safe_execute("platform_sim", task_id, _do_platform_sim_guarded, fallback_value=({}, None)),
             safe_execute("agent_sim", task_id, _do_agent_sim, fallback_value=[]),
         )
 
@@ -363,7 +405,7 @@ async def run_analysis(task_id: str, text: str):
                 is_transcript_noise=is_noise_sentence(rs.get("sentence", ""), transcript_quality),
             )
             for rs in risk_sentences
-            if rs.get("severity") in ("high", "medium")
+            if needs_rewrite(rs.get("severity"))
         ]
         rewrites = await asyncio.gather(*rewrite_tasks, return_exceptions=True)
         rewrites = [r for r in rewrites if not isinstance(r, Exception)]
@@ -379,8 +421,8 @@ async def run_analysis(task_id: str, text: str):
             detector = CrossModalConflictDetector()
             return await detector.detect_conflicts(
                 text=text,
-                visual_description=None,
-                audio_transcript=None,
+                visual_description=visual_description,
+                audio_transcript=audio_transcript,
             )
 
         cross_modal_result = await safe_execute("cross_modal", task_id, _do_cross_modal, fallback_value=None)
@@ -474,31 +516,14 @@ async def run_analysis(task_id: str, text: str):
 
         # 6. 存储结果
         # severity 映射：支持 4 档(green/yellow/orange/red) 和兼容旧 3 档(low/medium/high)
+        # 统一走 backend.services.severity 映射层，与评分判定保持同一词表
         def _normalize_severity(sev: str, score: int) -> str:
             """统一 severity 为 4 档：green/yellow/orange/red"""
-            sev = (sev or "").lower().strip()
-            # 已经是 4 档
-            if sev in ("green", "yellow", "orange", "red"):
-                return sev
-            # 旧 3 档映射
-            if sev == "low":
-                return "green"
-            if sev == "medium":
-                return "yellow" if score < 60 else "orange"
-            if sev == "high":
-                return "red"
-            # 按分数兜底
-            if score >= 76:
-                return "red"
-            if score >= 51:
-                return "orange"
-            if score >= 26:
-                return "yellow"
-            return "green"
+            return normalize_severity(sev, score)
 
         def _score_from_severity(severity: str) -> int:
             """severity 对应的风险分数中值（用于 risk_score 数值列）"""
-            return {"green": 10, "yellow": 35, "orange": 60, "red": 85}.get(severity, 0)
+            return score_from_severity(severity)
 
         for rs in risk_sentences:
             raw_severity = rs.get("severity", "green")

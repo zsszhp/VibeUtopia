@@ -66,7 +66,7 @@ def test_t8_detector_structure():
     print(f"✓ 分数集成测试 2: 50 + 高冲突 = {score2}")
     
     print("\nT8 结构测试：✓ 全部通过")
-    return True
+    return
 
 
 def test_t9_analyzer_structure():
@@ -96,7 +96,7 @@ def test_t9_analyzer_structure():
     assert "音频情感" in AUDIO_RISK_PROMPT
     print("✓ AUDIO_RISK_PROMPT 模板完整")
     
-    assert "OCR 文本" in OCR_RISK_PROMPT
+    assert "OCR文本" in OCR_RISK_PROMPT
     print("✓ OCR_RISK_PROMPT 模板完整")
     
     # 3. 空输入测试
@@ -139,7 +139,7 @@ def test_t9_analyzer_structure():
     print(f"✓ 分数集成测试 2: max(70, 64, 52, 0) + 10 = {score2}")
     
     print("\nT9 结构测试：✓ 全部通过")
-    return True
+    return
 
 
 def test_keyframe_extractor():
@@ -190,7 +190,7 @@ def test_keyframe_extractor():
         print("⚠ 无可用提取工具（需安装 ffmpeg-python 或 opencv-python）")
     
     print("\n关键帧提取器测试：✓ 全部通过")
-    return True
+    return
 
 
 def test_hardware_detector():
@@ -198,26 +198,33 @@ def test_hardware_detector():
     print("\n" + "="*80)
     print("硬件检测器 - 结构测试")
     print("="*80)
-    
+
     from backend.services.hardware_detector import (
-        detect_gpu,
-        get_hardware_tier
+        detect_tier,
+        HardwareTier,
+        TIER_CONFIGS,
     )
-    
-    # 1. GPU 检测
-    gpu_info = detect_gpu()
-    print(f"GPU 信息：{gpu_info.get('gpu_count', 0)} 个 GPU")
-    print(f"  型号：{gpu_info.get('gpu_name', '无')}")
-    print(f"  VRAM: {gpu_info.get('total_vram_gb', 0)} GB")
-    
-    # 2. 硬件层级判断
-    tier = get_hardware_tier()
-    print(f"硬件层级：{tier}")
-    assert tier in ("lite", "standard", "pro")
-    print("✓ 硬件层级判断正确")
-    
+
+    # 1. 硬件检测
+    info = detect_tier()
+    print(f"硬件层级：{info.tier.value}")
+    print(f"  CPU: {info.cpu_cores} 核, 内存: {info.ram_gb} GB")
+    print(f"  GPU: {info.gpu_name or '无'} VRAM: {info.vram_gb} GB")
+
+    assert isinstance(info.tier, HardwareTier)
+    assert info.cpu_cores > 0
+    assert info.ram_gb > 0
+
+    # 2. 硬件层级判断与推荐配置
+    assert info.tier in TIER_CONFIGS
+    recommendation = TIER_CONFIGS[info.tier]
+    assert recommendation.vision_model
+    assert recommendation.ocr_model
+    assert recommendation.audio_model
+    print("✓ 硬件层级判断与推荐配置正确")
+
     print("\n硬件检测器测试：✓ 全部通过")
-    return True
+    return
 
 
 def test_vram_manager():
@@ -225,24 +232,31 @@ def test_vram_manager():
     print("\n" + "="*80)
     print("VRAM 管理器 - 结构测试")
     print("="*80)
-    
-    from backend.services.vram_manager import VRAMManager
-    
+
+    from backend.services.vram_manager import VRAMManager, ModelPriority
+
     # 1. 实例化
     manager = VRAMManager()
     print("✓ VRAMManager 实例化成功")
-    
-    # 2. 模型 VRAM 配置检查
-    assert "glm-ocr" in manager.MODEL_VRAM
-    assert "faster-whisper" in manager.MODEL_VRAM
-    print("✓ 模型 VRAM 配置完整")
-    
-    # 3. 加载顺序检查
-    assert len(manager.LOADING_ORDER) > 0
-    print(f"✓ 模型加载顺序：{manager.LOADING_ORDER}")
-    
+
+    # 2. 默认模型注册检查
+    registered = manager._models
+    assert "whisper-large-v3" in registered
+    assert any("qwen3-vl" in mid for mid in registered)
+    print(f"✓ 已注册模型：{list(registered)}")
+
+    for model in registered.values():
+        assert model.vram_required_mb > 0
+        assert isinstance(model.priority, ModelPriority)
+
+    # 3. VRAM 状态检查
+    status = manager.get_vram_status()
+    assert status.total_mb > 0
+    assert 0 <= status.utilization_percent <= 100
+    print(f"✓ VRAM 状态：{status.used_mb:.0f}/{status.total_mb:.0f} MB")
+
     print("\nVRAM 管理器测试：✓ 全部通过")
-    return True
+    return
 
 
 def test_with_real_cases():
@@ -284,7 +298,7 @@ def test_with_real_cases():
         assert len(case["audio"]) > 0
     
     print(f"\n✓ 所有 {len(test_cases)} 个案例数据结构正确")
-    return True
+    return
 
 
 def main():

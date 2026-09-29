@@ -1,0 +1,78 @@
+/* Instrument Dark — 仪表舱式专业风控台设计令牌 */
+
+:root {
+  /* 中性面 */
+  --bg-base: #0B0D12;
+  --bg-surface: #11141B;
+  --bg-elevated: #171B24;
+  --bg-inset: #0E1118;
+  --bg-overlay: #1C2230;
+  --border-subtle: #232936;
+  --border-default: #2E3648;
+
+  /* 文字 */
+  --text-primary: #E6EAF2;
+  --text-secondary: #B7C0D4;
+  --text-tertiary: #8B94A8;
+  --text-disabled: #5C6578;
+
+  /* 品牌 */
+  --brand-600: #6366F1;
+  --brand-400: #818CF8;
+  --brand-300: #A5B4FC;
+  --brand-soft: rgba(99, 102, 241, 0.12);
+
+  /* 风险语义 */
+  --risk-safe: #22C55E;
+  --risk-warn: #EAB308;
+  --risk-high: #F97316;
+  --risk-critical: #EF4444;
+  --risk-safe-soft: rgba(34, 197, 94, 0.12);
+  --risk-warn-soft: rgba(234, 179, 8, 0.12);
+  --risk-high-soft: rgba(249, 115, 22, 0.12);
+  --risk-critical-soft: rgba(239, 68, 68, 0.12);
+
+  /* 图表分类色（与风险语义色分离） */
+  --chart-1: #6366F1;
+  --chart-2: #22D3EE;
+  --chart-3: #F472B6;
+  --chart-4: #A3E635;
+  --chart-5: #FBBF24;
+  --chart-6: #38BDF8;
+  --chart-7: #C084FC;
+  --chart-8: #94A3B8;
+
+  /* 字体 */
+  --font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-numeric: 'Inter', system-ui, sans-serif;
+
+  /* 字号刻度 */
+  --fs-2xs: 10px;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+  --fs-xl: 18px;
+  --fs-2xl: 24px;
+  --fs-hero: 32px;
+
+  /* 间距 4px 基线 */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  /* 圆角 */
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-full: 999px;
+
+  /* 动效 */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}

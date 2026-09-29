@@ -57,8 +57,7 @@ def test_template_variator():
         logger.info(f"✓ {archetype}: {len(persona.life_story)}字，7 层完整，Big Five 完整")
     
     logger.info(f"C-tier 测试结果：✅ PASS ({len(archetypes)}/{len(archetypes)})")
-    
-    return results
+    return
 
 
 def test_cgss_sampler_structure():
@@ -92,8 +91,7 @@ def test_cgss_sampler_structure():
     logger.info(f"✓ 记忆提取：生成{len(memories)}条记忆")
     
     logger.info("B-tier 结构测试：✅ PASS")
-    
-    return {"cgss_demographics": len(demographics), "weight_sum": total_weight}
+    return
 
 
 def test_interviewer_structure():
@@ -131,11 +129,7 @@ def test_interviewer_structure():
     logger.info(f"✓ 默认 7 层结构完整")
     
     logger.info("A-tier 结构测试：✅ PASS")
-    
-    return {
-        "interview_rounds": len(interviewer.INTERVIEW_ROUNDS),
-        "total_target_words": total_target_words,
-    }
+    return
 
 
 def test_persona_factory():
@@ -171,11 +165,7 @@ def test_persona_factory():
     logger.info(f"✓ 批量生成分布：A={tier_dist['A']}, B={tier_dist['B']}, C={tier_dist['C']}")
     
     logger.info("PersonaFactory 测试：✅ PASS")
-    
-    return {
-        "components_initialized": 3,
-        "c_tier_test_words": len(persona_c.life_story),
-    }
+    return
 
 
 def test_life_story_persona_dataclass():
@@ -202,8 +192,7 @@ def test_life_story_persona_dataclass():
     assert len(persona.big_five) == 5
     assert persona.quality_score == 0.8
     logger.info("✓ LifeStoryPersona 数据类验证通过")
-    
-    return {"valid": True}
+    return
 
 
 def main():

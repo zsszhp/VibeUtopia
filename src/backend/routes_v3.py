@@ -11,7 +11,7 @@
 8. 知识图谱可视化 API（阶段6）
 9. 博主历史分析 API（阶段6）
 10. 竞品对比 API（阶段6）
-11. 反事实仿真 API（阶段6）
+11. 反事实改写预估 API（阶段6）
 12. 决策辅助 API（阶段6）
 """
 
@@ -63,7 +63,7 @@ class MultimodalAnalysisResponse(BaseModel):
     confidence: float
 
 
-@router.post("/api/v3/analyze-multimodal")
+@router.post("/analyze-multimodal")
 async def analyze_multimodal(req: MultimodalAnalysisRequest) -> MultimodalAnalysisResponse:
     """多模态内容分析（支持图片 + 文本）
 
@@ -104,7 +104,7 @@ async def analyze_multimodal(req: MultimodalAnalysisRequest) -> MultimodalAnalys
         raise HTTPException(status_code=500, detail=f"分析失败：{str(e)}")
 
 
-@router.post("/api/v3/upload-image-analyze")
+@router.post("/upload-image-analyze")
 async def upload_image_analyze(
     image: UploadFile = File(..., description="上传图片"),
     prompt: str = Form(..., description="分析提示词"),
@@ -153,7 +153,7 @@ class AudioTranscribeResponse(BaseModel):
     language: str
 
 
-@router.post("/api/v3/transcribe-audio")
+@router.post("/transcribe-audio")
 async def transcribe_audio_api(
     audio_file: UploadFile = File(..., description="音频文件"),
     speaker_separation: bool = Form(default=True, description="是否说话人分离"),
@@ -209,7 +209,7 @@ class PersonaGenerationResponse(BaseModel):
     quality_score: float
 
 
-@router.post("/api/v3/generate-persona", deprecated=True,
+@router.post("/generate-persona", deprecated=True,
              summary="[DEPRECATED] 生成人生故事驱动的人格，请使用 /api/v1/persona/generate")
 async def generate_persona(req: PersonaGenerationRequest) -> PersonaGenerationResponse:
     """生成人生故事驱动的人格
@@ -246,7 +246,7 @@ async def generate_persona(req: PersonaGenerationRequest) -> PersonaGenerationRe
     )
 
 
-@router.post("/api/v3/generate-persona-batch", deprecated=True,
+@router.post("/generate-persona-batch", deprecated=True,
              summary="[DEPRECATED] 批量生成人格，请使用 /api/v1/persona/generate-batch")
 async def generate_persona_batch(
     platform: str = Form(...),
@@ -306,7 +306,7 @@ class MemoryRetrieveResponse(BaseModel):
     chromadb_used: bool
 
 
-@router.post("/api/v3/retrieve-memory", deprecated=True,
+@router.post("/retrieve-memory", deprecated=True,
              summary="[DEPRECATED] 向量检索 Agent 记忆，请使用 /api/v1/memory/retrieve")
 async def retrieve_memory(req: MemoryRetrieveRequest) -> MemoryRetrieveResponse:
     """向量检索 Agent 记忆（ChromaDB）
@@ -328,7 +328,7 @@ async def retrieve_memory(req: MemoryRetrieveRequest) -> MemoryRetrieveResponse:
     )
 
 
-@router.get("/api/v3/memory-stream-status", deprecated=True,
+@router.get("/memory-stream-status", deprecated=True,
             summary="[DEPRECATED] 获取 Memory Stream 状态，请使用 /api/v1/memory/status")
 async def get_memory_stream_status_api():
     """获取 Memory Stream 状态
@@ -339,7 +339,7 @@ async def get_memory_stream_status_api():
     return get_memory_stream_status()
 
 
-@router.post("/api/v3/store-memory", deprecated=True,
+@router.post("/store-memory", deprecated=True,
              summary="[DEPRECATED] 存储记忆到向量数据库，请使用 /api/v1/memory/store")
 async def store_memory(
     agent_id: str = Form(...),
@@ -384,7 +384,7 @@ class ModelRouteResponse(BaseModel):
     base_url: str
 
 
-@router.post("/api/v3/route-model")
+@router.post("/route-model")
 async def route_model(req: ModelRouteRequest) -> ModelRouteResponse:
     """获取最优模型路由"""
     from backend.services.llm_client import registry, router as model_router
@@ -403,7 +403,7 @@ async def route_model(req: ModelRouteRequest) -> ModelRouteResponse:
     )
 
 
-@router.get("/api/v3/available-models")
+@router.get("/available-models")
 async def list_available_models():
     """列出所有可用模型"""
     from backend.services.llm_client import registry
@@ -414,7 +414,7 @@ async def list_available_models():
     }
 
 
-@router.post("/api/v3/set-model-override")
+@router.post("/set-model-override")
 async def set_model_override(
     provider: str = Form(...),
     model: str = Form(...),
@@ -435,7 +435,7 @@ async def set_model_override(
 
 # ==================== 硬件检测 API ====================
 
-@router.get("/api/v3/hardware-info")
+@router.get("/hardware-info")
 async def get_hardware_info_api():
     """获取硬件信息"""
     info = get_hardware_info()
@@ -450,7 +450,7 @@ async def get_hardware_info_api():
     }
 
 
-@router.get("/api/v3/recommended-models")
+@router.get("/recommended-models")
 async def list_recommended_models():
     """获取推荐的模型列表"""
     detector = get_hardware_detector()
@@ -459,7 +459,7 @@ async def list_recommended_models():
 
 # ==================== 模型状态监控 API ====================
 
-@router.get("/api/v3/model-status")
+@router.get("/model-status")
 async def get_model_status():
     """获取模型 Key 池状态"""
     from backend.services.llm_client import router as model_router
@@ -469,7 +469,7 @@ async def get_model_status():
     }
 
 
-@router.get("/api/v3/llm-test")
+@router.get("/llm-test")
 async def test_llm(
     prompt: str = "你好，请做一个简单的自我介绍。",
     task_type: str = "default",
@@ -499,7 +499,7 @@ class ReportOptimizeResponse(BaseModel):
     actionability_score: float
 
 
-@router.post("/api/v3/optimize-report")
+@router.post("/optimize-report")
 async def optimize_report_api(req: ReportOptimizeRequest) -> ReportOptimizeResponse:
     """优化风险报告质量（细化风险等级 + 句子级建议 + 平台差异化建议）"""
     optimized = await optimize_report(req.report)
@@ -510,7 +510,7 @@ async def optimize_report_api(req: ReportOptimizeRequest) -> ReportOptimizeRespo
     )
 
 
-@router.get("/api/v3/risk-levels")
+@router.get("/risk-levels")
 async def list_risk_levels():
     """获取风险等级定义"""
     return {
@@ -526,7 +526,7 @@ async def list_risk_levels():
     }
 
 
-@router.get("/api/v3/risk-dimensions")
+@router.get("/risk-dimensions")
 async def list_risk_dimensions():
     """获取风险维度列表"""
     return {
@@ -536,7 +536,7 @@ async def list_risk_dimensions():
 
 # ==================== 信号采集面板 API（阶段6） ====================
 
-@router.get("/api/v3/signals/hotlist")
+@router.get("/signals/hotlist")
 async def get_signal_hotlist(
     platform: Optional[str] = None,
     limit: int = 20,
@@ -571,7 +571,7 @@ async def get_signal_hotlist(
     }
 
 
-@router.get("/api/v3/signals/events")
+@router.get("/signals/events")
 async def get_signal_events(
     status: Optional[str] = None,
     limit: int = 20,
@@ -605,7 +605,7 @@ async def get_signal_events(
     }
 
 
-@router.get("/api/v3/signals/scheduler/status")
+@router.get("/signals/scheduler/status")
 async def get_scheduler_status():
     """获取调度器状态"""
     from backend.main import signal_scheduler
@@ -622,7 +622,7 @@ class SchedulerControlRequest(BaseModel):
     mode: str = Field(default="standard", description="调度模式: realtime/standard/economy/manual")
 
 
-@router.post("/api/v3/signals/scheduler/start")
+@router.post("/signals/scheduler/start")
 async def start_scheduler(req: SchedulerControlRequest):
     """启动调度器"""
     from backend.main import signal_scheduler
@@ -636,7 +636,7 @@ async def start_scheduler(req: SchedulerControlRequest):
     raise HTTPException(status_code=400, detail=f"启动失败，未知模式: {req.mode}")
 
 
-@router.post("/api/v3/signals/scheduler/stop")
+@router.post("/signals/scheduler/stop")
 async def stop_scheduler():
     """停止调度器"""
     from backend.main import signal_scheduler
@@ -647,7 +647,7 @@ async def stop_scheduler():
 
 # ==================== 知识图谱可视化 API（阶段6） ====================
 
-@router.get("/api/v3/graph/overview")
+@router.get("/graph/overview")
 async def get_graph_overview():
     """图谱概览（节点数、边数、社区数）"""
     from backend.main import graph_store
@@ -673,7 +673,7 @@ async def get_graph_overview():
     }
 
 
-@router.get("/api/v3/graph/entity/{entity_id}")
+@router.get("/graph/entity/{entity_id}")
 async def get_graph_entity(entity_id: str):
     """实体详情"""
     from backend.main import graph_store
@@ -700,7 +700,7 @@ class GraphPathsRequest(BaseModel):
     max_depth: int = Field(default=5, ge=1, le=10, description="最大搜索深度")
 
 
-@router.get("/api/v3/graph/paths")
+@router.get("/graph/paths")
 async def get_graph_paths(
     from_id: str,
     to_id: str,
@@ -721,7 +721,7 @@ async def get_graph_paths(
     }
 
 
-@router.get("/api/v3/graph/neighbors/{entity_id}")
+@router.get("/graph/neighbors/{entity_id}")
 async def get_graph_neighbors(
     entity_id: str,
     depth: int = 1,
@@ -744,7 +744,7 @@ async def get_graph_neighbors(
 
 # ==================== 博主历史分析 API（阶段6） ====================
 
-@router.get("/api/v3/blogger/{blogger_id}/history")
+@router.get("/blogger/{blogger_id}/history")
 async def get_blogger_history(blogger_id: str, db: Session = Depends(get_db)):
     """博主历史分析"""
     from backend.services.blogger_history import BloggerHistoryAnalyzer
@@ -786,7 +786,7 @@ async def get_blogger_history(blogger_id: str, db: Session = Depends(get_db)):
     }
 
 
-@router.get("/api/v3/blogger/{blogger_id}/risk-profile")
+@router.get("/blogger/{blogger_id}/risk-profile")
 async def get_blogger_risk_profile(blogger_id: str, db: Session = Depends(get_db)):
     """博主风险画像"""
     from backend.services.blogger_history import BloggerHistoryAnalyzer
@@ -816,7 +816,7 @@ class CompetitorCompareRequest(BaseModel):
     field_name: str = Field(default="", description="所属领域")
 
 
-@router.post("/api/v3/competitor/compare")
+@router.post("/competitor/compare")
 async def competitor_compare(req: CompetitorCompareRequest, db: Session = Depends(get_db)):
     """竞品对比"""
     from backend.services.competitor_comparator import CompetitorComparator
@@ -855,18 +855,68 @@ async def competitor_compare(req: CompetitorCompareRequest, db: Session = Depend
     }
 
 
-# ==================== 反事实仿真 API（阶段6） ====================
+# ==================== 选题推荐 API（V2.R6） ====================
+
+class TopicRecommendRequest(BaseModel):
+    """选题推荐请求"""
+    blogger_profile: Dict[str, Any] = Field(default_factory=dict, description="博主画像数据")
+    hot_topics: Optional[List[Dict[str, Any]]] = Field(None, description="可选热点列表 [{title, platform, strength}]")
+    blogger_id: str = Field(default="", description="博主ID")
+    blogger_name: str = Field(default="", description="博主名称")
+
+
+@router.post("/blogger/topics/recommend")
+async def recommend_topics(req: TopicRecommendRequest):
+    """选题推荐
+
+    基于热点×博主风格匹配生成选题推荐，每个推荐含选题、切入点、风险预筛、效果预测。
+    无热点数据时自动从信号系统获取。
+    """
+    from backend.services.topic_recommender import TopicRecommender
+
+    recommender = TopicRecommender()
+    result = await recommender.recommend(
+        blogger_profile=req.blogger_profile,
+        hot_topics=req.hot_topics,
+        blogger_id=req.blogger_id,
+        blogger_name=req.blogger_name,
+    )
+
+    return {
+        "blogger_id": result.blogger_id,
+        "blogger_name": result.blogger_name,
+        "hot_topics_used": result.hot_topics_used,
+        "summary": result.summary,
+        "error": result.error,
+        "recommendations": [
+            {
+                "topic": r.topic,
+                "angle": r.angle,
+                "reason": r.reason,
+                "trend_score": r.trend_score,
+                "style_match": r.style_match,
+                "risk_level": r.risk_level,
+                "risk_note": r.risk_note,
+                "estimated_reach": r.estimated_reach,
+                "priority": r.priority,
+            }
+            for r in result.recommendations
+        ],
+    }
+
+
+# ==================== 反事实改写预估 API（阶段6） ====================
 
 class CounterfactualSimulateRequest(BaseModel):
-    """反事实仿真请求"""
+    """反事实改写预估请求"""
     text: str = Field(..., description="原始文案")
     risk_items: List[Dict[str, Any]] = Field(..., description="风险项列表")
     strategy_type: str = Field(default="soften", description="修改策略: delete/replace/soften/rephrase")
 
 
-@router.post("/api/v3/counterfactual/simulate")
+@router.post("/counterfactual/simulate")
 async def counterfactual_simulate(req: CounterfactualSimulateRequest):
-    """反事实仿真"""
+    """反事实改写预估（启发式预估，非全量仿真）"""
     from backend.services.counterfactual_sim import CounterfactualSimulator
 
     simulator = CounterfactualSimulator()
@@ -885,16 +935,20 @@ async def counterfactual_simulate(req: CounterfactualSimulateRequest):
             "target_sentence": result.strategy.target_sentence if result.strategy else "",
             "modified_sentence": result.strategy.modified_sentence if result.strategy else "",
             "description": result.strategy.description if result.strategy else "",
+            "rewrite_note": result.strategy.rewrite_note if result.strategy else "",
         } if result.strategy else None,
         "before": {
             "overall_risk_score": result.before.overall_risk_score if result.before else 0,
             "risk_level": result.before.risk_level if result.before else "green",
             "dimension_scores": result.before.dimension_scores if result.before else {},
+            "method": result.before.method if result.before else "",
         } if result.before else None,
         "after": {
             "overall_risk_score": result.after.overall_risk_score if result.after else 0,
             "risk_level": result.after.risk_level if result.after else "green",
             "dimension_scores": result.after.dimension_scores if result.after else {},
+            "method": result.after.method if result.after else "",
+            "estimated_range": result.after.estimated_range if result.after else None,
         } if result.after else None,
         "comparisons": [
             {
@@ -907,6 +961,11 @@ async def counterfactual_simulate(req: CounterfactualSimulateRequest):
             for c in result.comparisons
         ],
         "overall_improvement": result.overall_improvement,
+        "improvement_range": result.improvement_range,
+        "direction_hint": result.direction_hint,
+        "confidence": result.confidence,
+        "method": result.method,
+        "disclaimer": result.disclaimer,
         "recommendation": result.recommendation,
         "error": result.error,
     }
@@ -920,7 +979,7 @@ class DecisionAdviseRequest(BaseModel):
     risk_report: Dict[str, Any] = Field(..., description="风险评估报告")
 
 
-@router.post("/api/v3/decision/advise")
+@router.post("/decision/advise")
 async def decision_advise(req: DecisionAdviseRequest):
     """决策辅助"""
     from backend.services.decision_advisor import DecisionAdvisor
@@ -982,7 +1041,7 @@ class SimulationScaleResponse(BaseModel):
     tier_breakdown: Dict[str, Any]
 
 
-@router.post("/api/v3/simulation/scale")
+@router.post("/simulation/scale")
 async def set_simulation_scale(req: SimulationScaleRequest) -> SimulationScaleResponse:
     """设置仿真规模"""
     from backend.services.simulation.scale_manager import ScaleManager, ScaleLevel, SCALE_LABELS
@@ -1015,7 +1074,7 @@ async def set_simulation_scale(req: SimulationScaleRequest) -> SimulationScaleRe
     )
 
 
-@router.get("/api/v3/simulation/scale-levels")
+@router.get("/simulation/scale-levels")
 async def get_simulation_scale_levels():
     """获取所有仿真规模级别"""
     from backend.services.simulation.scale_manager import ScaleManager
@@ -1024,7 +1083,7 @@ async def get_simulation_scale_levels():
     return {"levels": manager.get_all_levels()}
 
 
-@router.get("/api/v3/simulation/scale-feasibility")
+@router.get("/simulation/scale-feasibility")
 async def check_scale_feasibility(level: str = "massive"):
     """验证仿真规模可行性"""
     from backend.services.simulation.scale_manager import ScaleManager, ScaleLevel
@@ -1053,7 +1112,7 @@ class BatchSubmitResponse(BaseModel):
     progress: float
 
 
-@router.post("/api/v3/batch/submit")
+@router.post("/batch/submit")
 async def submit_batch_analysis(req: BatchSubmitRequest) -> BatchSubmitResponse:
     """批量分析提交"""
     from backend.services.batch_analyzer import BatchAnalyzer
@@ -1075,7 +1134,7 @@ async def submit_batch_analysis(req: BatchSubmitRequest) -> BatchSubmitResponse:
     )
 
 
-@router.get("/api/v3/batch/{batch_id}/status")
+@router.get("/batch/{batch_id}/status")
 async def get_batch_status(batch_id: str):
     """批量分析状态"""
     from backend.services.batch_analyzer import BatchAnalyzer
@@ -1089,7 +1148,7 @@ async def get_batch_status(batch_id: str):
     return status
 
 
-@router.get("/api/v3/batch/{batch_id}/results")
+@router.get("/batch/{batch_id}/results")
 async def get_batch_results(batch_id: str):
     """批量分析结果"""
     from backend.services.batch_analyzer import BatchAnalyzer
@@ -1103,7 +1162,7 @@ async def get_batch_results(batch_id: str):
     return results
 
 
-@router.get("/api/v3/batch/cache-stats")
+@router.get("/batch/cache-stats")
 async def get_batch_cache_stats():
     """获取批量分析缓存统计"""
     from backend.services.batch_analyzer import BatchAnalyzer
@@ -1114,7 +1173,7 @@ async def get_batch_cache_stats():
 
 # ==================== 阶段5 极化预警 API ====================
 
-@router.get("/api/v3/polarization/warning")
+@router.get("/polarization/warning")
 async def get_polarization_warning(
     polarization_index: float = 0.0,
     trend: str = "stable",
@@ -1126,7 +1185,7 @@ async def get_polarization_warning(
     return warning.to_dict()
 
 
-@router.get("/api/v3/polarization/levels")
+@router.get("/polarization/levels")
 async def get_polarization_levels():
     """获取极化预警等级定义"""
     from backend.services.simulation.propagation.polarization import (
@@ -1147,7 +1206,7 @@ async def get_polarization_levels():
 
 # ==================== 阶段5 回测增强 API ====================
 
-@router.post("/api/v3/backtest/consistency")
+@router.post("/backtest/consistency")
 async def run_backtest_consistency(
     case_id: str = "bt_10",
     run_count: int = 3,
@@ -1170,7 +1229,7 @@ async def run_backtest_consistency(
     return result.to_dict()
 
 
-@router.post("/api/v3/backtest/v2-vs-mvp")
+@router.post("/backtest/v2-vs-mvp")
 async def generate_v2_vs_mvp_report(
     enable_consistency: bool = True,
 ):
@@ -1277,38 +1336,52 @@ async def get_frame_thumbnail(task_id: str, frame_path: str):
         frame_path: 帧图片文件路径
     """
     import os
+    import tempfile
+    from pathlib import Path
+
     from fastapi.responses import FileResponse
 
-    # 安全检查：防止路径遍历
-    if ".." in frame_path or frame_path.startswith("/") or frame_path.startswith("\\"):
-        return {"error": "非法路径"}
+    # 安全检查：拒绝路径遍历与绝对路径
+    if ".." in frame_path or frame_path.startswith("/") or frame_path.startswith("\\") or ":" in frame_path:
+        raise HTTPException(status_code=400, detail="非法路径")
+
+    temp_root = Path(tempfile.gettempdir()).resolve()
+
+    def _safe_join(base: Path, name: str) -> Path | None:
+        """把 name 限定在 base 目录内，解析后越界则返回 None。"""
+        candidate = (base / name).resolve()
+        try:
+            candidate.relative_to(base)
+        except ValueError:
+            return None
+        return candidate
 
     # 尝试在临时目录中查找
-    import tempfile
     possible_dirs = [
-        os.path.join(tempfile.gettempdir(), f"vibe_keyframes_{task_id}"),
-        os.path.join(tempfile.gettempdir(), f"vibe_dense_{task_id}"),
-        os.path.join(tempfile.gettempdir(), f"vibe_sequence_{task_id}"),
+        temp_root / f"vibe_keyframes_{task_id}",
+        temp_root / f"vibe_dense_{task_id}",
+        temp_root / f"vibe_sequence_{task_id}",
     ]
 
     for base_dir in possible_dirs:
-        full_path = os.path.join(base_dir, os.path.basename(frame_path))
-        if os.path.exists(full_path):
+        full_path = _safe_join(base_dir, os.path.basename(frame_path))
+        if full_path is not None and full_path.is_file():
             return FileResponse(
-                full_path,
+                str(full_path),
                 media_type="image/jpeg",
                 headers={"Cache-Control": "public, max-age=3600"},
             )
 
     # 直接尝试完整路径（需校验在临时目录内）
-    if os.path.exists(frame_path) and tempfile.gettempdir() in os.path.abspath(frame_path):
+    direct = _safe_join(temp_root, frame_path)
+    if direct is not None and direct.is_file():
         return FileResponse(
-            frame_path,
+            str(direct),
             media_type="image/jpeg",
             headers={"Cache-Control": "public, max-age=3600"},
         )
 
-    return {"error": "帧图片未找到"}
+    raise HTTPException(status_code=404, detail="帧图片未找到")
 
 
 # ==================== 图像生成 API (Agnes AI) ====================
@@ -1330,7 +1403,7 @@ class ImageGenResponse(BaseModel):
     images: List[Dict[str, Any]]
 
 
-@router.post("/api/v3/image/generate")
+@router.post("/image/generate")
 async def generate_image(req: ImageGenRequest) -> ImageGenResponse:
     """图像生成（支持文生图和图生图）
 
@@ -1369,7 +1442,7 @@ async def generate_image(req: ImageGenRequest) -> ImageGenResponse:
         raise HTTPException(status_code=500, detail=f"图像生成异常：{str(e)}")
 
 
-@router.get("/api/v3/image/models")
+@router.get("/image/models")
 async def list_image_gen_models():
     """列出所有可用的图像生成模型"""
     from backend.services.llm_client import registry

@@ -46,9 +46,11 @@ class FrameRiskResult:
     frame_index: int = 0
     timestamp: float = 0.0
     risks: list = field(default_factory=list)  # List[FrameRiskItem]
-    risk_level: str = "safe"   # safe/low/medium/high/critical
+    risk_level: str = "safe"   # safe/low/medium/high/critical/unknown
     summary: str = ""
     error: Optional[str] = None
+    # 失败策略：解析/VLM失败不得判 safe，标记为 unknown + needs_review
+    needs_review: bool = False
 
 
 @dataclass
@@ -59,6 +61,7 @@ class VideoRiskResult:
     overall_risk_level: str = "safe"
     high_risk_frames: int = 0
     risk_summary: str = ""
+    needs_review: bool = False
     error: Optional[str] = None
 
 
@@ -159,6 +162,7 @@ class FrameRiskAssessor:
                 risks=result.get("risks", []),
                 risk_level=result.get("risk_level", "safe"),
                 summary=result.get("summary", ""),
+                needs_review=bool(result.get("needs_review", False)),
             )
         except Exception as e:
             logger.warning("LLM视觉模型不可用，使用规则降级: %s", e)
@@ -200,14 +204,20 @@ class FrameRiskAssessor:
 
         max_risk_score = 0
         high_risk_count = 0
+        needs_review = False
 
         for result in results:
             if isinstance(result, Exception):
+                needs_review = True
                 continue
             if result.error:
+                needs_review = True
                 continue
 
             video_result.frame_results.append(result)
+
+            if result.needs_review or result.risk_level == "unknown":
+                needs_review = True
 
             risk_score = RISK_SCORE_MAP.get(result.risk_level, 0)
             if risk_score > max_risk_score:
@@ -220,8 +230,14 @@ class FrameRiskAssessor:
                 summaries.append(f"[{result.timestamp:.1f}s] {result.summary}")
 
         video_result.high_risk_frames = high_risk_count
-        video_result.overall_risk_level = self._score_to_level(max_risk_score)
-        video_result.risk_summary = "\n".join(summaries) if summaries else "未检测到画面风险"
+        video_result.needs_review = needs_review
+        if needs_review and max_risk_score <= RISK_SCORE_MAP.get("safe", 0):
+            # 全部失败/未知时不得报 safe，降级为 unknown 并要求人工复核
+            video_result.overall_risk_level = "unknown"
+            video_result.risk_summary = "部分帧评估失败或解析异常，结果未知需人工复核"
+        else:
+            video_result.overall_risk_level = self._score_to_level(max_risk_score)
+            video_result.risk_summary = "\n".join(summaries) if summaries else "未检测到画面风险"
 
         return video_result
 
@@ -399,10 +415,10 @@ class FrameRiskAssessor:
                     data = json.loads(json_str[start:end])
                 else:
                     logger.warning("无法解析画面风险JSON: %s", response[:200])
-                    return {"risk_level": "safe", "risks": [], "summary": "解析失败"}
+                    return {"risk_level": "unknown", "risks": [], "summary": "解析失败", "needs_review": True}
             except json.JSONDecodeError:
                 logger.warning("画面风险JSON解析失败: %s", response[:200])
-                return {"risk_level": "safe", "risks": [], "summary": "解析失败"}
+                return {"risk_level": "unknown", "risks": [], "summary": "解析失败", "needs_review": True}
 
         # 验证并转换risk items
         risks = []
@@ -438,8 +454,8 @@ class FrameRiskAssessor:
     def _rule_based_assess(self, frame_path: str, frame_index: int,
                            timestamp: float) -> "FrameRiskResult":
         """规则降级评估：当LLM视觉模型不可用时，基于图片基本特征做简单判断"""
-        risk_level = "safe"
-        summary = "视觉模型不可用，已跳过画面风险评估（规则降级模式）"
+        risk_level = "unknown"
+        summary = "视觉模型不可用，画面风险未知需人工复核（规则降级模式）"
         risks = []
 
         # 基于文件大小的简单启发式（大图可能内容更丰富）
@@ -458,4 +474,5 @@ class FrameRiskAssessor:
             risks=risks,
             risk_level=risk_level,
             summary=summary,
+            needs_review=True,
         )

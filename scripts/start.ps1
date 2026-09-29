@@ -63,8 +63,8 @@ if (-not $hasFastapi) {
 
 Write-Host "  启动 FastAPI 后端（端口 8000）..." -ForegroundColor White
 
-# 设置 PYTHONPATH 让 uvicorn 能找到 backend 模块
-$env:PYTHONPATH = $ProjectRoot
+# 包布局为 src/backend，必须把 src 加入 PYTHONPATH 才能 import backend
+$env:PYTHONPATH = Join-Path $ProjectRoot "src"
 
 $backendJob = Start-Process -FilePath "python" `
     -ArgumentList "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload" `
@@ -74,8 +74,9 @@ Write-Host "  等待后端启动（10 秒）..." -ForegroundColor Gray
 Start-Sleep -Seconds 10
 
 try {
-    $null = Invoke-WebRequest -Uri "http://localhost:8000/docs" -TimeoutSec 3 -UseBasicParsing 2>$null
+    $null = Invoke-WebRequest -Uri "http://localhost:8000/health" -TimeoutSec 3 -UseBasicParsing 2>$null
     Write-Host "  OK 后端服务已启动：http://localhost:8000" -ForegroundColor Green
+    Write-Host "    健康检查：http://localhost:8000/health" -ForegroundColor Gray
     Write-Host "    API 文档：http://localhost:8000/docs" -ForegroundColor Gray
 } catch {
     Write-Host "  ! 后端可能正在启动中..." -ForegroundColor DarkYellow
@@ -129,7 +130,7 @@ if ($hasDocker) {
     Write-Host "Docker 服务：" -ForegroundColor White
     Write-Host "  Neo4j Browser: http://localhost:7474" -ForegroundColor Gray
     Write-Host "  MySQL: localhost:3306" -ForegroundColor Gray
-    Write-Host "  停止：docker compose down" -ForegroundColor Gray
+    Write-Host "  停止：docker compose -f scripts\docker-compose.yml down" -ForegroundColor Gray
     Write-Host ""
 }
 

@@ -14,6 +14,16 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+def _sentence_text(item: dict) -> str:
+    """取风险句原文。Schema 字段为 sentence，兼容旧字段 text。"""
+    return (item.get("sentence") or item.get("text") or "").strip()
+
+
+def _normalize_for_match(text: str) -> str:
+    """归一化句子文本用于交叉比对（去空白/标点差异）。"""
+    return "".join(ch for ch in text if ch.isalnum())
+
+
 class EvidenceChainBuilder:
     """构建风险证据链
     
@@ -34,6 +44,7 @@ class EvidenceChainBuilder:
         score: int,
         severity: str,
         all_dimensions: list[dict] | None = None,
+        all_risk_sentences: list[dict] | None = None,
     ) -> dict[str, Any]:
         """为单个风险条目构建证据链
         
@@ -42,7 +53,8 @@ class EvidenceChainBuilder:
             dimension: 风险维度名称
             score: 风险分数
             severity: 严重程度
-            all_dimensions: 所有维度评估结果(用于交叉验证)
+            all_dimensions: 所有维度评估结果
+            all_risk_sentences: 任务级顶层 risk_sentences（交叉验证取数源）
             
         Returns:
             证据链字典
@@ -52,13 +64,13 @@ class EvidenceChainBuilder:
             "score": score,
             "severity": severity,
             "primary_evidence": {
-                "text": risk_sentence.get("text", ""),
+                "text": _sentence_text(risk_sentence),
                 "position": risk_sentence.get("position", {"start": 0, "end": 0}),
                 "context": risk_sentence.get("context", ""),
             },
             "assessment_basis": {
                 "rule": risk_sentence.get("rule", ""),
-                "reasoning": risk_sentence.get("reasoning", ""),
+                "reasoning": risk_sentence.get("reasoning", "") or risk_sentence.get("evidence", ""),
                 "keywords": risk_sentence.get("keywords", []),
             },
             "cross_validation": [],
@@ -66,10 +78,10 @@ class EvidenceChainBuilder:
             "confidence": 0.8,
         }
         
-        # 交叉验证: 检查其他维度是否也标记了此句子
-        if all_dimensions:
+        # 交叉验证: 在顶层 risk_sentences 中查其他维度是否也标记了此句子
+        if all_risk_sentences:
             chain["cross_validation"] = self._cross_validate(
-                risk_sentence, dimension, all_dimensions
+                risk_sentence, dimension, all_risk_sentences, all_dimensions
             )
         
         # 传导路径: 分析风险如何从低到高升级
@@ -86,39 +98,55 @@ class EvidenceChainBuilder:
         self,
         risk_sentence: dict,
         primary_dimension: str,
-        all_dimensions: list[dict],
+        all_risk_sentences: list[dict],
+        all_dimensions: list[dict] | None = None,
     ) -> list[dict]:
         """交叉验证: 检查其他维度是否也识别到此风险
+        
+        取数源为任务级顶层 risk_sentences（Schema 中风险句不在维度对象内），
+        按归一化后的句子文本匹配，并记录佐证维度的评分与理由。
         
         Args:
             risk_sentence: 风险句子
             primary_dimension: 主维度
-            all_dimensions: 所有维度结果
+            all_risk_sentences: 顶层 risk_sentences 列表
+            all_dimensions: 所有维度结果（用于补充分数/严重度）
             
         Returns:
             交叉验证结果列表
         """
         validations = []
-        sentence_text = risk_sentence.get("text", "")
-        
-        for dim in all_dimensions:
-            dim_name = dim.get("name", "")
-            if dim_name == primary_dimension:
+        sentence_text = _sentence_text(risk_sentence)
+        if not sentence_text:
+            return validations
+        norm_target = _normalize_for_match(sentence_text)
+        if not norm_target:
+            return validations
+
+        dim_scores = {d.get("name", ""): d for d in (all_dimensions or [])}
+
+        for rs in all_risk_sentences:
+            if rs is risk_sentence:
                 continue
-            
-            # 检查该维度的风险句子是否包含相同文本
-            dim_sentences = dim.get("risk_sentences", [])
-            for rs in dim_sentences:
-                if rs.get("text", "") == sentence_text:
-                    validations.append({
-                        "dimension": dim_name,
-                        "score": dim.get("score", 0),
-                        "severity": dim.get("severity", "low"),
-                        "corroboration": True,
-                        "reasoning": rs.get("reasoning", ""),
-                    })
-                    break
-        
+            dim_name = rs.get("dimension", "")
+            if not dim_name or dim_name == primary_dimension:
+                continue
+
+            other_text = _sentence_text(rs)
+            if not other_text:
+                continue
+            if _normalize_for_match(other_text) != norm_target:
+                continue
+
+            dim_info = dim_scores.get(dim_name, {})
+            validations.append({
+                "dimension": dim_name,
+                "score": dim_info.get("score", rs.get("score", 0)),
+                "severity": dim_info.get("severity", rs.get("severity", "low")),
+                "corroboration": True,
+                "reasoning": rs.get("reasoning", "") or rs.get("evidence", ""),
+            })
+
         return validations
     
     def _build_propagation_path(
@@ -213,10 +241,12 @@ class EvidenceChainBuilder:
             证据链列表
         """
         chains = []
+        dim_scores = {d.get("name", ""): d for d in dimensions}
         
         for rs in risk_sentences:
             dimension = rs.get("dimension", "未知")
-            score = rs.get("score", 0)
+            # risk_sentences 自身无 score 字段，分数取对应维度评估结果
+            score = rs.get("score", 0) or dim_scores.get(dimension, {}).get("score", 0)
             severity = rs.get("severity", "low")
             
             chain = self.build_chain(
@@ -225,6 +255,7 @@ class EvidenceChainBuilder:
                 score=score,
                 severity=severity,
                 all_dimensions=dimensions,
+                all_risk_sentences=risk_sentences,
             )
             chains.append(chain)
         

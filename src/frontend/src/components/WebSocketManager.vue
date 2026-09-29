@@ -70,6 +70,8 @@ function startPolling(taskId: string) {
     if (reviewStore.currentStep === 'report') {
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
       reviewStore.wsFallbackPolling = false
+      // 无 WebSocket 时轮询兜底：到 report 步拉取结果，收口任务生命周期
+      await reviewStore.fetchResult(taskId)
       return
     }
     await reviewStore.fetchProgress(taskId)

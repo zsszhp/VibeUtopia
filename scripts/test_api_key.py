@@ -7,7 +7,10 @@ os.environ.pop("HTTPS_PROXY", None)
 os.environ.pop("http_proxy", None)
 os.environ.pop("https_proxy", None)
 
-keys = ["ak_2dP4Hf9Tc4sx3258dE9008Q81b638", "ak_2mC1K99ZH6lS9Wh3dY3SE2C30YM7x"]
+raw = os.getenv("LONGCAT_API_KEY", "")
+keys = [k.strip() for k in raw.split(",") if k.strip()]
+if not keys:
+    raise SystemExit("LONGCAT_API_KEY 未配置，请在 .env 中设置后重试")
 url = "https://api.longcat.chat/openai/v1/chat/completions"
 
 for i, key in enumerate(keys):

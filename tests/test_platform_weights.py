@@ -60,7 +60,7 @@ def test_platform_profiles():
 
     # 测试P1平台
     p1_platforms = get_platforms_by_tier("P1")
-    assert len(p1_platforms) == 4, f"P1平台应为4个，实际{len(p1_platforms)}个"
+    assert len(p1_platforms) == 14, f"P1平台应为14个，实际{len(p1_platforms)}个"
     for p in p1_platforms:
         assert p.weight == 0.7, f"{p.platform_id}权重应为0.7，实际{p.weight}"
     print(f"  P1平台: {', '.join(p.platform_id for p in p1_platforms)}")

@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 async def assess_risks(text: str, transcript_quality: dict | None = None, prompt_version: str = "v2") -> dict:
-    """对文本进行七维风险评估
+    """对文本进行11维风险评估
 
     Args:
         text: 待评估文本

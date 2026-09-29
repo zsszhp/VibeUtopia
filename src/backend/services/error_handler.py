@@ -4,6 +4,7 @@ from typing import Any, Callable
 
 from backend.services.exceptions import AnalysisError, NetworkError, ServiceUnavailableError
 from backend.services.error_monitor import error_monitor
+from backend.services.log_sanitizer import redact_context, redact_secrets
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ async def safe_execute(
         except AnalysisError as e:
             error_monitor.record_error(e, task_id, step_name)
 
-            error_context = {
+            error_context = redact_context({
                 "task_id": task_id,
                 "step": step_name,
                 "error_code": e.error_code,
@@ -36,13 +37,13 @@ async def safe_execute(
                 "retry_count": retry_count,
                 "timestamp": e.timestamp,
                 **e.context,
-            }
+            })
 
             if isinstance(e, recoverable_errors) and retry_count < max_retries:
                 retry_count += 1
                 logger.warning(
                     "步骤 %s 可恢复错误，第 %d 次重试: %s | 上下文: %s",
-                    step_name, retry_count, str(e), error_context,
+                    step_name, retry_count, redact_secrets(str(e)), error_context,
                 )
                 await asyncio.sleep(1 * retry_count)
                 continue
@@ -50,12 +51,12 @@ async def safe_execute(
             if e.severity in ("high", "critical"):
                 logger.error(
                     "步骤 %s 严重错误: %s | 上下文: %s",
-                    step_name, str(e), error_context, exc_info=True,
+                    step_name, redact_secrets(str(e)), error_context, exc_info=True,
                 )
             else:
                 logger.warning(
                     "步骤 %s 降级执行: %s | 上下文: %s",
-                    step_name, str(e), error_context,
+                    step_name, redact_secrets(str(e)), error_context,
                 )
             return fallback_value
 
@@ -63,7 +64,7 @@ async def safe_execute(
             error_monitor.record_unexpected(e, task_id, step_name)
             logger.error(
                 "步骤 %s 未预期异常: %s | 任务ID: %s",
-                step_name, str(e), task_id, exc_info=True,
+                step_name, redact_secrets(str(e)), task_id, exc_info=True,
             )
             return fallback_value
 

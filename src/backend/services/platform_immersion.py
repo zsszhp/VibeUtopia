@@ -18,6 +18,26 @@ from backend.models import ImmersionRecord, HotTopic, AgentMemory
 from backend.database import get_db
 from backend.services.llm_client import router as model_router
 
+# 人格数据里的信息来源常用中文名，话题侧用平台 ID，两侧需可互认
+_PLATFORM_ALIASES = {
+    "weibo": ("微博", "新浪微博"),
+    "bilibili": ("B站", "哔哩哔哩", "Bilibili"),
+    "zhihu": ("知乎",),
+    "douyin": ("抖音",),
+    "xiaohongshu": ("小红书", "红书"),
+    "kuaishou": ("快手",),
+    "wechat": ("微信", "微信公众号"),
+    "wechat_channels": ("微信视频号", "视频号"),
+    "tieba": ("贴吧", "百度贴吧"),
+    "douban": ("豆瓣",),
+    "twitter": ("Twitter", "X", "推特"),
+    "youtube": ("YouTube", "油管"),
+    "telegram": ("Telegram", "电报"),
+    "reddit": ("Reddit",),
+    "facebook": ("Facebook", "脸书"),
+    "instagram": ("Instagram", "ins"),
+}
+
 
 class PlatformImmersion:
     """平台沉浸 - Agent 初始化后吸收当前热点"""
@@ -184,7 +204,10 @@ class PlatformImmersion:
         if any(exp.lower() in str(topic_keywords).lower() for exp in expertise):
             prob += 0.3
 
-        if topic_platform in info_sources:
+        source_hits = {str(s).strip().lower() for s in info_sources}
+        platform_hits = {topic_platform.lower()}
+        platform_hits.update(a.lower() for a in _PLATFORM_ALIASES.get(topic_platform.lower(), ()))
+        if source_hits & platform_hits:
             prob += 0.2
 
         if any(stance.lower() in str(topic_tags).lower() for stance in social_stances):

@@ -1,7 +1,10 @@
 import axios from 'axios'
+import { loadSettings } from '../utils/settings'
 
-const API_BASE = '/api/v1'
-const V3_BASE = '/api/v3'
+// apiBase 变更后前端会 reload，模块级读取一次即可生效
+const _prefix = loadSettings().apiBase.replace(/\/$/, '')
+const API_BASE = `${_prefix}/api/v1`
+const V3_BASE = `${_prefix}/api/v3`
 
 // ─── TypeScript 接口定义 ─────────────────────────────────────────
 
@@ -254,7 +257,7 @@ export const v3Api = {
   competitorCompare: (bloggerId: string, competitorIds: string[], fieldName?: string) =>
     axios.post(`${V3_BASE}/competitor/compare`, { blogger_id: bloggerId, competitor_ids: competitorIds, field_name: fieldName || '' }),
 
-  // 反事实仿真
+  // 反事实改写预估
   counterfactualSimulate: (params: { text: string; risk_items: any[]; strategy_type: string }) =>
     axios.post(`${V3_BASE}/counterfactual/simulate`, params),
 

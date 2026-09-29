@@ -1,7 +1,12 @@
 #!/bin/bash
 # VibeUtopia 一键启动脚本（开发环境版）
+# 用法: bash scripts/start.sh [--test]
 
 set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_ROOT"
 
 echo "=========================================="
 echo "  VibeUtopia 启动脚本"
@@ -28,9 +33,7 @@ fi
 echo "✅ 环境配置检查通过"
 echo ""
 
-# 启动后端
-echo "[2/4] 启动后端服务..."
-cd backend
+# 解析 Python 解释器
 if command -v python3 &> /dev/null; then
     PYTHON_CMD=python3
 elif command -v python &> /dev/null; then
@@ -41,21 +44,25 @@ else
 fi
 
 # 检查依赖
+echo "[2/4] 启动后端服务..."
 if ! $PYTHON_CMD -c "import fastapi" 2>/dev/null; then
     echo "⏳ 安装后端依赖..."
     $PYTHON_CMD -m pip install -r requirements.txt -q
 fi
 
+# 包布局为 src/backend，必须把 src 加入 PYTHONPATH
+export PYTHONPATH="$PROJECT_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+
 echo "🚀 启动 FastAPI 后端（端口 8000）..."
-$PYTHON_CMD -m uvicorn main:app --host 0.0.0.0 --port 8000 &
+$PYTHON_CMD -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
 BACKEND_PID=$!
-cd ..
 
 echo "⏳ 等待后端启动（10 秒）..."
 sleep 10
 
-if curl -s http://localhost:8000/docs > /dev/null 2>&1; then
+if curl -s http://localhost:8000/health > /dev/null 2>&1; then
     echo "✅ 后端服务已启动：http://localhost:8000"
+    echo "   健康检查：http://localhost:8000/health"
     echo "   API 文档：http://localhost:8000/docs"
 else
     echo "⚠️  后端可能正在启动中..."
@@ -64,23 +71,23 @@ echo ""
 
 # 启动前端
 echo "[3/4] 启动前端服务..."
-cd frontend
+cd "$PROJECT_ROOT/src/frontend"
 
 if [ ! -d node_modules ]; then
     echo "⏳ 安装前端依赖（首次约 2-5 分钟）..."
     npm install --silent
 fi
 
-echo "🚀 启动 Vite 开发服务器（端口 5173）..."
+echo "🚀 启动 Vite 开发服务器（端口 3000）..."
 npm run dev &
 FRONTEND_PID=$!
-cd ..
+cd "$PROJECT_ROOT"
 
 echo "⏳ 等待前端启动（10 秒）..."
 sleep 10
 
-if curl -s http://localhost:5173 > /dev/null 2>&1; then
-    echo "✅ 前端服务已启动：http://localhost:5173"
+if curl -s http://localhost:3000 > /dev/null 2>&1; then
+    echo "✅ 前端服务已启动：http://localhost:3000"
 else
     echo "⚠️  前端可能正在启动中..."
 fi
@@ -92,9 +99,10 @@ echo "  ✅ 服务已启动"
 echo "=========================================="
 echo ""
 echo "访问地址："
-echo "  🌐 前端：http://localhost:5173"
+echo "  🌐 前端：http://localhost:3000"
 echo "  🔌 后端 API：http://localhost:8000"
 echo "  📖 API 文档：http://localhost:8000/docs"
+echo "  💚 健康检查：http://localhost:8000/health"
 echo ""
 echo "后台进程："
 echo "  - 后端 PID: $BACKEND_PID"
@@ -107,7 +115,7 @@ if [ "$HAS_DOCKER" = true ]; then
     echo "Docker 服务："
     echo "  - Neo4j: http://localhost:7474"
     echo "  - MySQL: localhost:3306"
-    echo "  停止：docker compose down"
+    echo "  停止：docker compose -f scripts/docker-compose.yml down"
     echo ""
 fi
 
@@ -117,7 +125,7 @@ if [ "$1" == "--test" ]; then
     sleep 60
     kill $BACKEND_PID $FRONTEND_PID 2>/dev/null || true
     if [ "$HAS_DOCKER" = true ]; then
-        docker compose down 2>/dev/null || true
+        docker compose -f "$PROJECT_ROOT/scripts/docker-compose.yml" down 2>/dev/null || true
     fi
     echo "✅ 服务已停止"
     echo ""

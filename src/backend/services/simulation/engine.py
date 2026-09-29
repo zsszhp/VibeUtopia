@@ -143,8 +143,12 @@ class SimulationEngine:
 
     async def _load_agents(self):
         """从数据库加载Agent并分配层级"""
-        from backend.database import SessionLocal
-        from backend.models import AgentRecord
+        try:
+            from backend.database import SessionLocal
+            from backend.models import AgentRecord
+        except Exception as e:
+            logger.warning("Agent持久层不可用，跳过数据库加载: %s", e)
+            return
 
         db = SessionLocal()
         try:
@@ -158,9 +162,7 @@ class SimulationEngine:
                 # 分配层级
                 l6 = persona.get("L6_social", {})
                 influence = l6.get("influence_level", "普通用户") if isinstance(l6, dict) else "普通用户"
-                if influence == "KOL":
-                    self.agent_tiers[r.agent_id] = AgentTier.B
-                elif influence == "活跃分子":
+                if influence in ("KOL", "活跃分子"):
                     self.agent_tiers[r.agent_id] = AgentTier.B
                 else:
                     self.agent_tiers[r.agent_id] = AgentTier.C
@@ -171,11 +173,24 @@ class SimulationEngine:
                 l4 = persona.get("L4_behavior", {})
                 active_hours = l4.get("active_hours", "晚间") if isinstance(l4, dict) else "晚间"
                 self.time_model.set_agent_schedule(r.agent_id, active_hours)
+        except Exception as e:
+            logger.error("加载Agent失败: %s", e)
+        finally:
+            db.close()
 
     async def _supplement_agents(self, target_count: int):
-        """轻量模式：补充Agent到目标数量"""
+        """轻量模式：补充Agent到目标数量（人格取自平台原型库）"""
         import random as rng
-        from backend.services.persona_archetypes import ARCHETYPE_TEMPLATES
+
+        try:
+            from backend.services.persona_archetypes import (
+                archetype_to_dict,
+                get_random_archetypes,
+            )
+        except Exception as e:
+            logger.warning("人格原型库不可用，补充Agent将使用降级人格: %s", e)
+            archetype_to_dict = None
+            get_random_archetypes = None
 
         current = len(self.agents)
         needed = target_count - current
@@ -190,29 +205,40 @@ class SimulationEngine:
             count = per_platform + (1 if remainder > 0 else 0)
             remainder = max(0, remainder - 1)
 
+            archetypes = []
+            if get_random_archetypes is not None:
+                archetypes = get_random_archetypes(pname, count)
+
             for i in range(count):
                 agent_id = f"lightweight_{pname}_{i}_{uuid.uuid4().hex[:6]}"
 
-                # 简化人格：从原型模板随机选择
-                archetype = rng.choice(list(ARCHETYPE_TEMPLATES.keys())) if ARCHETYPE_TEMPLATES else "普通用户"
-                persona = {
-                    "persona_id": agent_id,
-                    "platform": pname,
-                    "archetype": archetype,
-                    "L1_demographics": {"age": rng.randint(18, 45), "gender": rng.choice(["男", "女"])},
-                    "L2_personality": {"openness": rng.random(), "conscientiousness": rng.random()},
-                    "L3_values": {"political_lean": rng.choice(["左", "中", "右"])},
-                    "L4_behavior": {"active_hours": rng.choice(["早晨", "午间", "晚间", "深夜"])},
-                    "L5_knowledge": {},
-                    "L6_social": {"influence_level": rng.choice(["KOL", "活跃分子", "普通用户"])},
-                    "L7_narrative": {"style": rng.choice(["理性分析", "情绪表达", "幽默调侃"])},
-                }
+                if archetypes and archetype_to_dict is not None:
+                    persona = archetype_to_dict(archetypes[i % len(archetypes)])
+                    influence = persona.get("L6_social", {}).get("influence_level", "普通用户")
+                    active_hours = persona.get("L4_behavior", {}).get("active_hours", "晚间")
+                else:
+                    influence = rng.choice(["KOL", "活跃分子", "普通用户"])
+                    active_hours = rng.choice(["早间", "午间", "晚间", "深夜"])
+                    persona = {
+                        "archetype_id": "fallback",
+                        "name": "普通用户",
+                        "platform": pname,
+                        "L1_basic": {"gender": rng.choice(["男", "女"])},
+                        "L2_values": {"social_justice": rng.uniform(0, 10)},
+                        "L4_behavior": {
+                            "expression_style": rng.choice(["激进", "直率", "中立", "温和", "谨慎"]),
+                            "interaction_preference": rng.choice(["潜水", "偶尔评论", "活跃评论"]),
+                            "active_hours": active_hours,
+                        },
+                        "L6_social": {"influence_level": influence},
+                    }
 
+                persona["persona_id"] = agent_id
+                persona["platform"] = pname
                 self.agents[agent_id] = persona
 
-                # 分配层级
-                influence = persona["L6_social"]["influence_level"]
-                if i < count // 2:
+                # 层级：A 级仅少量 KOL（当前 tick 循环只驱动 B/C），其余按影响力分 B/C
+                if influence == "KOL" and i < max(1, count // 10):
                     self.agent_tiers[agent_id] = AgentTier.A
                 elif influence in ("KOL", "活跃分子"):
                     self.agent_tiers[agent_id] = AgentTier.B
@@ -220,12 +246,9 @@ class SimulationEngine:
                     self.agent_tiers[agent_id] = AgentTier.C
 
                 self.agent_platform_map[agent_id] = pname
-                self.time_model.set_agent_schedule(agent_id, persona["L4_behavior"]["active_hours"])
+                self.time_model.set_agent_schedule(agent_id, active_hours)
 
         logger.info(f"轻量仿真补充 {needed} 个Agent，总计 {len(self.agents)} 个")
-
-        finally:
-            db.close()
 
     async def run(self):
         """运行仿真主循环"""
@@ -467,8 +490,12 @@ class SimulationEngine:
 
     async def _persist_tick(self, tick: SimulationTick):
         """持久化tick记录"""
-        from backend.database import SessionLocal
-        from backend.models import SimulationRecord, SimulationStatus
+        try:
+            from backend.database import SessionLocal
+            from backend.models import SimulationRecord, SimulationStatus
+        except Exception as e:
+            logger.warning("持久层不可用，跳过tick持久化: %s", e)
+            return
 
         db = SessionLocal()
         try:

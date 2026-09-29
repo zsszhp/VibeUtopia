@@ -51,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { NInput, NButton, NTag } from 'naive-ui'
 import * as d3 from 'd3'
 import { v3Api } from '../api'
@@ -153,7 +153,7 @@ function renderGraph() {
     .on('click', (_event: MouseEvent, d: any) => {
       selectedEntity.value = d
     })
-    .call(d3.drag<SVGCircleElement, any>()
+    .call((d3.drag<SVGCircleElement, any>()
       .on('start', (event: any, d: any) => {
         if (!event.active) simulation?.alphaTarget(0.3).restart()
         d.fx = d.x
@@ -167,8 +167,7 @@ function renderGraph() {
         if (!event.active) simulation?.alphaTarget(0)
         d.fx = null
         d.fy = null
-      })
-    )
+      })) as any)
 
   const label = g.append('g')
     .selectAll('text')
