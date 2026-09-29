@@ -58,6 +58,31 @@ _IRONY_RE = re.compile("|".join(re.escape(m) for m in IRONY_MARKERS))
 _TARGET_RE = re.compile("|".join(re.escape(m) for m in SENSITIVE_TARGETS))
 
 
+# 寓言/隐喻政治影射（笼子、动物园、幸福表演等）
+METAPHOR_PATTERNS = (
+    "关在笼子", "笼子里", "动物园", "以为自己很自由", "按时表演",
+    "很幸福", "幸福的", "被圈养", "提线木偶", "楚门", "戏子",
+    "笼中", "金丝雀", "温水", "青蛙", "韭菜", "待宰",
+)
+
+
+def detect_metaphor_risk(text: str) -> dict:
+    """寓言式政治影射检测（动物寓言、自由悖论等）"""
+    text = text or ""
+    hits = [p for p in METAPHOR_PATTERNS if p in text]
+    # 「笼子/动物园」+「自由/幸福」组合 → 高度疑似政治寓言
+    combo = (
+        any(p in text for p in ("笼子", "动物园", "圈养", "金丝雀", "楚门"))
+        and any(p in text for p in ("自由", "幸福", "表演", "按时"))
+    )
+    return {
+        "metaphor_hits": hits,
+        "allegory_combo": combo,
+        "suggested_min_score": 55 if (combo or len(hits) >= 2) else 0,
+        "notes": ["检测到寓言式影射（笼子/自由悖论类），按暗示含义至少 orange"] if (combo or len(hits) >= 2) else [],
+    }
+
+
 def detect_irony_risk(text: str) -> dict:
     """检测暗讽/隐喻风险信号
 
@@ -92,7 +117,9 @@ def detect_irony_risk(text: str) -> dict:
 def apply_irony_floor(dimensions: list[dict], text: str) -> list[dict]:
     """对时事踩雷/群体冒犯/价值观/政治敏感 等维度做反讽兜底抬分"""
     signal = detect_irony_risk(text)
-    floor = signal["suggested_min_score"]
+    meta = detect_metaphor_risk(text)
+    floor = max(signal["suggested_min_score"], meta["suggested_min_score"])
+    notes = signal["notes"] + meta["notes"]
     if floor <= 0:
         return dimensions
 
@@ -108,7 +135,7 @@ def apply_irony_floor(dimensions: list[dict], text: str) -> list[dict]:
                 d["score"] = floor
                 if d.get("severity") in (None, "green", "low"):
                     d["severity"] = "orange"
-                note = "；".join(signal["notes"])
+                note = "；".join(notes)
                 ev = d.get("evidence") or ""
                 if note and note not in ev:
                     d["evidence"] = (ev + "【反讽兜底】" + note).strip()
