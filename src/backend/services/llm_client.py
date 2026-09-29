@@ -750,7 +750,8 @@ async def _httpx_call(url: str, headers: dict, payload: dict, endpoint: ModelEnd
     started = time.perf_counter()
     call_kind = "vlm" if "image_url" in json.dumps(payload.get("messages", []), ensure_ascii=False)[:2000] else "chat"
     try:
-        async with httpx.AsyncClient(timeout=settings.LLM_TIMEOUT) as client:
+        timeout = httpx.Timeout(settings.LLM_TIMEOUT, connect=15.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(url, headers=headers, json=payload)
 
             if _is_quota_error(resp.status_code):
