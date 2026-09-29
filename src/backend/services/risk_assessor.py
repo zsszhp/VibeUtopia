@@ -4,6 +4,7 @@ import asyncio
 import logging
 
 from backend.services.llm_client import call_llm, load_prompt, parse_llm_json
+from backend.services.irony_detector import apply_irony_floor
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,9 @@ async def assess_risks(text: str, transcript_quality: dict | None = None, prompt
     for dim in result.get("dimensions", []):
         dim.setdefault("dimension_weight", _default_weight(dim.get("name", "")))
         dim.setdefault("affected_groups", [])
+
+    # 反讽/暗讽兜底：避免修辞被字面化为 green
+    result["dimensions"] = apply_irony_floor(result.get("dimensions") or [], text)
 
     # 为每个risk_sentence补充默认字段
     for rs in result.get("risk_sentences", []):
