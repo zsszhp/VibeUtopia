@@ -177,6 +177,20 @@ export interface UploadResponse {
 }
 
 export const api = {
+  /** 注册本地用户 */
+  registerUser: (username: string, password: string) =>
+    axios.post<{ access_token: string; username: string }>(`${API_BASE}/auth/register`, {
+      username,
+      password,
+    }),
+
+  /** 登录换 JWT */
+  login: (username: string, password: string) =>
+    axios.post<{ access_token: string; username: string }>(`${API_BASE}/auth/token`, {
+      username,
+      password,
+    }),
+
   /** 提交内容预审（统一入口） */
   submitReview: (req: ReviewRequest) =>
     axios.post<ReviewResponse>(`${API_BASE}/review`, req),

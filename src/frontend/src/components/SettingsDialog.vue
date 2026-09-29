@@ -46,6 +46,19 @@
         />
         <span class="setting-hint">模型由服务端按本机算力档位自动调度，此项暂不可用</span>
       </div>
+      <div class="setting-item">
+        <label class="setting-label">账号（可选）</label>
+        <div class="auth-row">
+          <NInput v-model:value="auth.username" size="small" placeholder="用户名" />
+          <NInput v-model:value="auth.password" size="small" type="password" show-password-on="click" placeholder="密码（至少8位）" />
+        </div>
+        <div class="auth-row">
+          <NButton size="small" type="primary" :loading="auth.loading" @click="handleLogin">登录</NButton>
+          <NButton size="small" :loading="auth.loading" @click="handleRegister">注册</NButton>
+          <NButton size="small" quaternary @click="handleLogout">退出</NButton>
+        </div>
+        <span class="setting-hint">{{ auth.message || (auth.token ? `已登录：${auth.username}` : '配置 JWT 后可用；本地开发可跳过') }}</span>
+      </div>
     </div>
 
     <template #footer>
@@ -59,8 +72,28 @@
 
 <script setup lang="ts">
 import { reactive, watch } from 'vue'
+import axios from 'axios'
 import { NModal, NInput, NSelect, NButton } from 'naive-ui'
 import { loadSettings, saveSettings, resetSettings, DEFAULT_SETTINGS } from '../utils/settings'
+import { api } from '../api'
+
+const TOKEN_KEY = 'vibe_jwt'
+
+function applyToken(token: string | null) {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token)
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+  } else {
+    localStorage.removeItem(TOKEN_KEY)
+    delete axios.defaults.headers.common['Authorization']
+  }
+}
+
+// 恢复已有 token
+const savedToken = localStorage.getItem(TOKEN_KEY)
+if (savedToken) {
+  axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`
+}
 
 const props = defineProps<{
   show: boolean
@@ -87,6 +120,56 @@ const modelOptions = [
 ]
 
 const form = reactive({ ...DEFAULT_SETTINGS })
+
+const auth = reactive({
+  username: localStorage.getItem('vibe_user') || '',
+  password: '',
+  token: localStorage.getItem(TOKEN_KEY) || '',
+  loading: false,
+  message: '',
+})
+
+async function handleLogin() {
+  auth.loading = true
+  auth.message = ''
+  try {
+    const r = await api.login(auth.username.trim(), auth.password)
+    applyToken(r.data.access_token)
+    auth.token = r.data.access_token
+    auth.username = r.data.username || auth.username
+    localStorage.setItem('vibe_user', auth.username)
+    auth.message = '登录成功'
+    auth.password = ''
+  } catch (e: any) {
+    auth.message = e?.response?.data?.detail || e?.message || '登录失败'
+  } finally {
+    auth.loading = false
+  }
+}
+
+async function handleRegister() {
+  auth.loading = true
+  auth.message = ''
+  try {
+    const r = await api.registerUser(auth.username.trim(), auth.password)
+    applyToken(r.data.access_token)
+    auth.token = r.data.access_token
+    localStorage.setItem('vibe_user', auth.username)
+    auth.message = '注册成功并已登录'
+    auth.password = ''
+  } catch (e: any) {
+    auth.message = e?.response?.data?.detail || e?.message || '注册失败'
+  } finally {
+    auth.loading = false
+  }
+}
+
+function handleLogout() {
+  applyToken(null)
+  auth.token = ''
+  auth.password = ''
+  auth.message = '已退出'
+}
 
 function loadForm() {
   Object.assign(form, loadSettings())
@@ -140,5 +223,12 @@ watch(() => props.show, (val) => {
   display: flex;
   justify-content: flex-end;
   gap: var(--sp-2);
+}
+
+.auth-row {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  align-items: center;
 }
 </style>
