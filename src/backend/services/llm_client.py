@@ -735,8 +735,9 @@ async def _call_endpoint(endpoint: ModelEndpoint, prompt: str, system: str) -> s
             {"role": "system", "content": system},
             {"role": "user", "content": prompt},
         ],
-        "temperature": 0.7,
-        "max_tokens": 4096,
+        # 风控/结构化输出用低温；推理型模型需要更大 max_tokens，否则 reasoning 吃掉预算导致空内容
+        "temperature": 0.2,
+        "max_tokens": 8192,
     }
 
     if _HAS_HTTPX:

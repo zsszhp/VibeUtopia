@@ -32,15 +32,17 @@ async def assess_risks(text: str, transcript_quality: dict | None = None, prompt
         # 插入到"文案内容："之前
         prompt = prompt.replace("文案内容：", transcript_hint + "文案内容：")
 
-    max_retries = 2
+    max_retries = 3
+    working_prompt = prompt
     for attempt in range(max_retries):
         try:
-            response = await call_llm(prompt, task_type="risk_assessment")
+            response = await call_llm(working_prompt, task_type="risk_assessment")
             result = parse_llm_json(response, fallback=None)
 
             if result is None:
-                logger.warning("风险评估LLM返回无法解析 (尝试%d/%d)", attempt + 1, max_retries)
+                logger.warning("风险评估LLM返回无法解析 (尝试%d/%d) resp_len=%s", attempt + 1, max_retries, len(response or ""))
                 if attempt < max_retries - 1:
+                    working_prompt = prompt + "\n\n【重试要求】只输出一个合法 JSON 对象，不要任何解释或代码块标记。"
                     continue
                 result = {"dimensions": [], "risk_sentences": [], "cross_effects": []}
 
