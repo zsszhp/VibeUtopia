@@ -395,3 +395,16 @@ Agent åœ¨ä»»åŠ¡æ‰§è¡Œè¿‡ç¨‹ä¸­å‘ç°çš„æ¡ç›®åº”éµå¾ªä»¥ä¸‹æ ¼å¼ï¼š
   - ÑéÖ¤£ºpytest 113 passed 9 skipped£»vue-tsc 0£»build ³É¹¦
   - ÎÄµµ£ºdocs/06_ÊµÊ©¼ÇÂ¼/11_R4¹¦ÄÜÉî»¯.md¡¢12_¹¤³ÌÖÊÁ¿ÊÕÎ².md
   - ´ı°ì£ºlive ÆÀ²â»ùÏß¡¢ECE Ğ£×¼¡¢¶à worker ÏŞÁ÷¡¢JWT ¶à×â»§
+
+### R5+L6L7+ECE ÓëÄ£ĞÍÇĞ»»Íê³É£¨2026-09-29£©
+- Date: 2026-09-29
+- Context: ÓÃ»§ÒªÇóÍê³ÉÈ«²¿²¢Ğ¡²½git
+- Category: ´úÂë½á¹¹ | »·¾³ÅäÖÃ
+- Instructions:
+  - Ä£ĞÍ£ºLongCat¹ıÆÚ£¬¸Ä OAIFREE hub.oaifree.com gpt-6-luna£¨.env OAIFREE_*£¬²»Èë¿â£©
+  - live»ùÏß£º12°¸ valid_accuracy=0.75 valid_ratio=1.0£¨ºì³È±ß½ç3ÎóÅĞ£©
+  - R5£ºJWT/workflow/export£»L6L7£ºnarrative_pragmatics+risk_emergence
+  - ECE/consistency Ä£¿éÂäµØ£»²âÊÔ¿âÇ¿ÖÆ SQLite
+  - pytest 137 passed 9 skipped£»vue-tsc 0
+  - ÊµÊ©¼ÇÂ¼ docs/06_ÊµÊ©¼ÇÂ¼/11-15
+  - ´ı°ì£ººì³È±ß½çĞ£×¼¡¢JWTÓÃ»§±í¡¢PDFµ¼³ö¡¢VGOLDÆÀ²â
