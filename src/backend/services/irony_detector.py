@@ -13,7 +13,36 @@ IRONY_MARKERS = (
     "懂的都懂", "你懂的", "厉害了", "赢麻了", "遥遥领先",
     "当然啦", "可不是嘛", "真是棒", "笑死", "典中典",
     "怎么说呢", "有一说一，确实", "难绷", "难崩",
+    "光辉", "感人", "精彩", "优秀", "伟大", "光荣",
+    "所谓的", "所谓的英雄", "编出来的", "根本不存在",
 )
+
+# 民族宗教贬损/改造话语（硬抬民族宗教维度）
+ETHNIC_BELITTLE = (
+    "落后", "改造他们", "不符合现代文明", "所谓文化", "所谓传统",
+    "劣根", "野蛮", "不开化", "应该用先进",
+)
+
+
+def apply_ethnic_floor(dimensions: list[dict], text: str) -> list[dict]:
+    """民族贬损/文明改造话语 → 民族宗教维度至少 70（硬红线软阈）"""
+    text = text or ""
+    if not any(k in text for k in ETHNIC_BELITTLE):
+        return dimensions
+    for d in dimensions or []:
+        if d.get("name") == "民族宗教":
+            try:
+                score = int(d.get("score", 0) or 0)
+            except (TypeError, ValueError):
+                score = 0
+            if score < 70:
+                d["score"] = 70
+                d["severity"] = "red"
+                ev = d.get("evidence") or ""
+                note = "【民族贬损兜底】检测到文明改造/习俗贬损表述，按红线触碰处理"
+                if note not in ev:
+                    d["evidence"] = (ev + note).strip()
+    return dimensions
 
 # 敏感指向（时事/政策/历史/群体/体制）
 SENSITIVE_TARGETS = (
@@ -21,6 +50,8 @@ SENSITIVE_TARGETS = (
     "民族", "宗教", "台湾", "香港", "新疆", "领土",
     "地域", "河南人", "东北人", "上海人", "农村", "城里人",
     "专家", "官方", "权威", "教材", "课本", "纪念碑",
+    "习俗", "传统", "落后", "改造他们", "文明", "劣根",
+    "英雄事迹", "编出来的", "胜利者", "光辉",
 )
 
 _IRONY_RE = re.compile("|".join(re.escape(m) for m in IRONY_MARKERS))
