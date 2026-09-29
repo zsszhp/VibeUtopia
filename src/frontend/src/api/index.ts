@@ -64,6 +64,9 @@ export interface CrossEffect {
 
 export interface ConfidenceBreakdown {
   overall: number
+  overall_confidence?: number
+  confidence_level?: 'low' | 'medium' | 'high' | 'very_high'
+  reason_labels?: string[]
   factors: {
     data_quality: number
     consistency: number

@@ -103,3 +103,41 @@ def score_from_severity(sev: str | None, score: int = 0) -> int:
     return {"green": 10, "yellow": 35, "orange": 60, "red": 85}.get(
         normalize_severity(sev, score), 0
     )
+
+
+# 红线维度（触碰即 HIGH）：与 Prompt risk_assessment_v2 红线组一致
+REDLINE_DIMENSIONS = frozenset({
+    "政治敏感", "法律合规", "民族宗教", "事实错误", "平台禁区",
+})
+
+# 红线强制分数下限：severity=red 的标定区间起点（76-100 red）
+REDLINE_SCORE_FLOOR = 76
+
+
+def is_redline_dimension(name: str | None) -> bool:
+    """是否红线维度"""
+    return (name or "") in REDLINE_DIMENSIONS
+
+
+def enforce_redline_dim_score(name: str, score: int, sev: str | None) -> tuple[int, bool]:
+    """红线维度被判 red/high 时，维度分强制抬升到 76+，保证 severity 与分数区间自洽
+
+    Returns:
+        (校正后分数, 是否触发强制抬升)
+    """
+    if not is_redline_dimension(name):
+        return int(score), False
+    if is_high_severity(sev, score):
+        lifted = max(int(score), REDLINE_SCORE_FLOOR)
+        return lifted, lifted != int(score)
+    return int(score), False
+
+
+def redline_triggers_floor(dimensions: list[dict] | None) -> bool:
+    """任一红线维度 red/high → 总体分应至少 76（红线代码化，不再只写在 Prompt）"""
+    for d in dimensions or []:
+        if not is_redline_dimension(d.get("name")):
+            continue
+        if is_high_severity(d.get("severity"), d.get("score", 0)):
+            return True
+    return False

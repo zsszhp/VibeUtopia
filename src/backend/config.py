@@ -81,6 +81,10 @@ class Settings:
     WHISPER_MODEL: str = os.getenv("WHISPER_MODEL", "base")
     WHISPER_DEVICE: str = os.getenv("WHISPER_DEVICE", "cpu")
 
+    # API 鉴权（可选）：配置后所有 /api/** 与 /ws/** 必须携带 X-API-Key 或 Authorization: Bearer
+    # 未配置时本地开发放行；生产环境必须配置，且不得写入仓库
+    API_KEY: str = os.getenv("API_KEY", "")
+
     # CORS 配置：逗号分隔的来源白名单，默认仅放行本地开发端口（Vite dev: 3000/5173）
     # 生产环境必须通过 CORS_ALLOW_ORIGINS 显式配置，禁止使用 *
     CORS_ALLOW_ORIGINS: list[str] = [

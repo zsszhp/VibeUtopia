@@ -80,6 +80,12 @@ class EnhancedAnalysisResult:
     video_text_narrative_consistency: int = 100
     frame_compression_ratio: float = 0.0
 
+    # Phase 2.8: 事件级理解 (R3)
+    events_summary: list = field(default_factory=list)
+    selected_frame_reasons: list = field(default_factory=list)
+    narrative_conflicts: list = field(default_factory=list)
+    event_understanding_meta: dict = field(default_factory=dict)
+
     # Phase 3: 仿真增强（deep模式）
     simulation_id: str = ""
     simulation_summary: dict = field(default_factory=dict)
@@ -444,6 +450,43 @@ async def _run_phase2_7(video_path: str, result: EnhancedAnalysisResult, text: s
             delta_result.compression_ratio,
         )
 
+        # Step 1.5: Phase 2.8 事件级理解（R3）——事件切分 + 自适应选帧 + 叙事冲突
+        try:
+            from backend.services.video_understanding import run_event_understanding
+            from backend.services.video_understanding.pipeline import frames_from_delta_frames
+
+            frame_obs = frames_from_delta_frames(delta_result.extracted_frames)
+            event_u = await run_event_understanding(frame_obs, text)
+            result.events_summary = event_u.events_summary
+            result.selected_frame_reasons = event_u.selected_frame_reasons
+            result.narrative_conflicts = [
+                {
+                    "kind": c.kind,
+                    "start": c.start,
+                    "end": c.end,
+                    "score": c.score,
+                    "evidence": c.evidence,
+                    "explanation": c.explanation,
+                    "confidence": c.confidence,
+                }
+                for c in event_u.conflicts
+            ]
+            result.event_understanding_meta = {
+                "event_count": len(event_u.events),
+                "selected_frame_count": len(event_u.selected_frames),
+                "conflict_count": len(event_u.conflicts),
+                "method_used": event_u.method_used,
+                "degraded": event_u.degraded,
+                "degrade_reason": event_u.degrade_reason,
+            }
+            logger.info(
+                "事件级理解完成: 事件=%d, 选帧=%d, 冲突=%d",
+                len(event_u.events), len(event_u.selected_frames), len(event_u.conflicts),
+            )
+        except Exception as e:
+            logger.warning("事件级理解失败(降级): %s", e)
+            result.event_understanding_meta = {"degraded": True, "degrade_reason": str(e)}
+
         # Step 2: 帧序列建模
         if delta_result.extracted_frames:
             sequence_analyzer = FrameSequenceAnalyzer(config=frame_sequence_cfg)
@@ -570,29 +613,41 @@ def _compile_final_report(result: EnhancedAnalysisResult):
             result.v2_overall_score = min(100, result.v2_overall_score + 10)
             result.v2_suggestion = get_suggestion(result.v2_overall_score)
 
-    # 可信度计算
-    confidence = 0.5  # 基线
-    sources = {"base": "MVP静态评估"}
+    # 可信度计算：统一入口 ConfidenceCalculator（弃用旧「模块计数」公式）
+    # 旧公式 0.5+信号0.15+实体0.1+仿真0.15+音频0.1 是功能计数器，与准确率无关，已移除
+    from backend.services.confidence_calculator import ConfidenceCalculator
 
+    # 供计算的 11 维评估结果（name/score 结构）
+    dims_for_confidence = [
+        {"name": name, "score": score}
+        for name, score in (result.v2_dimensions or result.mvp_dimensions or {}).items()
+    ]
+    confidence_calc = ConfidenceCalculator()
+    confidence_result = confidence_calc.calculate(
+        dimensions=dims_for_confidence,
+        risk_sentences=result.mvp_risk_sentences or [],
+        platform_reactions=result.mvp_platform_reactions or [],
+    )
+
+    # 模块信号降级为「原因标签/因子注释」，只解释不加成，避免模块越多置信度越高
+    sources: dict = {"formula": "confidence_calculator"}
     if result.signal_match_result and result.signal_match_result.matches:
-        confidence += 0.15
         sources["signal"] = f"热点关联({len(result.signal_match_result.matches)}条)"
-
     if result.entity_risk_chain_result and result.entity_risk_chain_result.chains:
-        confidence += 0.1
         sources["entity_chain"] = f"实体风险链({len(result.entity_risk_chain_result.chains)}条)"
-
     if result.simulation_id:
-        confidence += 0.15
         agent_count = result.simulation_summary.get("total_agents", 0)
         sources["simulation"] = f"轻量仿真({agent_count}Agent)"
-
     if result.audio_transcription:
-        confidence += 0.1
         sources["audio_multimodal"] = f"Paraformer音频转写+多模态分析(风险分={result.audio_risk_score})"
 
-    result.confidence = min(1.0, confidence)
-    result.confidence_sources = sources
+    result.confidence = confidence_result["overall_confidence"]
+    result.confidence_sources = {
+        **sources,
+        "confidence_level": confidence_result.get("confidence_level", "medium"),
+        "reason_labels": confidence_result.get("reason_labels", []),
+        "factors": confidence_result.get("factors", {}),
+    }
 
 
 def _get_graph_store():
@@ -655,6 +710,29 @@ def _persist_result(result: EnhancedAnalysisResult):
                     db.commit()
             except Exception as e:
                 logger.warning("持久化多模态分析结果失败: %s", e)
+
+        # 持久化事件级理解结果（R3：events_summary / selected_frame_reasons 供 UI 证据下钻）
+        try:
+            existing = db.query(V2AnalysisResult).filter(
+                V2AnalysisResult.task_id == result.task_id
+            ).first()
+            if existing:
+                if existing.simulation_summary:
+                    sim_data = json.loads(existing.simulation_summary)
+                else:
+                    sim_data = {}
+                if result.events_summary:
+                    sim_data["events_summary"] = result.events_summary
+                if result.selected_frame_reasons:
+                    sim_data["selected_frame_reasons"] = result.selected_frame_reasons
+                if result.narrative_conflicts:
+                    sim_data["narrative_conflicts"] = result.narrative_conflicts
+                if result.event_understanding_meta:
+                    sim_data["event_understanding"] = result.event_understanding_meta
+                existing.simulation_summary = json.dumps(sim_data, ensure_ascii=False)
+                db.commit()
+        except Exception as e:
+            logger.warning("持久化事件级理解结果失败: %s", e)
     except Exception as e:
         logger.error("持久化V2分析结果失败: %s", e)
         db.rollback()

@@ -110,6 +110,13 @@ data/signal_collection.log
 data/t7_enhancement.log
 
 # 检查点数据（断点续传运行时产物）
+# R2 计量与评测运行时产物（baseline.json 保留入库）
+data/metrics/
+data/eval/eval_*.json
+data/eval/eval_*.md
+data/eval/latest.json
+data/eval/latest.md
+
 data/checkpoints/
 
 # Prompt AB测试产物

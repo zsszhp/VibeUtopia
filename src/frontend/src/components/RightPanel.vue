@@ -16,6 +16,13 @@
             </NTag>
           </div>
 
+          <!-- 置信度原因标签 -->
+          <div v-if="reviewStore.result?.confidence_breakdown?.reason_labels?.length" class="reason-labels">
+            <NTag v-for="lab in reviewStore.result.confidence_breakdown.reason_labels" :key="lab" size="tiny" round class="reason-tag">
+              {{ reasonLabelName(lab) }}
+            </NTag>
+          </div>
+
           <!-- 置信度详细分解 -->
           <div v-if="reviewStore.result.confidence_breakdown" class="confidence-breakdown">
             <div class="breakdown-item">
@@ -289,6 +296,10 @@ const avgConfidence = computed(() => {
 })
 
 const confidenceTagType = computed(() => {
+  const level = reviewStore.result?.confidence_breakdown?.confidence_level
+  if (level === 'very_high' || level === 'high') return 'success' as const
+  if (level === 'medium') return 'warning' as const
+  if (level === 'low') return 'error' as const
   const c = reviewStore.result?.confidence ?? 0
   if (c >= 0.8) return 'success' as const
   if (c >= 0.6) return 'warning' as const
@@ -296,11 +307,35 @@ const confidenceTagType = computed(() => {
 })
 
 const confidenceLabel = computed(() => {
+  const level = reviewStore.result?.confidence_breakdown?.confidence_level
+  const levelMap: Record<string, string> = {
+    very_high: '极高置信',
+    high: '高置信',
+    medium: '中置信',
+    low: '低置信',
+  }
+  if (level && levelMap[level]) return levelMap[level]
   const c = reviewStore.result?.confidence ?? 0
   if (c >= 0.8) return '高置信'
   if (c >= 0.6) return '中置信'
   return '低置信'
 })
+
+const reasonLabelName = (lab: string) => {
+  const map: Record<string, string> = {
+    consistency: '评估一致',
+    low_consistency: '评估分歧',
+    cross_validation: '交叉验证',
+    no_cross_validation: '无交叉验证',
+    data_quality: '数据质量好',
+    low_data_quality: '数据质量低',
+    platform_validation: '平台验证',
+    weak_platform_validation: '平台验证弱',
+    full_coverage: '维度完整',
+    partial_coverage: '维度不全',
+  }
+  return map[lab] ?? lab
+}
 
 const decisionAdviceClass = computed(() => {
   const score = reviewStore.result?.overall_risk ?? 0
@@ -416,6 +451,8 @@ watch(compareTaskId, async (taskId) => {
   flex-shrink: 0;
 }
 
+.reason-labels { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.reason-tag { opacity: 0.85; }
 .confidence-breakdown {
   margin-top: var(--sp-3);
   display: flex;

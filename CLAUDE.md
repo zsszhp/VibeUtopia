@@ -89,7 +89,7 @@
 | V3.2 本地模型部署（Ollama/vLLM） | 🔜 待开发 |
 | V3.3 多语言内容风控 | 🔜 待开发 |
 
-详细进度见 `.monkeycode/MEMORY.md` 和 `docs/15_环境与待办事项.md`。
+详细进度见 `.monkeycode/MEMORY.md` 和 `docs/04_规范与工程/03_环境与待办.md`。
 
 ---
 

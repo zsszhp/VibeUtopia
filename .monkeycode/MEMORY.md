@@ -274,13 +274,13 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
     - 地图完整性审核: ✅ 可行（VLM+地理知识库比对）
     - 代码/文件夹溯源: ⚠️ 部分可行（OCR+GitHub Search API，受OCR准确率限制）
     - 敏感符号检测: ✅ 可行（YOLOv8区域检测+VLM细审）
-  - **新增设计文档**: `docs/design/30_细粒度视频理解设计.md`
-  - **蓝图更新**: `docs/design/04_V2深化路线图.md` 新增 V3.4 阶段（📋 规划中）
+  - **新增设计文档**: `docs/02_系统设计/13_细粒度视频理解.md`
+  - **蓝图更新**: `docs/01_产品与需求/04_路线图与里程碑.md` 新增 V3.4 阶段（📋 规划中）
   - **Go/No-Go**: 短暂画面检出率≥85%，地图审核召回率≥90%，增量耗时≤30秒/10分钟视频
   - **已下载论文19篇**: references/papers/（video-understanding/6篇、fine-grained-detection/7篇、video-ocr/6篇）
-  - **已克隆项目5个**: references/projects/（video-fine-grained/3个、video-content-audit/2个）
+  - **已克隆项目5个**: references/projects/（video-fine-grained/3个、video-content-docs/06_实施记录/（2 个））
   - **参考论文索引更新**: `references/参考论文与开源项目.md` 新增"四-B、细粒度视频理解"章节
-  - **文档索引更新**: `docs/00_文档索引与阅读指引.md` 新增30号文档
+  - **文档索引更新**: `docs/README.md` 新增30号文档
   - **状态**: 蓝图已写入，等待用户确认后开始实施
 
 ### V3.4 细粒度视频理解实施（2026-05-18）
@@ -373,14 +373,14 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
     - 架构: OpenAPI自动生成前端类型、共享常量包、useECharts/useForceGraph composable提取
   - **Git提交**: da9fa09(VLM格式修复), 48b2868(测试v2完成)
 
-### ��Ʒ���ƽ׶�R1��ɣ�2026-09-29��
+### 产Ʒ完善阶段R1完成（2026-09-29）
 - Date: 2026-09-29
-- Context: ���ɫ�Ŷӵ���+ʵʩ���û�ȷ�Ϻ�ִ��
-- Category: ����ṹ | ���Է���
+- Context: 多角ɫ团队调研+ʵʩ，用户ȷ认后ִ行
+- Category: 代码结构 | 测试方法
 - Instructions:
-  - ��Ʊ��� docs/audit/00-18 ��19�ݣ�ʵʩ��¼ 19-25 ��7��
-  - ��ͼ��docs/design/31 ��һ��ԭ����Ƶ����ܹ���32 ��Ʒ������ͼ��33 ʵʩ�ƻ�
-  - P0�޸���ǰ�ˣ�tokens/��ɫ/Verdict/����ɼ�/��������ߣ�����ˣ�V3˫ǰ׺/health/����ͳһ��������engine�﷨������ʵ��ʵ�����㷨severityӳ��/֤����/֡���С���ȫ��Կ������DX������pytest
-  - ��֤��pytest 55 passed 9 skipped 0 failed��vue-tsc 0 error��npm build �ɹ�
-  - ������ֵͳһ30/60/80��11ά�ھ�ͳһ
-  - ���죺API��Ȩ������76+ǿ�ơ��ɱ�����������ع��Ž�����Ƶ�¼����ܹ�ʵʩ(R3)
+  - 审计报告 docs/05_调研审计/00-18 共19份；ʵʩ记¼ 19-25 共7份
+  - 蓝ͼ：docs/02_系统设计/14_第一性原理视频理解架构.md 第һ性ԭ理视Ƶ理解架构、32 产Ʒ总体蓝ͼ、33 ʵʩ计划
+  - P0修复：ǰ端（tokens/暗ɫ/Verdict/错误可见/死组件接线）、后端（V3˫ǰ׺/health/错误ͳһ）、仿真engine语法、反事ʵ诚ʵ化、算法severityӳ射/֤据链/֡序列、安ȫ密Կ清理、DX启动与pytest
+  - 验֤：pytest 55 passed 9 skipped 0 failed；vue-tsc 0 error；npm build 成功
+  - 风险阈ֵͳһ30/60/80；11ά口径ͳһ
+  - 待办：API鉴Ȩ、红线76+ǿ制、成本计量、评测回归门禁、视Ƶ事件级架构ʵʩ(R3)

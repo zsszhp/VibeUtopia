@@ -68,6 +68,7 @@ class ModelsResponse(BaseModel):
     """可用模型响应"""
     hardware_tier: str
     models: dict[str, dict[str, str]]
+    hardware_details: dict | None = None
 
 
 class UploadResponse(BaseModel):
@@ -630,6 +631,7 @@ async def get_models():
     阶段1.3增强: 使用硬件自适应检测模块返回详细配置
     """
     # 使用新的硬件检测模块
+    hardware_info: dict | None = None
     try:
         from backend.services.hardware_detector import get_hardware_summary
         hardware_info = get_hardware_summary()
@@ -658,9 +660,8 @@ async def get_models():
             }
         }
         
-        # 附加硬件详情
-        models["_hardware_details"] = hardware_info
-        
+        # 硬件详情单独字段返回（不混入 models，保持 dict[str, dict[str, str]] 类型）
+
     except Exception as e:
         logger.warning("硬件检测失败,使用默认配置: %s", e)
         # 降级到旧逻辑
@@ -695,7 +696,8 @@ async def get_models():
 
     return ModelsResponse(
         hardware_tier=hardware_tier,
-        models=models
+        models=models,
+        hardware_details=hardware_info,
     )
 
 
@@ -1012,4 +1014,27 @@ async def get_memory_status():
             total_memories=0,
             agent_memories={},
         )
+
+
+@router.get("/metrics/summary")
+async def get_metrics_summary(n: int = 50):
+    """LLM 调用计量汇总（成本/耗时/失败率）
+
+    Query:
+        n: 最近 N 次分析（无 analysis_id 时退化为最近 N 条调用），默认 50
+
+    Returns:
+        调用数 / 失败率 / 耗时分位（p50/p90/p99）/ token 合计；无记录时 available=False
+    """
+    from backend.services.llm_meter import meter as llm_meter
+
+    try:
+        window = max(1, min(int(n), 1000))
+    except (TypeError, ValueError):
+        window = 50
+    try:
+        return llm_meter.summarize(n=window)
+    except Exception as e:
+        logger.error("计量汇总失败：%s", e)
+        return {"available": False, "error": str(e)}
 

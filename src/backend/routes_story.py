@@ -6,6 +6,7 @@
 import json
 import logging
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -29,6 +30,27 @@ router = APIRouter(prefix="/api/v1/story", tags=["人生故事生成"])
 
 # 存储生成任务的临时目录
 STORY_STORAGE_DIR = Path(__file__).parent.parent / "data" / "stories"
+
+# user_id 只允许安全字符，防止 ../ 等路径穿越写到存储目录之外
+_USER_ID_RE = re.compile(r"^[\w\u4e00-\u9fff\-]{1,64}$")
+
+
+def _safe_user_id(user_id: str) -> str:
+    """校验 user_id 作为路径片段的合法性，拒绝路径遍历与分隔符"""
+    uid = (user_id or "").strip()
+    if not uid or not _USER_ID_RE.match(uid) or ".." in uid:
+        raise HTTPException(status_code=400, detail="非法 user_id")
+    return uid
+
+
+def _user_dir(user_id: str) -> Path:
+    """解析 user_id 对应的存储目录，确保仍位于 STORY_STORAGE_DIR 内"""
+    uid = _safe_user_id(user_id)
+    base = STORY_STORAGE_DIR.resolve()
+    target = (STORY_STORAGE_DIR / uid).resolve()
+    if target != base and base not in target.parents:
+        raise HTTPException(status_code=400, detail="非法 user_id")
+    return target
 
 
 class StoryGenerateRequest(BaseModel):
@@ -93,13 +115,14 @@ async def generate_story(
     background_tasks: BackgroundTasks,
 ):
     """生成单个人生故事"""
-    task_id = f"story_{request.user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    user_id = _safe_user_id(request.user_id)
+    task_id = f"story_{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
     os.makedirs(STORY_STORAGE_DIR, exist_ok=True)
 
     background_tasks.add_task(
         _process_story_generation,
         task_id,
-        request.user_id,
+        user_id,
         request.persona_data,
         request.include_scenes,
         request.include_analysis,
@@ -116,7 +139,8 @@ async def generate_story(
 @router.get("/{user_id}", response_model=StoryQueryResponse)
 async def get_story(user_id: str):
     """获取已生成的人生故事元数据"""
-    story_dir = STORY_STORAGE_DIR / user_id
+    user_id = _safe_user_id(user_id)
+    story_dir = _user_dir(user_id)
 
     if not story_dir.exists():
         raise HTTPException(status_code=404, detail=f"用户 {user_id} 的人生故事尚未生成")
@@ -161,7 +185,8 @@ async def get_story(user_id: str):
 @router.get("/{user_id}/timeline")
 async def get_timeline(user_id: str):
     """获取人生时间线详情"""
-    timeline_path = STORY_STORAGE_DIR / user_id / f"{user_id}_timeline.json"
+    user_id = _safe_user_id(user_id)
+    timeline_path = _user_dir(user_id) / f"{user_id}_timeline.json"
 
     if not timeline_path.exists():
         raise HTTPException(status_code=404, detail="时间线不存在")
@@ -175,7 +200,8 @@ async def get_timeline(user_id: str):
 @router.get("/{user_id}/scenes")
 async def get_scenes(user_id: str):
     """获取场景故事列表"""
-    scenes_path = STORY_STORAGE_DIR / user_id / f"{user_id}_scenes.json"
+    user_id = _safe_user_id(user_id)
+    scenes_path = _user_dir(user_id) / f"{user_id}_scenes.json"
 
     if not scenes_path.exists():
         raise HTTPException(status_code=404, detail="场景故事不存在")
@@ -204,7 +230,8 @@ async def get_scenes(user_id: str):
 @router.get("/{user_id}/full")
 async def get_full_story(user_id: str):
     """获取完整人生故事内容"""
-    narrative_path = STORY_STORAGE_DIR / user_id / f"{user_id}_narrative.json"
+    user_id = _safe_user_id(user_id)
+    narrative_path = _user_dir(user_id) / f"{user_id}_narrative.json"
 
     if not narrative_path.exists():
         raise HTTPException(status_code=404, detail="叙事文件不存在")
@@ -230,8 +257,9 @@ async def evolve_persona(user_id: str, request: StoryEvolveRequest):
     支持事件组合效应、依恋类型响应、MBTI 倾向性调整。
     """
     evolver = PersonalityEvolver()
-    
-    persona_path = STORY_STORAGE_DIR / user_id / f"{user_id}_narrative.json"
+
+    user_id = _safe_user_id(user_id)
+    persona_path = _user_dir(user_id) / f"{user_id}_narrative.json"
     if not persona_path.exists():
         raise HTTPException(status_code=404, detail="用户人格数据不存在")
     
@@ -271,7 +299,7 @@ async def _process_story_generation(
     logger.info("开始生成人生故事，task_id: %s, user_id: %s", task_id, user_id)
 
     try:
-        user_dir = STORY_STORAGE_DIR / user_id
+        user_dir = _user_dir(user_id)
         os.makedirs(user_dir, exist_ok=True)
 
         timeline_builder = TimelineBuilder()

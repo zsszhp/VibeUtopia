@@ -49,6 +49,7 @@ ANALYSIS_STAGES = [
     "platform_simulation",   # 平台仿真
     "cross_modal_detection", # 跨模态检测
     "fine_grained_video",    # 细粒度视频理解（V3.4，最耗时）
+    "event_understanding",   # 事件级理解（R3：事件切分+自适应选帧+叙事冲突）
     "report_compilation",    # 报告生成
 ]
 
@@ -141,6 +142,13 @@ class ResumableAnalyzer:
                 "从检查点恢复: %s, 进度=%.0f%%, 跳过已完成阶段",
                 self.task_id, self._checkpoint.progress * 100,
             )
+            # 旧检查点补齐新增阶段（如 event_understanding），保证断点续传可执行
+            from backend.services.checkpoint_manager import StageCheckpoint, StageStatus as _SS
+            for name in ANALYSIS_STAGES:
+                if name not in self._checkpoint.stages:
+                    if name == "fine_grained_video" and not (self.video_path and os.path.exists(self.video_path)):
+                        continue
+                    self._checkpoint.stages[name] = StageCheckpoint(name=name, status=_SS.PENDING)
 
         # 收集各阶段结果
         stage_results: dict[str, Any] = {}
@@ -194,7 +202,14 @@ class ResumableAnalyzer:
                 )
                 stage_results["fine_grained_video"] = r
 
-            # ─── 阶段 8: 报告生成 ───
+            # ─── 阶段 8: 事件级理解（事件切分+自适应选帧+叙事冲突）───
+            r = await self._run_stage(
+                "event_understanding", stage_results,
+                lambda: self._understand_events(text, stage_results),
+            )
+            stage_results["event_understanding"] = r
+
+            # ─── 阶段 9: 报告生成 ───
             r = await self._run_stage(
                 "report_compilation", stage_results,
                 lambda: self._compile_report(text, stage_results),
@@ -450,6 +465,49 @@ class ResumableAnalyzer:
         except Exception as e:
             return {"has_risk": False, "error": str(e), "_summary": "细粒度分析失败(降级)"}
 
+    async def _understand_events(self, text: str, stage_results: dict) -> dict:
+        """阶段 8: 事件级理解（R3）——事件切分 + 自适应选帧 + 叙事冲突
+
+        输入优先取细粒度阶段的帧元数据 + 转写文本；全程离线可跑，
+        LLM 增强失败自动降级为规则结果。
+        """
+        try:
+            from backend.services.video_understanding import run_event_understanding
+
+            frames = []
+            # 细粒度阶段若已产出帧元数据则复用；否则用纯文本事件切分
+            fine = stage_results.get("fine_grained_video", {}) or {}
+            dense_frames = fine.get("evidence_frames") or fine.get("frames") or []
+            for f in dense_frames:
+                if isinstance(f, dict):
+                    frames.append({
+                        "timestamp": f.get("timestamp", 0.0),
+                        "frame_id": f.get("frame_id", "") or f.get("frame_index", ""),
+                        "image_path": f.get("image_path", "") or f.get("file_path", ""),
+                        "ocr_text": f.get("ocr_text", "") or f.get("text", ""),
+                        "diff_score": f.get("anomaly_score", 0.0) or f.get("diff_score", 0.0),
+                    })
+
+            extraction = stage_results.get("text_extraction", {}) or {}
+            transcript_text = extraction.get("text", "") or text
+
+            result = await run_event_understanding(frames, transcript_text)
+            out = result.to_output_dict()
+            out["_llm_calls"] = 0
+            out["_summary"] = (
+                f"事件理解: {len(result.events)}事件, "
+                f"选帧{len(result.selected_frames)}, 冲突{len(result.conflicts)}"
+            )
+            return out
+        except Exception as e:
+            return {
+                "events_summary": [],
+                "selected_frame_reasons": [],
+                "narrative_conflicts": [],
+                "event_understanding": {"degraded": True, "degrade_reason": str(e)},
+                "_summary": f"事件理解失败(降级): {e}",
+            }
+
     async def _compile_report(self, text: str, stage_results: dict) -> dict:
         """阶段 8: 报告生成（汇总所有阶段结果）"""
         from backend.services.analyzer import calculate_overall_score, get_suggestion
@@ -466,6 +524,9 @@ class ResumableAnalyzer:
         if fine_grained.get("has_risk"):
             overall_score = min(100, overall_score + fine_grained.get("risk_upgrade", 0))
 
+        # 事件级理解结果透传（供 UI 证据下钻）
+        event_u = stage_results.get("event_understanding", {}) or {}
+
         risk_level = "green"
         if overall_score > 75:
             risk_level = "red"
@@ -480,6 +541,9 @@ class ResumableAnalyzer:
             "suggestion": suggestion,
             "dimensions": dimensions,
             "cross_effects": cross_effects,
+            "events_summary": event_u.get("events_summary", []),
+            "selected_frame_reasons": event_u.get("selected_frame_reasons", []),
+            "narrative_conflicts": event_u.get("narrative_conflicts", []),
             "_llm_calls": 0,
             "_summary": f"报告: 总分={overall_score}, 等级={risk_level}, 建议={suggestion}",
         }

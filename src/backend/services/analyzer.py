@@ -16,10 +16,14 @@ from backend.services.cross_modal_detector import CrossModalConflictDetector, in
 from backend.services.evidence_chain import EvidenceChainBuilder
 from backend.services.confidence_calculator import ConfidenceCalculator
 from backend.services.error_handler import safe_execute
+from backend.services.llm_meter import reset_analysis_id, set_analysis_id
 from backend.services.severity import (
+    REDLINE_SCORE_FLOOR,
+    enforce_redline_dim_score,
     is_high_severity,
     needs_rewrite,
     normalize_severity,
+    redline_triggers_floor,
     score_from_severity,
 )
 
@@ -123,6 +127,10 @@ def calculate_overall_score(dimensions: list[dict]) -> tuple[int, dict, list[dic
         name = d.get("name", "")
         score = d.get("score", 0)
         severity = d.get("severity", "low")
+        # 红线维度被判 red/high 时分数强制 76+（severity 与分数区间自洽）
+        score, lifted = enforce_redline_dim_score(name, score, severity)
+        if lifted:
+            d["score"] = score
         # 使用LLM返回的权重，如无则用默认权重
         weight = d.get("dimension_weight", DIMENSION_WEIGHTS.get(name, 1.0))
         dimension_weights[name] = weight
@@ -172,6 +180,11 @@ def calculate_overall_score(dimensions: list[dict]) -> tuple[int, dict, list[dic
                     "combined_severity": "high",
                 })
         overall = min(100, overall + 15)
+
+    # 规则3（红线代码化）：任一红线维度 red/high → 总体至少 76
+    # 与 30/60/80 展示阈值语义一致：76+ 落在 red 档（高风险）
+    if redline_triggers_floor(dimensions):
+        overall = max(overall, REDLINE_SCORE_FLOOR)
 
     return overall, dimension_weights, cross_effects
 
@@ -238,6 +251,8 @@ async def run_analysis(
     }
     cfg = depth_config.get(depth, depth_config["standard"])
     logger.info("任务 %s: 分析深度=%s, 超时=%ds", task_id, depth, cfg["timeout"])
+    # 计量关联：本次分析内所有 LLM 调用归属该 task_id
+    meter_token = set_analysis_id(task_id)
     db: Session = SessionLocal()
     try:
         # ═══════════════════════════════════════════════════════════════════════
@@ -669,4 +684,5 @@ async def run_analysis(
         except Exception:
             db.rollback()
     finally:
+        reset_analysis_id(meter_token)
         db.close()

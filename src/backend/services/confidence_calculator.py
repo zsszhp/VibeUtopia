@@ -1,10 +1,14 @@
-"""置信度计算模块
+"""置信度计算模块（唯一入口）
 
 多源交叉验证的置信度量化系统,基于:
 - 数据源质量
 - 评估一致性
 - 模型可靠性
 - 证据充分性
+
+历史曾并存四套公式（设计文档多轮一致性 / 白皮书四因子等权 / 本模块四因子加权 /
+enhanced_analyzer 模块计数），现已收敛到本模块为唯一入口；对外输出 4 级
+low/medium/high/very_high 与原因标签。
 """
 from __future__ import annotations
 
@@ -12,6 +16,27 @@ import logging
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# 4 级置信度阈值（与前端 0.6/0.8 展示带兼容：high 及以上均落在前端“高置信”带）
+CONFIDENCE_LEVELS = ("low", "medium", "high", "very_high")
+_LEVEL_THRESHOLDS = (
+    (0.85, "very_high"),
+    (0.70, "high"),
+    (0.50, "medium"),
+    (0.0, "low"),
+)
+
+
+def confidence_level(score: float) -> str:
+    """总体置信度分数 → 4 级词表"""
+    try:
+        s = float(score)
+    except (TypeError, ValueError):
+        return "low"
+    for threshold, name in _LEVEL_THRESHOLDS:
+        if s >= threshold:
+            return name
+    return "low"
 
 
 class ConfidenceCalculator:
@@ -45,7 +70,7 @@ class ConfidenceCalculator:
             platform_reactions: 平台反应列表
             
         Returns:
-            置信度计算结果
+            置信度计算结果（含 overall_confidence / confidence_level / reason_labels / factors / breakdown）
         """
         # 1. 数据源质量因子
         data_quality_score = self._assess_data_quality(
@@ -86,9 +111,16 @@ class ConfidenceCalculator:
             "evidence": evidence_score,
             "platform_validation": platform_validation_score,
         }
-        
+
+        reason_labels = self._build_reason_labels(
+            dimensions=dimensions,
+            evidence_chains=evidence_chains,
+        )
+
         return {
             "overall_confidence": round(overall_confidence, 2),
+            "confidence_level": confidence_level(overall_confidence),
+            "reason_labels": reason_labels,
             "factors": self.confidence_factors,
             "breakdown": {
                 "data_quality_score": round(data_quality_score, 2),
@@ -97,6 +129,47 @@ class ConfidenceCalculator:
                 "platform_validation_score": round(platform_validation_score, 2),
             },
         }
+
+    def _build_reason_labels(
+        self,
+        dimensions: list[dict],
+        evidence_chains: list[dict] | None,
+    ) -> list[str]:
+        """生成置信度原因标签（解释为何是该等级，而非黑盒分数）"""
+        factors = self.confidence_factors
+        labels: list[str] = []
+
+        if factors.get("consistency", 0) >= 0.7:
+            labels.append("consistency")
+        elif factors.get("consistency", 1) < 0.5:
+            labels.append("low_consistency")
+
+        cross_validated = any(
+            len(ec.get("cross_validation", []) or []) > 0
+            for ec in (evidence_chains or [])
+        )
+        if cross_validated:
+            labels.append("cross_validation")
+        elif evidence_chains:
+            labels.append("no_cross_validation")
+
+        if factors.get("data_quality", 0) >= 0.7:
+            labels.append("data_quality")
+        elif factors.get("data_quality", 1) < 0.6:
+            labels.append("low_data_quality")
+
+        if factors.get("platform_validation", 0) >= 0.7:
+            labels.append("platform_validation")
+        elif factors.get("platform_validation", 1) < 0.5:
+            labels.append("weak_platform_validation")
+
+        if len(dimensions or []) >= 11:
+            labels.append("full_coverage")
+        elif len(dimensions or []) < 7:
+            labels.append("partial_coverage")
+
+        return labels
+
     
     def _assess_data_quality(
         self,

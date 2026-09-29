@@ -13,6 +13,7 @@ from pathlib import Path
 import yaml
 
 from backend.config import settings
+from backend.services.llm_meter import meter as llm_meter
 from backend.services.log_sanitizer import redact_secrets
 
 logger = logging.getLogger(__name__)
@@ -494,6 +495,34 @@ def _is_quota_error(status_code: int) -> bool:
     return status_code in (429, 402, 403)
 
 
+def _meter_usage(
+    endpoint: ModelEndpoint,
+    data: dict | None,
+    latency_ms: float,
+    success: bool,
+    call_kind: str = "chat",
+    task_type: str = "",
+    error_type: str = "",
+) -> None:
+    """记录一次调用的计量信息（失败不影响主流程）"""
+    try:
+        usage = (data or {}).get("usage") or {}
+        llm_meter.record(
+            model=endpoint.model_id,
+            provider=endpoint.provider,
+            call_kind=call_kind,
+            task_type=task_type,
+            latency_ms=latency_ms,
+            success=success,
+            error_type=error_type,
+            prompt_tokens=usage.get("prompt_tokens"),
+            completion_tokens=usage.get("completion_tokens"),
+            total_tokens=usage.get("total_tokens"),
+        )
+    except Exception as e:
+        logger.debug("LLM 计量写入失败（不影响调用）: %s", e)
+
+
 # ---------------------------------------------------------------------------
 # 核心 LLM 调用
 # ---------------------------------------------------------------------------
@@ -710,25 +739,41 @@ async def _call_endpoint(endpoint: ModelEndpoint, prompt: str, system: str) -> s
 
 async def _httpx_call(url: str, headers: dict, payload: dict, endpoint: ModelEndpoint) -> str:
     """httpx 异步调用"""
-    async with httpx.AsyncClient(timeout=settings.LLM_TIMEOUT) as client:
-        resp = await client.post(url, headers=headers, json=payload)
+    started = time.perf_counter()
+    call_kind = "vlm" if "image_url" in json.dumps(payload.get("messages", []), ensure_ascii=False)[:2000] else "chat"
+    try:
+        async with httpx.AsyncClient(timeout=settings.LLM_TIMEOUT) as client:
+            resp = await client.post(url, headers=headers, json=payload)
 
-        if _is_quota_error(resp.status_code):
-            raise QuotaExhaustedError(
-                f"{endpoint.provider_name} {endpoint.model_id} HTTP {resp.status_code}: {redact_secrets(resp.text[:200])}"
-            )
+            if _is_quota_error(resp.status_code):
+                _meter_usage(endpoint, None, (time.perf_counter() - started) * 1000,
+                             success=False, call_kind=call_kind, error_type=f"http_{resp.status_code}")
+                raise QuotaExhaustedError(
+                    f"{endpoint.provider_name} {endpoint.model_id} HTTP {resp.status_code}: {redact_secrets(resp.text[:200])}"
+                )
 
-        if resp.status_code == 400:
-            logger.error("LLM 400 错误详情: url=%s, model=%s, response=%s", url, endpoint.model_id, redact_secrets(resp.text[:500]))
-            raise RuntimeError(f"请求格式错误 (HTTP 400): {redact_secrets(resp.text[:300])}")
+            if resp.status_code == 400:
+                logger.error("LLM 400 错误详情: url=%s, model=%s, response=%s", url, endpoint.model_id, redact_secrets(resp.text[:500]))
+                _meter_usage(endpoint, None, (time.perf_counter() - started) * 1000,
+                             success=False, call_kind=call_kind, error_type="http_400")
+                raise RuntimeError(f"请求格式错误 (HTTP 400): {redact_secrets(resp.text[:300])}")
 
-        resp.raise_for_status()
-        data = resp.json()
-        return data["choices"][0]["message"]["content"]
+            resp.raise_for_status()
+            data = resp.json()
+            _meter_usage(endpoint, data, (time.perf_counter() - started) * 1000,
+                         success=True, call_kind=call_kind)
+            return data["choices"][0]["message"]["content"]
+    except (QuotaExhaustedError, RuntimeError):
+        raise
+    except Exception as e:
+        _meter_usage(endpoint, None, (time.perf_counter() - started) * 1000,
+                     success=False, call_kind=call_kind, error_type=type(e).__name__)
+        raise
 
 
 async def _urllib_call(url: str, headers: dict, payload: dict, endpoint: ModelEndpoint) -> str:
     """urllib 同步调用 (httpx 不可用时的降级方案)"""
+    started = time.perf_counter()
     payload_bytes = json.dumps(payload).encode("utf-8")
     try:
         req = urllib.request.Request(url, data=payload_bytes, headers=headers, method="POST")
@@ -738,12 +783,22 @@ async def _urllib_call(url: str, headers: dict, payload: dict, endpoint: ModelEn
             lambda: urllib.request.urlopen(req, timeout=settings.LLM_TIMEOUT),
         )
         data = json.loads(resp_data.read().decode("utf-8"))
+        _meter_usage(endpoint, data, (time.perf_counter() - started) * 1000,
+                     success=True, call_kind="chat")
         return data["choices"][0]["message"]["content"]
     except urllib.error.HTTPError as e:
+        _meter_usage(endpoint, None, (time.perf_counter() - started) * 1000,
+                     success=False, call_kind="chat", error_type=f"http_{e.code}")
         if _is_quota_error(e.code):
             raise QuotaExhaustedError(
                 f"{endpoint.provider_name} {endpoint.model_id} HTTP {e.code}"
             )
+        raise
+    except QuotaExhaustedError:
+        raise
+    except Exception as e:
+        _meter_usage(endpoint, None, (time.perf_counter() - started) * 1000,
+                     success=False, call_kind="chat", error_type=type(e).__name__)
         raise
 
 
@@ -956,28 +1011,43 @@ async def _httpx_call_image_gen(
     url: str, headers: dict, payload: dict, endpoint: ModelEndpoint,
 ) -> dict:
     """httpx 异步调用图像生成"""
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(url, headers=headers, json=payload)
+    started = time.perf_counter()
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(url, headers=headers, json=payload)
 
-        if _is_quota_error(resp.status_code):
-            raise QuotaExhaustedError(
-                f"{endpoint.provider_name} {endpoint.model_id} HTTP {resp.status_code}: {redact_secrets(resp.text[:200])}"
-            )
+            if _is_quota_error(resp.status_code):
+                _meter_usage(endpoint, None, (time.perf_counter() - started) * 1000,
+                             success=False, call_kind="image_gen", error_type=f"http_{resp.status_code}")
+                raise QuotaExhaustedError(
+                    f"{endpoint.provider_name} {endpoint.model_id} HTTP {resp.status_code}: {redact_secrets(resp.text[:200])}"
+                )
 
-        if resp.status_code == 400:
-            logger.error("图像生成 400 错误: url=%s, model=%s, response=%s", url, endpoint.model_id, redact_secrets(resp.text[:500]))
-            raise RuntimeError(f"请求格式错误 (HTTP 400): {redact_secrets(resp.text[:300])}")
+            if resp.status_code == 400:
+                logger.error("图像生成 400 错误: url=%s, model=%s, response=%s", url, endpoint.model_id, redact_secrets(resp.text[:500]))
+                _meter_usage(endpoint, None, (time.perf_counter() - started) * 1000,
+                             success=False, call_kind="image_gen", error_type="http_400")
+                raise RuntimeError(f"请求格式错误 (HTTP 400): {redact_secrets(resp.text[:300])}")
 
-        resp.raise_for_status()
-        data = resp.json()
+            resp.raise_for_status()
+            data = resp.json()
+            _meter_usage(endpoint, data, (time.perf_counter() - started) * 1000,
+                         success=True, call_kind="image_gen")
 
-        return _parse_image_gen_response(data, endpoint)
+            return _parse_image_gen_response(data, endpoint)
+    except (QuotaExhaustedError, RuntimeError):
+        raise
+    except Exception as e:
+        _meter_usage(endpoint, None, (time.perf_counter() - started) * 1000,
+                     success=False, call_kind="image_gen", error_type=type(e).__name__)
+        raise
 
 
 async def _urllib_call_image_gen(
     url: str, headers: dict, payload: dict, endpoint: ModelEndpoint,
 ) -> dict:
     """urllib 同步调用图像生成（httpx 不可用时的降级方案）"""
+    started = time.perf_counter()
     payload_bytes = json.dumps(payload).encode("utf-8")
     try:
         req = urllib.request.Request(url, data=payload_bytes, headers=headers, method="POST")
@@ -987,13 +1057,23 @@ async def _urllib_call_image_gen(
             lambda: urllib.request.urlopen(req, timeout=60),
         )
         data = json.loads(resp_data.read().decode("utf-8"))
+        _meter_usage(endpoint, data, (time.perf_counter() - started) * 1000,
+                     success=True, call_kind="image_gen")
 
         return _parse_image_gen_response(data, endpoint)
     except urllib.error.HTTPError as e:
+        _meter_usage(endpoint, None, (time.perf_counter() - started) * 1000,
+                     success=False, call_kind="image_gen", error_type=f"http_{e.code}")
         if _is_quota_error(e.code):
             raise QuotaExhaustedError(
                 f"{endpoint.provider_name} {endpoint.model_id} HTTP {e.code}"
             )
+        raise
+    except QuotaExhaustedError:
+        raise
+    except Exception as e:
+        _meter_usage(endpoint, None, (time.perf_counter() - started) * 1000,
+                     success=False, call_kind="image_gen", error_type=type(e).__name__)
         raise
 
 

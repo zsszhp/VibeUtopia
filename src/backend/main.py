@@ -1,12 +1,13 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request, WebSocket
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from backend.auth import check_ws_api_key, is_auth_enabled, require_api_key
 from backend.database import init_db
 from backend.routes import router
 from backend.services.signal.scheduler import SignalScheduler
@@ -48,7 +49,18 @@ async def lifespan(app: FastAPI):
     graph_store.close()
 
 
-app = FastAPI(title="VibeUtopia", version="0.5.0", lifespan=lifespan)
+app = FastAPI(
+    title="VibeUtopia",
+    version="0.5.0",
+    lifespan=lifespan,
+    description=(
+        "内容预审风控平台 API。\n\n"
+        "## 鉴权\n"
+        "生产环境必须配置环境变量 `API_KEY`，所有 `/api/**` 与 `/ws/**` 请求须携带 "
+        "`X-API-Key: <key>` 或 `Authorization: Bearer <key>`。\n"
+        "未配置 `API_KEY` 时仅限本地开发放行（响应头 `X-API-Auth: disabled`），禁止裸奔上生产。"
+    ),
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -57,6 +69,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def auth_mode_headers(request: Request, call_next):
+    """响应头标注鉴权模式：未启用时明确提示生产必须配置 API_KEY"""
+    response = await call_next(request)
+    if is_auth_enabled():
+        response.headers["X-API-Auth"] = "api-key"
+    else:
+        response.headers["X-API-Auth"] = "disabled"
+        response.headers["X-API-Auth-Warning"] = (
+            "API_KEY not configured; authentication is DISABLED. "
+            "Production deployments MUST set API_KEY."
+        )
+    return response
+
+
+# 路由统一挂鉴权依赖：配置了 API_KEY 则校验 X-API-Key / Authorization: Bearer，未配置放行
+# （危险端点 delete / resume delete / set-model-override / upload 均被覆盖）
+_AUTH_DEPS = [Depends(require_api_key)]
 
 
 # ─── 统一错误响应（前端固定解析 response.data.detail） ──────────────
@@ -99,9 +131,12 @@ async def healthz():
     return {"status": "ok"}
 
 
-@app.get("/api/v1/health", tags=["ops"])
+@app.get("/api/v1/health", tags=["ops"], dependencies=_AUTH_DEPS)
 async def health_v1():
-    """文档与运维脚本约定的健康检查路径（与 /health 等价）。"""
+    """文档与运维脚本约定的健康检查路径（与 /health 等价，受 API Key 保护）。
+
+    免鉴权探活请使用 /health、/healthz、/ready。
+    """
     return {"status": "ok", "service": "vibeutopia", "version": app.version}
 
 
@@ -124,34 +159,39 @@ async def ready():
     return {"status": "ok", "checks": checks}
 
 
-app.include_router(router, prefix="/api/v1")
+# 路由统一挂鉴权依赖（_AUTH_DEPS 已在上方定义）
+
+app.include_router(router, prefix="/api/v1", dependencies=_AUTH_DEPS)
 
 # 注册阶段 3 新增路由（装饰器为相对路径，前缀在此统一挂载，避免双重前缀）
 from backend.routes_v3 import router as router_v3
-app.include_router(router_v3, prefix="/api/v3")
+app.include_router(router_v3, prefix="/api/v3", dependencies=_AUTH_DEPS)
 
 # 注册博主多视频知识引擎路由
 from backend.routes_blogger import router as router_blogger
-app.include_router(router_blogger, prefix="/api/v1")
+app.include_router(router_blogger, prefix="/api/v1", dependencies=_AUTH_DEPS)
 
 # 注册本地模型部署管理路由 (V3.2)
 from backend.routes_local_models import router as router_local_models
-app.include_router(router_local_models)
+app.include_router(router_local_models, dependencies=_AUTH_DEPS)
 
 # 注册断点续传路由
 from backend.routes_resume import router as router_resume
-app.include_router(router_resume, prefix="/api/v1")
+app.include_router(router_resume, prefix="/api/v1", dependencies=_AUTH_DEPS)
 
 # 注册人生故事生成路由（路由自身携带 prefix=/api/v1/story，此处不叠加前缀）
 from backend.routes_story import router as router_story
-app.include_router(router_story)
+app.include_router(router_story, dependencies=_AUTH_DEPS)
 
 
 # ─── WebSocket端点 ────────────────────────────────────────────────
 
 @app.websocket("/ws/simulation/{sim_id}")
-async def ws_simulation(websocket, sim_id: str):
+async def ws_simulation(websocket: WebSocket, sim_id: str):
     """仿真状态实时推送WebSocket"""
+    if not await check_ws_api_key(websocket):
+        await websocket.close(code=1008, reason="missing or invalid API key")
+        return
     await websocket.accept()
 
     if sim_id not in ws_connections:
@@ -183,7 +223,7 @@ async def ws_simulation(websocket, sim_id: str):
 
 
 @app.websocket("/ws/review/{task_id}")
-async def ws_review_progress(websocket, task_id: str):
+async def ws_review_progress(websocket: WebSocket, task_id: str):
     """预审分析进度实时推送WebSocket — 5步骤进度格式
 
     推送消息类型:
@@ -191,6 +231,9 @@ async def ws_review_progress(websocket, task_id: str):
     - risk_alert: 风险预警弹窗
     - review_complete: 分析完成，完整报告已可查询
     """
+    if not await check_ws_api_key(websocket):
+        await websocket.close(code=1008, reason="missing or invalid API key")
+        return
     await websocket.accept()
 
     if task_id not in review_ws_connections:

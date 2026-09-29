@@ -52,6 +52,8 @@ class CodeTraceResult:
     confidence: float = 0.0
     risk_level: str = "safe"
     description: str = ""
+    # 失败策略：检测/解析失败不得判 safe，标记为 unknown + needs_review
+    needs_review: bool = False
 
 
 @dataclass
@@ -62,6 +64,7 @@ class VideoCodeTraceResult:
     trace_results: list = field(default_factory=list)
     has_opensource_risk: bool = False
     max_risk_level: str = "safe"
+    needs_review: bool = False
     error: Optional[str] = None
 
 
@@ -155,12 +158,25 @@ class CodeOriginTracer:
             return CodeTraceResult(
                 frame_path=frame_path,
                 timestamp=timestamp,
+                risk_level="unknown",
+                needs_review=True,
                 description=f"帧图片不存在: {frame_path}",
             )
 
         vlm_result = await self._vlm_analyze_code(frame_path)
 
-        if not vlm_result or not vlm_result.get("has_code", False):
+        if vlm_result is None:
+            # 失败不得判 safe：VLM 调用/解析失败 → unknown + 需人工复核
+            return CodeTraceResult(
+                frame_path=frame_path,
+                timestamp=timestamp,
+                risk_level="unknown",
+                needs_review=True,
+                confidence=0.0,
+                description="VLM代码分析失败，结果未知需人工复核",
+            )
+
+        if not vlm_result.get("has_code", False):
             return CodeTraceResult(
                 frame_path=frame_path,
                 timestamp=timestamp,
@@ -201,17 +217,22 @@ class CodeOriginTracer:
         trace_results = []
         frames_with_code = 0
         has_opensource_risk = False
+        needs_review = False
         max_risk_level = "safe"
-        risk_order = {"safe": 0, "medium": 1, "high": 2, "critical": 3}
+        # unknown 表示检测失败/结果未知，不参与风险升级，但会置 needs_review
+        risk_order = {"unknown": 0, "safe": 1, "low": 2, "medium": 3, "high": 4, "critical": 5}
 
         for frame_path, timestamp in zip(frame_paths, timestamps):
             result = await self.trace_frame(frame_path, timestamp)
             trace_results.append(result)
 
+            if result.needs_review or result.risk_level == "unknown":
+                needs_review = True
+
             if result.code_features:
                 frames_with_code += 1
 
-            if result.is_likely_opensource:
+            if result.is_likely_opensource and result.risk_level not in ("unknown",):
                 has_opensource_risk = True
                 if risk_order.get(result.risk_level, 0) > risk_order.get(max_risk_level, 0):
                     max_risk_level = result.risk_level
@@ -221,6 +242,7 @@ class CodeOriginTracer:
             trace_results=trace_results,
             has_opensource_risk=has_opensource_risk,
             max_risk_level=max_risk_level,
+            needs_review=needs_review,
         )
 
     def _extract_code_features(self, vlm_result: dict) -> list[CodeFeature]:
@@ -420,7 +442,8 @@ class CodeOriginTracer:
             if result:
                 return result
 
-            return {"has_code": False}
+            # 解析失败不得当作「无代码」，交由上层置 unknown + needs_review
+            return None
         except Exception as e:
             logger.warning("VLM代码分析失败: %s", e)
             return None

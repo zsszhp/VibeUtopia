@@ -193,6 +193,10 @@ class FineGrainedPipeline:
                     )
                     report.code_trace = code_result
 
+                    if getattr(code_result, "needs_review", False):
+                        needs_review = True
+                        key_findings.append("代码溯源部分帧检测失败，结果未知需人工复核")
+
                     if code_result.has_opensource_risk:
                         key_findings.append(f"代码溯源发现风险: 可能使用开源项目")
                         risk_upgrade += 20
@@ -205,6 +209,7 @@ class FineGrainedPipeline:
 
                 except Exception as e:
                     logger.warning("代码溯源失败: %s", e)
+                    needs_review = True
 
         # 3c. 敏感符号检测
         if self.config["enable_symbol_detect"]:
@@ -214,6 +219,10 @@ class FineGrainedPipeline:
                     frame_paths, timestamps
                 )
                 report.symbol_detect = symbol_result
+
+                if getattr(symbol_result, "needs_review", False):
+                    needs_review = True
+                    key_findings.append("敏感符号检测部分帧失败，结果未知需人工复核")
 
                 if symbol_result.has_symbol_risk:
                     key_findings.append("敏感符号检测发现风险")
@@ -227,6 +236,7 @@ class FineGrainedPipeline:
 
             except Exception as e:
                 logger.warning("敏感符号检测失败: %s", e)
+                needs_review = True
 
         # 3d. 时序异常检测
         if self.config["enable_temporal_anomaly"] and report.dense_scan and not report.dense_scan.error:
