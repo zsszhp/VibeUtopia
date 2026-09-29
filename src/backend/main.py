@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from backend.auth import check_ws_api_key, is_auth_enabled, require_api_key
+from backend.auth import auth_router, check_ws_api_key, is_auth_enabled, is_jwt_enabled, require_api_key
 from backend.database import init_db
 from backend.rate_limit import rate_limit
 from backend.routes import router
@@ -59,6 +59,8 @@ app = FastAPI(
         "## 鉴权\n"
         "生产环境必须配置环境变量 `API_KEY`，所有 `/api/**` 与 `/ws/**` 请求须携带 "
         "`X-API-Key: <key>` 或 `Authorization: Bearer <key>`。\n"
+        "配置 `JWT_SECRET` 后启用 JWT 多租户雏形：`POST /api/v1/auth/token` 用用户名+密码换 token，"
+        "`Authorization: Bearer <jwt>` 优先按 JWT 校验（可不带 API Key）。\n"
         "未配置 `API_KEY` 时仅限本地开发放行（响应头 `X-API-Auth: disabled`），禁止裸奔上生产。\n\n"
         "## 限流\n"
         "所有 `/api/**` 请求按客户端 IP 做滑动窗口限流，配额 `RATE_LIMIT_PER_MIN`（默认 60 次/分钟），"
@@ -87,6 +89,8 @@ async def auth_mode_headers(request: Request, call_next):
             "API_KEY not configured; authentication is DISABLED. "
             "Production deployments MUST set API_KEY."
         )
+    if is_jwt_enabled():
+        response.headers["X-API-Auth-JWT"] = "enabled"
     return response
 
 
@@ -164,6 +168,9 @@ async def ready():
 
 
 # 路由统一挂公共依赖（限流+鉴权，_API_DEPS 已在上方定义）
+
+# JWT 换取端点：不能挂 require_api_key（否则无法用账号密码登录），仅限流
+app.include_router(auth_router, prefix="/api/v1", dependencies=[Depends(rate_limit)])
 
 app.include_router(router, prefix="/api/v1", dependencies=_API_DEPS)
 

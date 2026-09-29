@@ -9,6 +9,9 @@ httpx>=0.27.0
 websockets>=12.0
 python-multipart>=0.0.18
 
+# JWT 多租户（可选启用，配置 JWT_SECRET 后需要）
+PyJWT>=2.8.0
+
 # 数据库与存储
 pymysql>=1.1.0
 neo4j>=5.0.0

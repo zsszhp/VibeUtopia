@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-"""事件级视频理解管线 —— 串接切分 / 选帧 / 叙事冲突
+"""事件级视频理解管线 —— 串接切分 / 选帧 / 冲突 / 语用(L6) / 涌现(L7)
 
-输入帧序列（时间戳 + 可选描述/OCR）与转写，输出事件级摘要与
-选帧理由，供主流程写入分析结果（events_summary / selected_frame_reasons）。
+输入帧序列（时间戳 + 可选描述/OCR）与转写，输出事件级摘要、
+选帧理由、叙事语用线索与风险涌现分，供主流程写入分析结果
+（events_summary / selected_frame_reasons / narrative_pragmatics / emergence_summary）。
 全程离线可跑；LLM 增强可选且失败降级。
 """
 
@@ -18,18 +19,23 @@ from backend.services.video_understanding.models import (
     TranscriptSegment,
 )
 from backend.services.video_understanding.narrative_conflict import NarrativeConflictDetector
+from backend.services.video_understanding.narrative_pragmatics import NarrativePragmaticsAnalyzer
+from backend.services.video_understanding.risk_emergence import RiskEmergenceScorer, build_risk_atoms
 
 logger = logging.getLogger(__name__)
 
 
 class VideoEventUnderstandingPipeline:
-    """事件级理解编排：EventSegmenter → AnchorSelector → NarrativeConflictDetector"""
+    """事件级理解编排：EventSegmenter → AnchorSelector → NarrativeConflictDetector
+    → NarrativePragmaticsAnalyzer(L6) → RiskEmergenceScorer(L7)"""
 
     def __init__(self, config: Optional[dict] = None):
         config = config or {}
         self.segmenter = EventSegmenter(config.get("segmenter"))
         self.selector = AnchorSelector(config.get("selector"))
         self.conflict_detector = NarrativeConflictDetector(config.get("conflict"))
+        self.pragmatics_analyzer = NarrativePragmaticsAnalyzer(config.get("pragmatics"))
+        self.emergence_scorer = RiskEmergenceScorer(config.get("emergence"))
 
     async def run(
         self,
@@ -57,10 +63,20 @@ class VideoEventUnderstandingPipeline:
             events = self.segmenter.segment(obs, segments)
             selected = self.selector.select(obs, events, budget=frame_budget)
             conflicts = await self.conflict_detector.detect(segments, obs)
+            pragmatics = await self.pragmatics_analyzer.analyze(segments, obs, events)
+            atoms = build_risk_atoms(
+                events, conflicts, pragmatics, obs,
+                config=self.emergence_scorer.config,
+            )
+            emergence = self.emergence_scorer.aggregate(
+                atoms, conflicts=conflicts, pragmatics=pragmatics, frames=obs, events=events,
+            )
 
             result.events = events
             result.selected_frames = selected
             result.conflicts = conflicts
+            result.narrative_pragmatics = pragmatics
+            result.emergence_summary = emergence
             result.events_summary = [self._event_summary(e) for e in events]
             result.selected_frame_reasons = [
                 {
@@ -73,8 +89,8 @@ class VideoEventUnderstandingPipeline:
                 }
                 for s in selected
             ]
-            result.method_used = "heuristic_segmenter+anchor_selector+rule_conflict"
-            if self.conflict_detector.config.get("enable_llm"):
+            result.method_used = "heuristic_segmenter+anchor_selector+rule_conflict+rule_pragmatics+phi_emergence"
+            if self.conflict_detector.config.get("enable_llm") or self.pragmatics_analyzer.config.get("enable_llm"):
                 result.method_used += "+llm_enhance"
         except Exception as e:
             logger.warning("事件级理解失败(降级): %s", e)

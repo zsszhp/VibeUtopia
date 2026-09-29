@@ -86,6 +86,10 @@ class EnhancedAnalysisResult:
     narrative_conflicts: list = field(default_factory=list)
     event_understanding_meta: dict = field(default_factory=dict)
 
+    # Phase 2.8+: 叙事语用(L6) 与风险涌现(L7)
+    narrative_pragmatics: list = field(default_factory=list)
+    emergence_summary: dict = field(default_factory=dict)
+
     # Phase 3: 仿真增强（deep模式）
     simulation_id: str = ""
     simulation_summary: dict = field(default_factory=dict)
@@ -471,17 +475,35 @@ async def _run_phase2_7(video_path: str, result: EnhancedAnalysisResult, text: s
                 }
                 for c in event_u.conflicts
             ]
+            result.narrative_pragmatics = [
+                {
+                    "risk_type": p.risk_type,
+                    "trigger_events": list(p.trigger_events),
+                    "explanation": p.explanation,
+                    "audience_segments": list(p.audience_segments),
+                    "confidence": p.confidence,
+                    "start": p.start,
+                    "end": p.end,
+                    "score": p.score,
+                    "evidence": p.evidence,
+                }
+                for p in event_u.narrative_pragmatics
+            ]
+            result.emergence_summary = event_u.emergence_summary or {}
             result.event_understanding_meta = {
                 "event_count": len(event_u.events),
                 "selected_frame_count": len(event_u.selected_frames),
                 "conflict_count": len(event_u.conflicts),
+                "pragmatic_count": len(event_u.narrative_pragmatics),
                 "method_used": event_u.method_used,
                 "degraded": event_u.degraded,
                 "degrade_reason": event_u.degrade_reason,
             }
             logger.info(
-                "事件级理解完成: 事件=%d, 选帧=%d, 冲突=%d",
+                "事件级理解完成: 事件=%d, 选帧=%d, 冲突=%d, 语用=%d, 涌现分=%s",
                 len(event_u.events), len(event_u.selected_frames), len(event_u.conflicts),
+                len(event_u.narrative_pragmatics),
+                (event_u.emergence_summary or {}).get("risk_score"),
             )
         except Exception as e:
             logger.warning("事件级理解失败(降级): %s", e)
@@ -727,6 +749,10 @@ def _persist_result(result: EnhancedAnalysisResult):
                     sim_data["selected_frame_reasons"] = result.selected_frame_reasons
                 if result.narrative_conflicts:
                     sim_data["narrative_conflicts"] = result.narrative_conflicts
+                if result.narrative_pragmatics:
+                    sim_data["narrative_pragmatics"] = result.narrative_pragmatics
+                if result.emergence_summary:
+                    sim_data["emergence_summary"] = result.emergence_summary
                 if result.event_understanding_meta:
                     sim_data["event_understanding"] = result.event_understanding_meta
                 existing.simulation_summary = json.dumps(sim_data, ensure_ascii=False)

@@ -67,6 +67,34 @@ class NarrativeConflict:
 
 
 @dataclass
+class PragmaticRisk:
+    """叙事语用风险线索（L6）——影射/带节奏/狗哨等，只给线索与置信"""
+    risk_type: str = ""     # insinuation / provocation / dog_whistle / setup_payoff
+    trigger_events: list = field(default_factory=list)   # 关联事件 id
+    explanation: str = ""
+    audience_segments: list = field(default_factory=list)
+    confidence: float = 0.5
+    start: float = 0.0
+    end: float = 0.0
+    score: float = 0.0      # 强度 0-1
+    evidence: list = field(default_factory=list)
+
+
+@dataclass
+class RiskAtom:
+    """事件级风险原子（L7 输入）——可回溯到时间轴的证据，非最终定级"""
+    atom_id: str = ""
+    atom_type: str = ""     # modality_conflict / narrative_pragmatic / short_flash / claim_exposure
+    event_id: str = ""
+    start: float = 0.0
+    end: float = 0.0
+    severity: float = 0.0   # 0-1
+    confidence: float = 0.5
+    evidence: list = field(default_factory=list)
+    explanation: str = ""
+
+
+@dataclass
 class EventUnderstandingResult:
     """事件级理解总结果"""
     events: list = field(default_factory=list)
@@ -74,6 +102,8 @@ class EventUnderstandingResult:
     conflicts: list = field(default_factory=list)
     events_summary: list = field(default_factory=list)
     selected_frame_reasons: list = field(default_factory=list)
+    narrative_pragmatics: list = field(default_factory=list)
+    emergence_summary: dict = field(default_factory=dict)
     method_used: str = "heuristic"
     degraded: bool = False
     degrade_reason: str = ""
@@ -95,10 +125,26 @@ class EventUnderstandingResult:
                 }
                 for c in self.conflicts
             ],
+            "narrative_pragmatics": [
+                {
+                    "risk_type": p.risk_type,
+                    "trigger_events": list(p.trigger_events),
+                    "explanation": p.explanation,
+                    "audience_segments": list(p.audience_segments),
+                    "confidence": p.confidence,
+                    "start": p.start,
+                    "end": p.end,
+                    "score": p.score,
+                    "evidence": p.evidence,
+                }
+                for p in self.narrative_pragmatics
+            ],
+            "emergence_summary": self.emergence_summary or {},
             "event_understanding": {
                 "event_count": len(self.events),
                 "selected_frame_count": len(self.selected_frames),
                 "conflict_count": len(self.conflicts),
+                "pragmatic_count": len(self.narrative_pragmatics),
                 "method_used": self.method_used,
                 "degraded": self.degraded,
                 "degrade_reason": self.degrade_reason,

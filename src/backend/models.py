@@ -28,6 +28,11 @@ class Task(Base):
     depth = Column(String(20), default="standard")
     created_at = Column(DateTime, default=utcnow)
     completed_at = Column(DateTime, nullable=True)
+    # R5 多租户雏形：任务归属（JWT sub），无 token 时为 NULL，行为与旧版兼容
+    owner_id = Column(String(64), nullable=True, index=True)
+    # R5 审核工作流：draft/pending_review/approved/rejected
+    workflow_status = Column(String(20), default="draft")
+    workflow_history_json = Column(MySQLText, nullable=True)  # JSON: 状态流转留痕
 
     risk_items = relationship("RiskItem", backref="task", cascade="all, delete-orphan")
     platform_reactions = relationship("PlatformReaction", backref="task", cascade="all, delete-orphan")

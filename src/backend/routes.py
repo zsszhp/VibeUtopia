@@ -4,12 +4,15 @@ import json
 import logging
 import os
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.auth import AuthIdentity, get_identity
 from backend.config import settings
 from backend.database import get_db
 from backend.models import Task, AnalysisSummary, RiskItem, PlatformReaction, HotspotCorrelationRecord
@@ -76,6 +79,28 @@ class UploadResponse(BaseModel):
     file_path: str
     file_name: str
     file_size: int
+
+
+class WorkflowUpdateRequest(BaseModel):
+    """审核工作流状态更新请求"""
+    status: str = Field(..., description="目标状态：draft/pending_review/approved/rejected")
+    note: str = Field("", description="审批备注（写入状态历史留痕）")
+
+
+# R5 审核工作流：状态与合法流转（同状态重复提交仅追加备注留痕）
+WORKFLOW_STATUSES = ("draft", "pending_review", "approved", "rejected")
+WORKFLOW_TRANSITIONS: dict[str, set[str]] = {
+    "draft": {"pending_review"},
+    "pending_review": {"approved", "rejected", "draft"},
+    "approved": {"pending_review"},
+    "rejected": {"pending_review", "draft"},
+}
+
+EXPORT_DISCLAIMER = (
+    "本报告由 VibeUtopia 自动分析生成，仅供内容合规参考，不构成法律意见。"
+    "模型判断存在误差与不确定性，请结合人工复核后决策；"
+    "触及红线维度的内容不提供改写方案，建议不予发布。"
+)
 
 
 class PersonaGenerateRequest(BaseModel):
@@ -154,7 +179,8 @@ def _score_to_risk_level(score: int | None) -> str:
 async def submit_review(
     req: ReviewRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    identity: AuthIdentity = Depends(get_identity),
 ):
     """提交内容预审（统一入口）
 
@@ -162,6 +188,8 @@ async def submit_review(
     - text: 纯文本分析
     - video: 视频文件分析（提取文案后分析）
     - mixed: 文本+视频混合分析
+
+    携带 JWT 时任务写入 owner_id 归属；无 token 行为与旧版兼容（owner_id 为空）。
     """
     # 收集所有文本内容
     texts_to_analyze: list[str] = []
@@ -241,6 +269,8 @@ async def submit_review(
         model=settings.DEEPSEEK_MODEL,
         mode=req.mode,
         depth=req.options.get("depth", "standard") if req.options else "standard",
+        owner_id=identity.owner_id,
+        workflow_status="draft",
     )
     db.add(task)
     db.commit()
@@ -279,6 +309,9 @@ async def get_review_result(task_id: str, db: Session = Depends(get_db)):
     result: dict[str, Any] = {
         "task_id": task.id,
         "status": task.status,
+        "owner_id": task.owner_id,
+        "workflow_status": task.workflow_status or "draft",
+        "workflow_history": _load_workflow_history(task),
     }
 
     if task.status == "completed":
@@ -568,6 +601,300 @@ async def get_review_progress(task_id: str, db: Session = Depends(get_db)):
         detail=detail_map.get(current_step, "处理中..."),
         completed_dimensions=[],
         remaining_dimensions=[]
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# R5 审核工作流 + 报告导出
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _load_workflow_history(task: Task) -> list[dict]:
+    """解析任务上的工作流状态历史（JSON 字段留痕）"""
+    if not task.workflow_history_json:
+        return []
+    try:
+        history = json.loads(task.workflow_history_json)
+        return history if isinstance(history, list) else []
+    except json.JSONDecodeError:
+        return []
+
+
+def _check_task_access(task: Task, identity: AuthIdentity) -> None:
+    """归属校验雏形：任务有归属且请求带不同用户身份时 403；无 token 行为兼容（放行）"""
+    if task.owner_id and identity.owner_id and task.owner_id != identity.owner_id:
+        raise HTTPException(status_code=403, detail="无权访问他人名下的审核任务")
+
+
+@router.patch("/review/{task_id}/workflow")
+async def update_review_workflow(
+    task_id: str,
+    req: WorkflowUpdateRequest,
+    db: Session = Depends(get_db),
+    identity: AuthIdentity = Depends(get_identity),
+):
+    """更新审核工作流状态（draft/pending_review/approved/rejected）
+
+    每次流转写入状态历史留痕（from/to/note/actor/at）；同状态提交仅追加备注。
+    """
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    _check_task_access(task, identity)
+
+    target = (req.status or "").strip()
+    if target not in WORKFLOW_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"非法状态: {target or '(空)'}，仅支持 {'/'.join(WORKFLOW_STATUSES)}",
+        )
+
+    current = task.workflow_status or "draft"
+    if target != current and target not in WORKFLOW_TRANSITIONS.get(current, set()):
+        raise HTTPException(status_code=400, detail=f"非法状态流转: {current} → {target}")
+
+    history = _load_workflow_history(task)
+    history.append({
+        "from": current,
+        "to": target,
+        "note": (req.note or "").strip(),
+        "actor": identity.owner_id or identity.auth_type,
+        "at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    task.workflow_status = target
+    task.workflow_history_json = json.dumps(history, ensure_ascii=False)
+    db.commit()
+
+    return {
+        "task_id": task_id,
+        "status": target,
+        "previous_status": current,
+        "workflow_history": history,
+    }
+
+
+def _build_export_payload(task: Task, db: Session) -> dict[str, Any]:
+    """汇总导出所需数据：结论 / 分数 / Top 风险 / 改写 / 工作流留痕"""
+    summary = db.query(AnalysisSummary).filter(AnalysisSummary.task_id == task.id).first()
+    risk_items = db.query(RiskItem).filter(RiskItem.task_id == task.id).all()
+
+    dimensions: list[dict] = []
+    rewrites: list[dict] = []
+    overall_score: int | None = None
+    suggestion = ""
+    confidence: float | None = None
+    if summary:
+        overall_score = summary.overall_score
+        suggestion = summary.suggestion or ""
+        try:
+            dims_data = json.loads(summary.dimensions_json) if summary.dimensions_json else {}
+        except json.JSONDecodeError:
+            dims_data = {}
+        if isinstance(dims_data, dict):
+            for name, data in dims_data.items():
+                if isinstance(data, dict):
+                    dimensions.append({
+                        "name": name,
+                        "score": data.get("score", 0),
+                        "severity": data.get("severity", "green"),
+                        "evidence": data.get("evidence", ""),
+                        "suggestion": data.get("suggestion", ""),
+                    })
+                elif isinstance(data, (int, float)):
+                    dimensions.append({"name": name, "score": int(data), "severity": "", "evidence": "", "suggestion": ""})
+        try:
+            rewrites = json.loads(summary.rewrites_json) if summary.rewrites_json else []
+            if not isinstance(rewrites, list):
+                rewrites = []
+        except json.JSONDecodeError:
+            rewrites = []
+        try:
+            conf_data = json.loads(summary.confidence_json) if summary.confidence_json else {}
+            if isinstance(conf_data, dict):
+                confidence = conf_data.get("overall_confidence")
+        except json.JSONDecodeError:
+            confidence = None
+
+    # Top 风险：按 risk_score 降序取前 5，缺失分数的按 severity 权重兜底
+    sev_weight = {"red": 4, "orange": 3, "yellow": 2, "green": 1, "high": 3, "medium": 2, "low": 1}
+    top_risks = sorted(
+        risk_items,
+        key=lambda r: (
+            r.risk_score if r.risk_score is not None else -1,
+            sev_weight.get((r.severity or "").lower(), 0),
+        ),
+        reverse=True,
+    )[:5]
+    top_risk_payload = [
+        {
+            "sentence": r.sentence or "",
+            "dimension": r.dimension or "",
+            "severity": r.severity or "",
+            "evidence": r.evidence or "",
+            "risk_score": r.risk_score,
+        }
+        for r in top_risks
+    ]
+
+    risk_level = _score_to_risk_level(overall_score)
+    return {
+        "task_id": task.id,
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "owner_id": task.owner_id,
+        "analysis_status": task.status,
+        "workflow_status": task.workflow_status or "draft",
+        "workflow_history": _load_workflow_history(task),
+        "verdict": {
+            "overall_score": overall_score,
+            "risk_level": risk_level,
+            "suggestion": suggestion or ("可发" if overall_score is not None and overall_score <= 25 else ""),
+            "confidence": confidence,
+        },
+        "dimensions": dimensions,
+        "top_risks": top_risk_payload,
+        "rewrites": rewrites,
+        "disclaimer": EXPORT_DISCLAIMER,
+    }
+
+
+def _render_export_markdown(payload: dict[str, Any]) -> str:
+    """Markdown 报告：Verdict + 分数 + Top 风险 + 改写 + 免责"""
+    verdict = payload.get("verdict") or {}
+    score = verdict.get("overall_score")
+    score_text = f"{score}/100" if score is not None else "N/A"
+    conf = verdict.get("confidence")
+    conf_text = f"{conf}" if conf is not None else "N/A"
+
+    lines: list[str] = [
+        "# 内容预审报告",
+        "",
+        f"- **任务 ID**: `{payload.get('task_id', '')}`",
+        f"- **导出时间**: {payload.get('exported_at', '')}",
+        f"- **分析状态**: {payload.get('analysis_status', '')}",
+        f"- **工作流状态**: {payload.get('workflow_status', '')}",
+        f"- **归属**: {payload.get('owner_id') or '（无）'}",
+        "",
+        "## 一、结论（Verdict）",
+        "",
+        f"- **总风险分**: {score_text}",
+        f"- **风险等级**: {verdict.get('risk_level', '')}",
+        f"- **发布建议**: {verdict.get('suggestion', '') or 'N/A'}",
+        f"- **置信度**: {conf_text}",
+        "",
+        "## 二、维度得分",
+        "",
+    ]
+
+    dims = payload.get("dimensions") or []
+    if dims:
+        lines.append("| 维度 | 得分 | 等级 | 证据 |")
+        lines.append("|------|------|------|------|")
+        for d in dims:
+            evidence = (d.get("evidence") or "").replace("\n", " ").replace("|", "\\|")
+            if len(evidence) > 60:
+                evidence = evidence[:57] + "..."
+            lines.append(
+                f"| {d.get('name', '')} | {d.get('score', '')} | {d.get('severity', '')} | {evidence} |"
+            )
+    else:
+        lines.append("（暂无维度数据）")
+
+    lines.extend(["", "## 三、Top 风险", ""])
+    top_risks = payload.get("top_risks") or []
+    if top_risks:
+        for i, r in enumerate(top_risks, 1):
+            score_part = f"，风险分 {r['risk_score']}" if r.get("risk_score") is not None else ""
+            lines.append(
+                f"{i}. **[{r.get('dimension') or '未知维度'}]** {r.get('sentence', '')}"
+                f"（{r.get('severity') or 'N/A'}{score_part}）"
+            )
+            if r.get("evidence"):
+                lines.append(f"   - 证据：{r['evidence']}")
+    else:
+        lines.append("（暂无风险条目）")
+
+    lines.extend(["", "## 四、改写建议", ""])
+    rewrites = payload.get("rewrites") or []
+    if rewrites:
+        idx = 0
+        for rw in rewrites:
+            if not isinstance(rw, dict):
+                continue
+            idx += 1
+            original = rw.get("original", "")
+            lines.append(f"### {idx}. 原文")
+            lines.append("")
+            lines.append(f"> {original}" if original else "> （空）")
+            lines.append("")
+            if rw.get("is_redline"):
+                lines.append(f"**红线说明**：{rw.get('redline_note') or '该内容建议不予发布'}")
+                lines.append("")
+                continue
+            candidates = rw.get("rewrites") or []
+            if isinstance(candidates, list) and candidates:
+                for j, item in enumerate(candidates, 1):
+                    if isinstance(item, dict):
+                        lines.append(f"**改写方案 {j}**：{item.get('text', '')}")
+                        if item.get("rewrite_note"):
+                            lines.append(f"**说明**：{item['rewrite_note']}")
+                    else:
+                        lines.append(f"**改写方案 {j}**：{item}")
+                lines.append("")
+            else:
+                lines.append(f"**建议**：{rw.get('suggestion', '')}")
+                if rw.get("rewrite_note"):
+                    lines.append(f"**说明**：{rw['rewrite_note']}")
+                lines.append("")
+    else:
+        lines.append("（暂无改写建议）")
+
+    history = payload.get("workflow_history") or []
+    if history:
+        lines.extend(["", "## 附、工作流留痕", ""])
+        for h in history:
+            lines.append(
+                f"- `{h.get('at', '')}` {h.get('from', '')} → {h.get('to', '')}"
+                f"（操作者: {h.get('actor', '')}"
+                + (f"，备注: {h.get('note')}" if h.get("note") else "")
+                + "）"
+            )
+
+    lines.extend(["", "## 五、免责声明", "", payload.get("disclaimer") or EXPORT_DISCLAIMER, ""])
+    return "\n".join(lines)
+
+
+@router.get("/review/{task_id}/export")
+async def export_review(
+    task_id: str,
+    format: str = "md",
+    db: Session = Depends(get_db),
+    identity: AuthIdentity = Depends(get_identity),
+):
+    """导出审核报告：GET /api/v1/review/{task_id}/export?format=md|json
+
+    - format=md：Markdown 报告（Verdict + 分数 + Top 风险 + 改写 + 免责）
+    - format=json：结构化报告数据（含同一免责声明）
+    """
+    fmt = (format or "md").strip().lower()
+    if fmt not in ("md", "json"):
+        raise HTTPException(status_code=400, detail="format 仅支持 md 或 json")
+
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    _check_task_access(task, identity)
+
+    payload = _build_export_payload(task, db)
+    if fmt == "json":
+        return payload
+
+    markdown = _render_export_markdown(payload)
+    return Response(
+        content=markdown,
+        media_type="text/markdown; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="review_{task_id}.md"',
+        },
     )
 
 

@@ -85,6 +85,14 @@ class Settings:
     # 未配置时本地开发放行；生产环境必须配置，且不得写入仓库
     API_KEY: str = os.getenv("API_KEY", "")
 
+    # JWT 多租户雏形（可选）：配置 JWT_SECRET 后启用 /api/v1/auth/token 换取 Bearer JWT
+    # Authorization: Bearer <jwt> 优先按 JWT 校验；未配置时 JWT 关闭，API_KEY 机制不变
+    JWT_SECRET: str = os.getenv("JWT_SECRET", "")
+    JWT_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", "720"))
+    # 本地单用户占位（多租户用户表落地前的最小闭环）；密码仅环境变量注入，禁止写入仓库
+    ADMIN_USERNAME: str = os.getenv("ADMIN_USERNAME", "admin")
+    ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "")
+
     # API 限流：每客户端每分钟最大请求数（滑动窗口，单进程内存计数）
     # <= 0 表示不限流；覆盖 /api/**（/health 等探活端点除外）
     RATE_LIMIT_PER_MIN: int = int(os.getenv("RATE_LIMIT_PER_MIN", "60"))

@@ -496,7 +496,9 @@ class ResumableAnalyzer:
             out["_llm_calls"] = 0
             out["_summary"] = (
                 f"事件理解: {len(result.events)}事件, "
-                f"选帧{len(result.selected_frames)}, 冲突{len(result.conflicts)}"
+                f"选帧{len(result.selected_frames)}, 冲突{len(result.conflicts)}, "
+                f"语用{len(result.narrative_pragmatics)}, "
+                f"涌现分{(result.emergence_summary or {}).get('risk_score', 0)}"
             )
             return out
         except Exception as e:
@@ -504,6 +506,8 @@ class ResumableAnalyzer:
                 "events_summary": [],
                 "selected_frame_reasons": [],
                 "narrative_conflicts": [],
+                "narrative_pragmatics": [],
+                "emergence_summary": {},
                 "event_understanding": {"degraded": True, "degrade_reason": str(e)},
                 "_summary": f"事件理解失败(降级): {e}",
             }
@@ -544,6 +548,8 @@ class ResumableAnalyzer:
             "events_summary": event_u.get("events_summary", []),
             "selected_frame_reasons": event_u.get("selected_frame_reasons", []),
             "narrative_conflicts": event_u.get("narrative_conflicts", []),
+            "narrative_pragmatics": event_u.get("narrative_pragmatics", []),
+            "emergence_summary": event_u.get("emergence_summary", {}),
             "_llm_calls": 0,
             "_summary": f"报告: 总分={overall_score}, 等级={risk_level}, 建议={suggestion}",
         }

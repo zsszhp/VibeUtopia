@@ -115,17 +115,33 @@ def load_paperwork_cases() -> list[dict]:
 # 预测：live（真实 LLM）/ mock（离线子集）
 # ---------------------------------------------------------------------------
 
-async def predict_live(text: str) -> dict:
-    """真实链路：11 维评估 + 统一评分（不落库，只出预测）"""
+async def predict_live(text: str, sample_runs: int = 1) -> dict:
+    """真实链路：11 维评估 + 统一评分 + 置信度（可选多次采样一致性）"""
     from backend.services.analyzer import calculate_overall_score
-    from backend.services.risk_assessor import assess_risks
+    from backend.services.confidence_calculator import ConfidenceCalculator
+    from backend.services.consistency_sampler import sample_assess_risk_levels
 
-    result = await assess_risks(text)
+    result, sampling = await sample_assess_risk_levels(text, runs=sample_runs)
+    if not result:
+        raise RuntimeError("assess_risks 返回空维度（视为 API/解析失败）")
     dimensions = result.get("dimensions") or []
     if not dimensions:
         raise RuntimeError("assess_risks 返回空维度（视为 API/解析失败）")
     overall, _weights, _cross = calculate_overall_score(dimensions)
-    return {"score": int(overall), "level": _score_to_level(int(overall)), "dimensions": dimensions}
+    conf = ConfidenceCalculator().calculate(
+        dimensions=dimensions,
+        risk_sentences=result.get("risk_sentences") or [],
+        sampling_summary=sampling or None,
+    )
+    return {
+        "score": int(overall),
+        "level": _score_to_level(int(overall)),
+        "dimensions": dimensions,
+        "confidence": conf["overall_confidence"],
+        "confidence_level": conf.get("confidence_level"),
+        "reason_labels": conf.get("reason_labels", []),
+        "sampling": sampling or None,
+    }
 
 
 _KEYWORD_RULES: list[tuple[str, list[str], int]] = [
@@ -146,6 +162,7 @@ _KEYWORD_RULES: list[tuple[str, list[str], int]] = [
 def predict_mock(text: str) -> dict:
     """离线 mock：关键词启发式出维度，只用于跑通评测链路，不代表真实准确率。"""
     from backend.services.analyzer import calculate_overall_score
+    from backend.services.confidence_calculator import ConfidenceCalculator
 
     dimensions = []
     for name, keywords, base_score in _KEYWORD_RULES:
@@ -161,7 +178,16 @@ def predict_mock(text: str) -> dict:
             for n, _kw, _s in _KEYWORD_RULES
         ]
     overall, _weights, _cross = calculate_overall_score(dimensions)
-    return {"score": int(overall), "level": _score_to_level(int(overall)), "dimensions": dimensions}
+    conf = ConfidenceCalculator().calculate(dimensions=dimensions, risk_sentences=[])
+    return {
+        "score": int(overall),
+        "level": _score_to_level(int(overall)),
+        "dimensions": dimensions,
+        "confidence": conf["overall_confidence"],
+        "confidence_level": conf.get("confidence_level"),
+        "reason_labels": conf.get("reason_labels", []),
+        "sampling": None,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -179,7 +205,7 @@ def _hit_score_range(score: int, range_: list | None) -> bool | None:
     return low <= score <= high
 
 
-async def run_eval(mode: str, limit: int | None, source: str) -> dict:
+async def run_eval(mode: str, limit: int | None, source: str, sample_runs: int = 1) -> dict:
     cases: list[dict] = []
     if source in ("all", "backtest"):
         cases.extend(load_backtest_cases())

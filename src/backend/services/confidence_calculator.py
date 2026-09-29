@@ -59,6 +59,7 @@ class ConfidenceCalculator:
         transcript_quality: dict | None = None,
         evidence_chains: list[dict] | None = None,
         platform_reactions: list[dict] | None = None,
+        sampling_summary: dict | None = None,
     ) -> dict[str, Any]:
         """计算总体置信度
         
@@ -68,6 +69,8 @@ class ConfidenceCalculator:
             transcript_quality: 转写质量信息
             evidence_chains: 证据链列表
             platform_reactions: 平台反应列表
+            sampling_summary: 多次采样一致性摘要（consistency_sampler.summarize_samples），
+                提供 consistency_rate / label（consistency_*）
             
         Returns:
             置信度计算结果（含 overall_confidence / confidence_level / reason_labels / factors / breakdown）
@@ -79,7 +82,18 @@ class ConfidenceCalculator:
         
         # 2. 评估一致性因子
         consistency_score = self._assess_consistency(dimensions)
-        
+        sampling_rate = None
+        if sampling_summary:
+            try:
+                sampling_rate = float(sampling_summary.get("consistency_rate"))
+            except (TypeError, ValueError):
+                sampling_rate = None
+            if sampling_rate is not None:
+                # 多次采样一致性与维度内部一致性等权合成（无采样时保持原口径）
+                consistency_score = max(
+                    0.0, min(1.0, 0.5 * consistency_score + 0.5 * sampling_rate)
+                )
+
         # 3. 证据充分性因子
         evidence_score = self._assess_evidence_sufficiency(
             evidence_chains, risk_sentences
@@ -115,9 +129,10 @@ class ConfidenceCalculator:
         reason_labels = self._build_reason_labels(
             dimensions=dimensions,
             evidence_chains=evidence_chains,
+            sampling_summary=sampling_summary,
         )
 
-        return {
+        result = {
             "overall_confidence": round(overall_confidence, 2),
             "confidence_level": confidence_level(overall_confidence),
             "reason_labels": reason_labels,
@@ -129,11 +144,20 @@ class ConfidenceCalculator:
                 "platform_validation_score": round(platform_validation_score, 2),
             },
         }
+        if sampling_summary:
+            result["sampling"] = {
+                "runs": sampling_summary.get("runs"),
+                "consistency_rate": sampling_summary.get("consistency_rate"),
+                "majority_level": sampling_summary.get("majority_level"),
+                "label": sampling_summary.get("label"),
+            }
+        return result
 
     def _build_reason_labels(
         self,
         dimensions: list[dict],
         evidence_chains: list[dict] | None,
+        sampling_summary: dict | None = None,
     ) -> list[str]:
         """生成置信度原因标签（解释为何是该等级，而非黑盒分数）"""
         factors = self.confidence_factors
@@ -143,6 +167,22 @@ class ConfidenceCalculator:
             labels.append("consistency")
         elif factors.get("consistency", 1) < 0.5:
             labels.append("low_consistency")
+
+        # 多次采样一致性标签（consistency_*）
+        if sampling_summary:
+            sampling_label = sampling_summary.get("label")
+            if sampling_label in (
+                "consistency_full",
+                "consistency_majority",
+                "consistency_split",
+            ):
+                labels.append(sampling_label)
+            rate = sampling_summary.get("consistency_rate")
+            try:
+                if rate is not None and float(rate) >= 1.0 and sampling_label != "consistency_full":
+                    labels.append("consistency_full")
+            except (TypeError, ValueError):
+                pass
 
         cross_validated = any(
             len(ec.get("cross_validation", []) or []) > 0
