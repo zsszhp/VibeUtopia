@@ -385,58 +385,58 @@ Agent åœ¨ä»»åŠ¡æ‰§è¡Œè¿‡ç¨‹ä¸­å‘ç°çš„æ¡ç›®åº”éµå¾ªä»¥ä¸‹æ ¼å¼ï¼š
   - é£é™©é˜ˆÖµÍ³Ò»30/60/80ï¼›11Î¬å£å¾„Í³Ò»
   - å¾…åŠï¼šAPIé‰´È¨ã€çº¢çº¿76+Ç¿åˆ¶ã€æˆæœ¬è®¡é‡ã€è¯„æµ‹å›å½’é—¨ç¦ã€è§†Æµäº‹ä»¶çº§æ¶æ„ÊµÊ©(R3)
 
-### R4¹¦ÄÜÉî»¯+¹¤³ÌÖÊÁ¿ÊÕÎ²Íê³É£¨2026-09-29£©
+### R4åŠŸèƒ½æ·±åŒ–+å·¥ç¨‹è´¨é‡æ”¶å°¾å®Œæˆï¼ˆ2026-09-29ï¼‰
 - Date: 2026-09-29
-- Context: ¼ÌĞøÍÆ½øÊ£ÓàÂ·ÏßÍ¼
-- Category: ´úÂë½á¹¹
+- Context: ç»§ç»­æ¨è¿›å‰©ä½™è·¯çº¿å›¾
+- Category: ä»£ç ç»“æ„
 - Instructions:
-  - R4£º²©Ö÷·ç¸ñ»­Ïñ blogger_style_profiler¡¢Ñ¡Ìâ¿¨±Õ»·¡¢¶Ô±ê¿ÉÄ£·Â¶¯×÷¡¢TopicRecommendPanel¡¢risk_impact
-  - ¹¤³Ì£ºrate_limit »¬¶¯´°¿Ú 60/min¡¢temporal_anomaly needs_review¡¢CI workflow¡¢ÆÀ²â»ùÏßËµÃ÷
-  - ÑéÖ¤£ºpytest 113 passed 9 skipped£»vue-tsc 0£»build ³É¹¦
-  - ÎÄµµ£ºdocs/06_ÊµÊ©¼ÇÂ¼/11_R4¹¦ÄÜÉî»¯.md¡¢12_¹¤³ÌÖÊÁ¿ÊÕÎ².md
-  - ´ı°ì£ºlive ÆÀ²â»ùÏß¡¢ECE Ğ£×¼¡¢¶à worker ÏŞÁ÷¡¢JWT ¶à×â»§
+  - R4ï¼šåšä¸»é£æ ¼ç”»åƒ blogger_style_profilerã€é€‰é¢˜å¡é—­ç¯ã€å¯¹æ ‡å¯æ¨¡ä»¿åŠ¨ä½œã€TopicRecommendPanelã€risk_impact
+  - å·¥ç¨‹ï¼šrate_limit æ»‘åŠ¨çª—å£ 60/minã€temporal_anomaly needs_reviewã€CI workflowã€è¯„æµ‹åŸºçº¿è¯´æ˜
+  - éªŒè¯ï¼špytest 113 passed 9 skippedï¼›vue-tsc 0ï¼›build æˆåŠŸ
+  - æ–‡æ¡£ï¼šdocs/06_å®æ–½è®°å½•/11_R4åŠŸèƒ½æ·±åŒ–.mdã€12_å·¥ç¨‹è´¨é‡æ”¶å°¾.md
+  - å¾…åŠï¼šlive è¯„æµ‹åŸºçº¿ã€ECE æ ¡å‡†ã€å¤š worker é™æµã€JWT å¤šç§Ÿæˆ·
 
-### R5+L6L7+ECE ÓëÄ£ĞÍÇĞ»»Íê³É£¨2026-09-29£©
+### R5+L6L7+ECE ä¸æ¨¡å‹åˆ‡æ¢å®Œæˆï¼ˆ2026-09-29ï¼‰
 - Date: 2026-09-29
-- Context: ÓÃ»§ÒªÇóÍê³ÉÈ«²¿²¢Ğ¡²½git
-- Category: ´úÂë½á¹¹ | »·¾³ÅäÖÃ
+- Context: ç”¨æˆ·è¦æ±‚å®Œæˆå…¨éƒ¨å¹¶å°æ­¥git
+- Category: ä»£ç ç»“æ„ | ç¯å¢ƒé…ç½®
 - Instructions:
-  - Ä£ĞÍ£ºLongCat¹ıÆÚ£¬¸Ä OAIFREE hub.oaifree.com gpt-6-luna£¨.env OAIFREE_*£¬²»Èë¿â£©
-  - live»ùÏß£º12°¸ valid_accuracy=0.75 valid_ratio=1.0£¨ºì³È±ß½ç3ÎóÅĞ£©
-  - R5£ºJWT/workflow/export£»L6L7£ºnarrative_pragmatics+risk_emergence
-  - ECE/consistency Ä£¿éÂäµØ£»²âÊÔ¿âÇ¿ÖÆ SQLite
-  - pytest 137 passed 9 skipped£»vue-tsc 0
-  - ÊµÊ©¼ÇÂ¼ docs/06_ÊµÊ©¼ÇÂ¼/11-15
-  - ´ı°ì£ººì³È±ß½çĞ£×¼¡¢JWTÓÃ»§±í¡¢PDFµ¼³ö¡¢VGOLDÆÀ²â
+  - æ¨¡å‹ï¼šLongCatè¿‡æœŸï¼Œæ”¹ OAIFREE hub.oaifree.com gpt-6-lunaï¼ˆ.env OAIFREE_*ï¼Œä¸å…¥åº“ï¼‰
+  - liveåŸºçº¿ï¼š12æ¡ˆ valid_accuracy=0.75 valid_ratio=1.0ï¼ˆçº¢æ©™è¾¹ç•Œ3è¯¯åˆ¤ï¼‰
+  - R5ï¼šJWT/workflow/exportï¼›L6L7ï¼šnarrative_pragmatics+risk_emergence
+  - ECE/consistency æ¨¡å—è½åœ°ï¼›æµ‹è¯•åº“å¼ºåˆ¶ SQLite
+  - pytest 137 passed 9 skippedï¼›vue-tsc 0
+  - å®æ–½è®°å½• docs/06_å®æ–½è®°å½•/11-15
+  - å¾…åŠï¼šçº¢æ©™è¾¹ç•Œæ ¡å‡†ã€JWTç”¨æˆ·è¡¨ã€PDFå¯¼å‡ºã€VGOLDè¯„æµ‹
 
-### 25°¸»ùÏßÓë·´·í¶µµ×£¨2026-09-29£©
+### 25æ¡ˆåŸºçº¿ä¸åè®½å…œåº•ï¼ˆ2026-09-29ï¼‰
 - Date: 2026-09-29
-- Context: ¼ÌĞøÍêÉÆËã·¨¿ÉĞÅ¶È
-- Category: ²âÊÔ·½·¨
+- Context: ç»§ç»­å®Œå–„ç®—æ³•å¯ä¿¡åº¦
+- Category: æµ‹è¯•æ–¹æ³•
 - Instructions:
-  - live 25°¸»ùÏß valid_accuracy=0.68 valid_ratio=1.0
-  - Ê§ÊÖ¼¯ÖĞ orange/red ±ß½ç£»BT015 ÒşÓ÷·´·íÒÑÓÃ irony_detector ¶µµ×
-  - ºìÏßÈíÓ²·Ö¼¶£ºÓ²50/Èí70
-  - HTMLµ¼³ö¡¢ÃÅ½ûÏÈÓÚbaselineÂäÅÌ
-  - pytest 145 passed
+  - live 25æ¡ˆåŸºçº¿ valid_accuracy=0.68 valid_ratio=1.0
+  - å¤±æ‰‹é›†ä¸­ orange/red è¾¹ç•Œï¼›BT015 éšå–»åè®½å·²ç”¨ irony_detector å…œåº•
+  - çº¢çº¿è½¯ç¡¬åˆ†çº§ï¼šç¡¬50/è½¯70
+  - HTMLå¯¼å‡ºã€é—¨ç¦å…ˆäºbaselineè½ç›˜
+  - pytest 145 passed
 
-### Ëã·¨±ß½çÓÅ»¯Óë¶àÓÃ»§ÕËºÅ£¨2026-09-29Ğø£©
+### ç®—æ³•è¾¹ç•Œä¼˜åŒ–ä¸å¤šç”¨æˆ·è´¦å·ï¼ˆ2026-09-29ç»­ï¼‰
 - Date: 2026-09-29
-- Context: Á¬ĞøĞ¡²½ÍÆËÍ
-- Category: ´úÂë½á¹¹
+- Context: è¿ç»­å°æ­¥æ¨é€
+- Category: ä»£ç ç»“æ„
 - Instructions:
-  - ºìÏßÈíÓ²·Ö¼¶(Ó²50/Èí70)¡¢·´·í+Ô¢ÑÔÓ°Éä¶µµ×¡¢Ãñ×å±áËğ¶µµ×
-  - Õë¶ÔĞÔ¸´²â£ºBT005=76red BT011=79red BT015²»ÔÙgreen
-  - users±í+×¢²á/µÇÂ¼JWT¡¢Ç°¶ËÉèÖÃÒ³ÕËºÅÈë¿Ú
-  - HTML±¨¸æµ¼³ö¡¢ÆÀ²âÃÅ½ûÏÈÓÚbaseline
-  - pytest 145 passed
+  - çº¢çº¿è½¯ç¡¬åˆ†çº§(ç¡¬50/è½¯70)ã€åè®½+å¯“è¨€å½±å°„å…œåº•ã€æ°‘æ—è´¬æŸå…œåº•
+  - é’ˆå¯¹æ€§å¤æµ‹ï¼šBT005=76red BT011=79red BT015ä¸å†green
+  - usersè¡¨+æ³¨å†Œ/ç™»å½•JWTã€å‰ç«¯è®¾ç½®é¡µè´¦å·å…¥å£
+  - HTMLæŠ¥å‘Šå¯¼å‡ºã€è¯„æµ‹é—¨ç¦å…ˆäºbaseline
+  - pytest 145 passed
 
-### live»ùÏß0.84£¨2026-09-29£©
+### liveåŸºçº¿0.84ï¼ˆ2026-09-29ï¼‰
 - Date: 2026-09-29
-- Context: Ëã·¨±ß½çÓÅ»¯ºó×îÖÕ¸´²â
-- Category: ²âÊÔ·½·¨
+- Context: ç®—æ³•è¾¹ç•Œä¼˜åŒ–åæœ€ç»ˆå¤æµ‹
+- Category: æµ‹è¯•æ–¹æ³•
 - Instructions:
-  - 25°¸ live valid_accuracy=0.84 valid_ratio=1.0
-  - »ùÏßÑİ½ø 0.68¡ú0.72¡ú0.76¡ú0.84
-  - green/yellowÈ«¶Ô£»3Æ«ÑÏ1µÍ¹À
-  - docs/06_ÊµÊ©¼ÇÂ¼/18_×îÖÕlive¸´²â.md
+  - 25æ¡ˆ live valid_accuracy=0.84 valid_ratio=1.0
+  - åŸºçº¿æ¼”è¿› 0.68â†’0.72â†’0.76â†’0.84
+  - green/yellowå…¨å¯¹ï¼›3åä¸¥1ä½ä¼°
+  - docs/06_å®æ–½è®°å½•/18_æœ€ç»ˆliveå¤æµ‹.md
