@@ -184,3 +184,6 @@ git_do.py
 git_push.py
 push_to_github.py
 do_commit.ps1
+
+data/eval/live_run.log
+data/eval/live_run.err
