@@ -86,6 +86,19 @@ providers:
         vision: false
         text: true
 
+  # --- OAI Free Hub（OpenAI 兼容网关，如 gpt-6-luna）---
+  oaifree:
+    name: "OAI Hub"
+    base_url: "https://hub.oaifree.com/v1"
+    api_key_env: "OAIFREE_API_KEY"
+    models:
+      - id: "gpt-6-luna"
+        tier: advanced
+        priority: 1
+      - id: "gpt-6-luna"
+        tier: standard
+        priority: 2
+
   zhipu:
     name: "智谱AI"
     base_url: "https://open.bigmodel.cn/api/paas/v4"

@@ -28,6 +28,23 @@ fallback_strategy:
 
 # ==================== Provider 配置 ====================
 providers:
+  # --- OAI Hub (OpenAI 兼容网关) ---
+  oaifree:
+    name: "OAI Hub"
+    api_key_env: "OAIFREE_API_KEY"
+    base_url: "https://hub.oaifree.com/v1"
+    models:
+      - id: "gpt-6-luna"
+        tier: advanced
+        vision: false
+        text: true
+        priority: 1
+      - id: "gpt-6-luna"
+        tier: standard
+        vision: false
+        text: true
+        priority: 2
+
   # --- 阿里通义千问 (支持多模态) ---
   aliyun:
     name: "阿里通义千问"
