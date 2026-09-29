@@ -112,6 +112,8 @@ REDLINE_DIMENSIONS = frozenset({
 
 # 红线强制分数下限：severity=red 的标定区间起点（76-100 red）
 REDLINE_SCORE_FLOOR = 76
+# 红线「触及」阈值：分数≥50 即视为触碰红线（PRD 任何触及均属高风险）
+REDLINE_TOUCH_SCORE = 50
 
 
 def is_redline_dimension(name: str | None) -> bool:
@@ -120,24 +122,27 @@ def is_redline_dimension(name: str | None) -> bool:
 
 
 def enforce_redline_dim_score(name: str, score: int, sev: str | None) -> tuple[int, bool]:
-    """红线维度被判 red/high 时，维度分强制抬升到 76+，保证 severity 与分数区间自洽
+    """红线维度：red/high 或分数≥50（orange 触及）时抬升到 76+
+
+    PRD：红线维度「任何触及均属高风险」。模型对民族宗教/价值观等
+    常给 orange，导致总体停在橙档；此处代码兜底。
 
     Returns:
         (校正后分数, 是否触发强制抬升)
     """
     if not is_redline_dimension(name):
         return int(score), False
-    if is_high_severity(sev, score):
+    if is_high_severity(sev, score) or int(score) >= REDLINE_TOUCH_SCORE:
         lifted = max(int(score), REDLINE_SCORE_FLOOR)
         return lifted, lifted != int(score)
     return int(score), False
 
 
 def redline_triggers_floor(dimensions: list[dict] | None) -> bool:
-    """任一红线维度 red/high → 总体分应至少 76（红线代码化，不再只写在 Prompt）"""
+    """任一红线维度 red/high 或 score≥50 → 总体分至少 76"""
     for d in dimensions or []:
         if not is_redline_dimension(d.get("name")):
             continue
-        if is_high_severity(d.get("severity"), d.get("score", 0)):
+        if is_high_severity(d.get("severity"), d.get("score", 0)) or int(d.get("score", 0) or 0) >= REDLINE_TOUCH_SCORE:
             return True
     return False
