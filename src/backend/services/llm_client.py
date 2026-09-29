@@ -18,6 +18,14 @@ from backend.services.log_sanitizer import redact_secrets
 
 logger = logging.getLogger(__name__)
 
+
+def _err_msg(e: BaseException) -> str:
+    """异常可读信息：无 message 的异常（Timeout 等）退回类型名+repr。"""
+    text = str(e).strip()
+    if text:
+        return f"{type(e).__name__}: {text}"
+    return f"{type(e).__name__}: {e!r}"
+
 PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
 try:
@@ -705,13 +713,13 @@ async def _call_with_routing(prompt: str, system: str, task_type: str) -> str:
                     break
                 except Exception as e2:
                     last_error = e2
-                    logger.warning("LLM 调用失败 %s (重试%d次): %s", key, attempt + 1, redact_secrets(str(e2)))
+                    logger.warning("LLM 调用失败 %s (重试%d次): %s", key, attempt + 1, redact_secrets(_err_msg(e2)))
 
             if not retried:
                 # 非配额错误重试后仍失败，尝试下一个模型
-                logger.warning("模型 %s 调用失败，尝试下一个模型", key)
+                logger.warning("模型 %s 调用失败，尝试下一个模型: %s", key, redact_secrets(_err_msg(last_error)) if last_error else "")
 
-    raise RuntimeError(f"所有模型不可用，已尝试: {tried}" + (f"，最后错误: {redact_secrets(str(last_error))}" if last_error else ""))
+    raise RuntimeError(f"所有模型不可用，已尝试: {tried}" + (f"，最后错误: {redact_secrets(_err_msg(last_error))}" if last_error else ""))
 
 
 async def _call_endpoint(endpoint: ModelEndpoint, prompt: str, system: str) -> str:
