@@ -486,3 +486,15 @@ class ImmersionRecord(Base):
     error = Column(MySQLText, nullable=True)
     created_at = Column(DateTime, default=utcnow)
     completed_at = Column(DateTime, nullable=True)
+
+
+class User(Base):
+    """本地用户账号（R5 多租户账号表）"""
+    __tablename__ = "users"
+
+    id = Column(String(36), primary_key=True)
+    username = Column(String(64), unique=True, nullable=False, index=True)
+    password_hash = Column(String(128), nullable=False)
+    role = Column(String(20), default="member")  # admin / member
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=utcnow)

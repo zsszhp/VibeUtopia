@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import secrets
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
@@ -186,22 +187,105 @@ def _constant_time_eq(a: str, b: str) -> bool:
     return secrets.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
 
 
+def hash_password(password: str) -> str:
+    """PBKDF2-SHA256 密码哈希（不存明文）"""
+    import hashlib
+    salt = settings.JWT_SECRET[:16] if settings.JWT_SECRET else "vibe-local-salt"
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 120_000)
+    return dk.hex()
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    try:
+        return secrets.compare_digest(hash_password(password), password_hash or "")
+    except Exception:
+        return False
+
+
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=64)
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+@auth_router.post("/auth/register", response_model=TokenResponse)
+async def register_user(req: RegisterRequest):
+    """注册本地用户并直接签发 JWT（R5 多租户账号）"""
+    if not is_jwt_enabled():
+        raise HTTPException(status_code=503, detail="JWT 未启用：请配置环境变量 JWT_SECRET")
+    username = req.username.strip()
+    if not username.replace("_", "").isalnum():
+        raise HTTPException(status_code=400, detail="用户名仅允许字母数字下划线")
+
+    from backend.database import SessionLocal
+    from backend.models import User
+
+    db = SessionLocal()
+    try:
+        existing = db.query(User).filter(User.username == username).first()
+        if existing:
+            raise HTTPException(status_code=409, detail="用户名已存在")
+        user = User(
+            id=str(uuid.uuid4()),
+            username=username,
+            password_hash=hash_password(req.password),
+            role="member",
+        )
+        db.add(user)
+        db.commit()
+    finally:
+        db.close()
+
+    token, expires_in = create_access_token(username)
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        expires_in=expires_in,
+        username=username,
+    )
+
+
 @auth_router.post("/auth/token", response_model=TokenResponse)
 async def issue_token(req: TokenRequest):
-    """用用户名+密码换取 JWT（本地单用户 admin/settings.ADMIN_PASSWORD 占位）
+    """用用户名+密码换取 JWT
 
+    优先校验 users 表；无匹配时回退 admin/settings.ADMIN_PASSWORD。
     - JWT_SECRET 未配置 → 503（未启用）
-    - ADMIN_PASSWORD 未配置 → 503（禁止空口令放行）
     - 凭证错误 → 401（不区分用户/密码错误，避免枚举）
     """
     if not is_jwt_enabled():
         raise HTTPException(status_code=503, detail="JWT 未启用：请配置环境变量 JWT_SECRET")
+    username = req.username.strip()
+
+    # 1) users 表
+    try:
+        from backend.database import SessionLocal
+        from backend.models import User
+
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.username == username, User.is_active == True).first()  # noqa: E712
+            if user and verify_password(req.password, user.password_hash):
+                token, expires_in = create_access_token(user.username)
+                return TokenResponse(
+                    access_token=token,
+                    token_type="bearer",
+                    expires_in=expires_in,
+                    username=user.username,
+                )
+        finally:
+            db.close()
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # 表不存在时回退 admin
+
+    # 2) 本地 admin 占位
     expected_user = (getattr(settings, "ADMIN_USERNAME", "") or "admin").strip() or "admin"
     expected_pass = getattr(settings, "ADMIN_PASSWORD", "") or ""
     if not expected_pass:
-        raise HTTPException(status_code=503, detail="ADMIN_PASSWORD 未配置，禁止空口令签发令牌")
+        raise HTTPException(status_code=503, detail="ADMIN_PASSWORD 未配置且用户不存在，禁止空口令签发令牌")
 
-    user_ok = _constant_time_eq(req.username.strip(), expected_user)
+    user_ok = _constant_time_eq(username, expected_user)
     pass_ok = _constant_time_eq(req.password, expected_pass)
     if not (user_ok and pass_ok):
         raise HTTPException(status_code=401, detail="用户名或密码错误")
