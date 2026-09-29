@@ -193,7 +193,14 @@ async def run_eval(mode: str, limit: int | None, source: str) -> dict:
         import os
         use_mock = not any(
             (os.getenv(k) or "").strip()
-            for k in ("DEEPSEEK_API_KEY", "LONGCAT_API_KEY", "SILICONFLOW_API_KEY", "OPENAI_API_KEY")
+            for k in (
+                "OAIFREE_API_KEY",
+                "DEEPSEEK_API_KEY",
+                "LONGCAT_API_KEY",
+                "SILICONFLOW_API_KEY",
+                "OPENAI_API_KEY",
+                "SENSENOVA_API_KEY",
+            )
         )
 
     started = time.perf_counter()
@@ -204,7 +211,8 @@ async def run_eval(mode: str, limit: int | None, source: str) -> dict:
     score_range_valid = 0
     api_failures = 0
 
-    for case in cases:
+    total = len(cases)
+    for idx, case in enumerate(cases, 1):
         rec = {
             "case_id": case["case_id"],
             "source": case["source"],
@@ -212,6 +220,7 @@ async def run_eval(mode: str, limit: int | None, source: str) -> dict:
             "expected_level": case["expected_level"],
             "risk_score_range": case["risk_score_range"],
         }
+        print(f"[eval] {idx}/{total} {case['case_id']} start", flush=True)
         try:
             if use_mock:
                 pred = predict_mock(case["text"])
@@ -230,9 +239,11 @@ async def run_eval(mode: str, limit: int | None, source: str) -> dict:
                 score_range_hits += 1 if sr else 0
             valid += 1
             hits += 1 if rec["level_hit"] else 0
+            print(f"[eval] {idx}/{total} {case['case_id']} ok pred={pred.get('level')} expect={case['expected_level']}", flush=True)
         except Exception as e:
-            rec.update({"status": "api_error", "error": str(e)[:200], "level_hit": False})
+            rec.update({"status": "api_error", "error": f"{type(e).__name__}: {e}"[:200], "level_hit": False})
             api_failures += 1
+            print(f"[eval] {idx}/{total} {case['case_id']} FAIL {type(e).__name__}: {e}", flush=True)
         records.append(rec)
 
     total = len(records)
