@@ -53,6 +53,9 @@
       <PlatformReactions v-if="reviewStore.result.platform_reactions" :reactions="reviewStore.result.platform_reactions" />
     </div>
 
+    <!-- 审核工作流与报告导出 -->
+    <WorkflowExportBar v-if="reviewStore.result" />
+
     <!-- 热点关联摘要 -->
     <div v-if="reviewStore.result?.signal_correlations?.length" class="signal-summary">
       <h3 class="summary-title">热点关联摘要</h3>
@@ -78,6 +81,7 @@ import AnalysisDashboard from '../components/AnalysisDashboard.vue'
 import RiskGauge from '../components/RiskGauge.vue'
 import DimensionRadar from '../components/DimensionRadar.vue'
 import PlatformReactions from '../components/PlatformReactions.vue'
+import WorkflowExportBar from '../components/WorkflowExportBar.vue'
 
 const reviewStore = useReviewStore()
 

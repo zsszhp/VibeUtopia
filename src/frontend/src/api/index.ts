@@ -215,6 +215,20 @@ export const api = {
   /** 获取历史报告详情 */
   getHistoryDetail: (taskId: string) =>
     axios.get<ReviewResult>(`${API_BASE}/history/${taskId}`),
+
+  /** 审核工作流状态流转 */
+  updateWorkflow: (taskId: string, status: string, note?: string) =>
+    axios.patch<{ task_id: string; workflow_status: string }>(
+      `${API_BASE}/review/${taskId}/workflow`,
+      { status, note }
+    ),
+
+  /** 导出报告 */
+  exportReview: (taskId: string, format: 'md' | 'json' = 'md') =>
+    axios.get(`${API_BASE}/review/${taskId}/export`, {
+      params: { format },
+      responseType: 'blob',
+    }),
 }
 
 // ─── 阶段6 扩展API ─────────────────────────────────────────────────
