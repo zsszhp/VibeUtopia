@@ -401,18 +401,24 @@ def main() -> int:
     print(f"报告: {json_path}")
     print(f"报告: {md_path}")
 
+    # 先门禁再写基线：避免「先覆盖 baseline 导致门禁永远通过」
+    gate_code = _check_baseline(report, Path(args.baseline), args.max_drop)
+
     if args.save_baseline:
         base_path = out_dir / "baseline.json"
-        base_path.write_text(json.dumps({
-            "saved_at": report["generated_at"],
-            "mode": report["mode"],
-            "valid_accuracy": report["valid_accuracy"],
-            "valid_ratio": report["valid_ratio"],
-            "total_cases": report["total_cases"],
-        }, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"基线已保存: {base_path}")
+        if gate_code != 0 and base_path.exists():
+            print(f"[gate] 未保存新基线（门禁未通过），保留原基线: {base_path}")
+        else:
+            base_path.write_text(json.dumps({
+                "saved_at": report["generated_at"],
+                "mode": report["mode"],
+                "valid_accuracy": report["valid_accuracy"],
+                "valid_ratio": report["valid_ratio"],
+                "total_cases": report["total_cases"],
+            }, ensure_ascii=False, indent=2), encoding="utf-8")
+            print(f"基线已保存: {base_path}")
 
-    return _check_baseline(report, Path(args.baseline), args.max_drop)
+    return gate_code
 
 
 if __name__ == "__main__":

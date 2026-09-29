@@ -863,6 +863,52 @@ def _render_export_markdown(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _render_export_html(payload: dict[str, Any]) -> str:
+    """可打印 HTML 报告（浏览器打开后可另存为 PDF）"""
+    md = _render_export_markdown(payload)
+    # 轻量转义 + 段落/标题/列表，避免引入 markdown 依赖
+    def esc(s: str) -> str:
+        return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    body_lines: list[str] = []
+    for line in md.splitlines():
+        if line.startswith("# "):
+            body_lines.append(f"<h1>{esc(line[2:])}</h1>")
+        elif line.startswith("## "):
+            body_lines.append(f"<h2>{esc(line[3:])}</h2>")
+        elif line.startswith("### "):
+            body_lines.append(f"<h3>{esc(line[4:])}</h3>")
+        elif line.startswith("> "):
+            body_lines.append(f"<blockquote>{esc(line[2:])}</blockquote>")
+        elif line.startswith("|"):
+            body_lines.append(f"<pre class='table-line'>{esc(line)}</pre>")
+        elif line.strip() == "":
+            body_lines.append("")
+        else:
+            body_lines.append(f"<p>{esc(line)}</p>")
+
+    title = esc(str(payload.get("task_id", "report")))
+    return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>VibeUtopia 预审报告 {title}</title>
+<style>
+  body {{ font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+         max-width: 860px; margin: 32px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.65; }}
+  h1 {{ font-size: 22px; border-bottom: 2px solid #6366f1; padding-bottom: 8px; }}
+  h2 {{ font-size: 17px; margin-top: 28px; color: #312e81; }}
+  blockquote {{ border-left: 4px solid #c7d2fe; margin: 8px 0; padding: 8px 12px; background: #f5f5ff; }}
+  .table-line {{ font-size: 12px; background: #fafafa; padding: 2px 6px; margin: 0; overflow-x: auto; }}
+  @media print {{ body {{ margin: 12px; }} }}
+</style>
+</head>
+<body>
+{''.join(body_lines)}
+</body>
+</html>"""
+
+
 @router.get("/review/{task_id}/export")
 async def export_review(
     task_id: str,
@@ -870,14 +916,15 @@ async def export_review(
     db: Session = Depends(get_db),
     identity: AuthIdentity = Depends(get_identity),
 ):
-    """导出审核报告：GET /api/v1/review/{task_id}/export?format=md|json
+    """导出审核报告：GET /api/v1/review/{task_id}/export?format=md|json|html
 
     - format=md：Markdown 报告（Verdict + 分数 + Top 风险 + 改写 + 免责）
     - format=json：结构化报告数据（含同一免责声明）
+    - format=html：可打印 HTML（浏览器可另存 PDF）
     """
     fmt = (format or "md").strip().lower()
-    if fmt not in ("md", "json"):
-        raise HTTPException(status_code=400, detail="format 仅支持 md 或 json")
+    if fmt not in ("md", "json", "html"):
+        raise HTTPException(status_code=400, detail="format 仅支持 md、json 或 html")
 
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
@@ -887,6 +934,16 @@ async def export_review(
     payload = _build_export_payload(task, db)
     if fmt == "json":
         return payload
+
+    if fmt == "html":
+        html = _render_export_html(payload)
+        return Response(
+            content=html,
+            media_type="text/html; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="review_{task_id}.html"',
+            },
+        )
 
     markdown = _render_export_markdown(payload)
     return Response(
