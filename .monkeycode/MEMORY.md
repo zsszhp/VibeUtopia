@@ -384,3 +384,14 @@ Agent åœ¨ä»»åŠ¡æ‰§è¡Œè¿‡ç¨‹ä¸­å‘ç°çš„æ¡ç›®åº”éµå¾ªä»¥ä¸‹æ ¼å¼ï¼š
   - éªŒÖ¤ï¼špytest 55 passed 9 skipped 0 failedï¼›vue-tsc 0 errorï¼›npm build æˆåŠŸ
   - é£é™©é˜ˆÖµÍ³Ò»30/60/80ï¼›11Î¬å£å¾„Í³Ò»
   - å¾…åŠï¼šAPIé‰´È¨ã€çº¢çº¿76+Ç¿åˆ¶ã€æˆæœ¬è®¡é‡ã€è¯„æµ‹å›å½’é—¨ç¦ã€è§†Æµäº‹ä»¶çº§æ¶æ„ÊµÊ©(R3)
+
+### R4¹¦ÄÜÉî»¯+¹¤³ÌÖÊÁ¿ÊÕÎ²Íê³É£¨2026-09-29£©
+- Date: 2026-09-29
+- Context: ¼ÌĞøÍÆ½øÊ£ÓàÂ·ÏßÍ¼
+- Category: ´úÂë½á¹¹
+- Instructions:
+  - R4£º²©Ö÷·ç¸ñ»­Ïñ blogger_style_profiler¡¢Ñ¡Ìâ¿¨±Õ»·¡¢¶Ô±ê¿ÉÄ£·Â¶¯×÷¡¢TopicRecommendPanel¡¢risk_impact
+  - ¹¤³Ì£ºrate_limit »¬¶¯´°¿Ú 60/min¡¢temporal_anomaly needs_review¡¢CI workflow¡¢ÆÀ²â»ùÏßËµÃ÷
+  - ÑéÖ¤£ºpytest 113 passed 9 skipped£»vue-tsc 0£»build ³É¹¦
+  - ÎÄµµ£ºdocs/06_ÊµÊ©¼ÇÂ¼/11_R4¹¦ÄÜÉî»¯.md¡¢12_¹¤³ÌÖÊÁ¿ÊÕÎ².md
+  - ´ı°ì£ºlive ÆÀ²â»ùÏß¡¢ECE Ğ£×¼¡¢¶à worker ÏŞÁ÷¡¢JWT ¶à×â»§

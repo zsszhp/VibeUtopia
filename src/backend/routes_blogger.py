@@ -52,6 +52,16 @@ class TimelineRequest(BaseModel):
     topic: str = Field(..., description="话题")
 
 
+class StyleProfileRequest(BaseModel):
+    """博主风格画像请求"""
+    blogger_id: str = Field(default="", description="博主ID")
+    blogger_name: str = Field(default="", description="博主名称")
+    contents: List[str] = Field(default_factory=list, description="历史文案列表")
+    video_metadata: Optional[List[Dict[str, Any]]] = Field(
+        default=None, description="视频元数据 [{title, duration, platform, publish_date}]"
+    )
+
+
 @router.post("/index", summary="创建博主视频索引")
 async def create_index(request: IndexRequest, background_tasks: BackgroundTasks):
     """为博主建立全视频知识索引（异步后台执行）"""
@@ -151,6 +161,25 @@ async def get_blogger_profile(blogger_id: str):
         "total_duration_hours": profile.total_duration_hours,
         "last_updated": profile.last_updated,
     }
+
+
+@router.post("/style-profile", summary="博主风格画像")
+async def generate_style_profile(request: StyleProfileRequest):
+    """输入历史文案/视频元数据，生成风格维度画像
+
+    输出话题/语气/节奏/风险偏好/人设等结构化字段，可直接供前端博主画像展示。
+    LLM 不可用时自动降级为规则分析。
+    """
+    from backend.services.blogger_style_profiler import BloggerStyleProfiler
+
+    profiler = BloggerStyleProfiler()
+    result = await profiler.analyze(
+        contents=request.contents,
+        video_metadata=request.video_metadata,
+        blogger_id=request.blogger_id,
+        blogger_name=request.blogger_name,
+    )
+    return result.to_dict()
 
 
 @router.post("/contradictions", summary="观点矛盾检测")

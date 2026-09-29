@@ -35,3 +35,16 @@ def pytest_collection_modifyitems(config, items):
 @pytest.fixture(scope="session", autouse=True)
 def _ensure_data_dirs():
     (ROOT / "data").mkdir(exist_ok=True)
+
+
+@pytest.fixture(scope="function", autouse=True)
+def _isolate_rate_limiter():
+    """用例间隔离限流计数：默认注入高配额，避免共享窗口误触发 429。
+
+    限流专项用例（tests/test_rate_limit.py）自行注入低配额限流器。
+    """
+    from backend.rate_limit import SlidingWindowRateLimiter, reset_limiter, set_limiter
+
+    set_limiter(SlidingWindowRateLimiter(max_requests=1_000_000))
+    yield
+    reset_limiter()

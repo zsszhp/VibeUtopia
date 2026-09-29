@@ -9,6 +9,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.auth import check_ws_api_key, is_auth_enabled, require_api_key
 from backend.database import init_db
+from backend.rate_limit import rate_limit
 from backend.routes import router
 from backend.services.signal.scheduler import SignalScheduler
 from backend.services.graph.graph_store import GraphStore
@@ -58,7 +59,10 @@ app = FastAPI(
         "## 鉴权\n"
         "生产环境必须配置环境变量 `API_KEY`，所有 `/api/**` 与 `/ws/**` 请求须携带 "
         "`X-API-Key: <key>` 或 `Authorization: Bearer <key>`。\n"
-        "未配置 `API_KEY` 时仅限本地开发放行（响应头 `X-API-Auth: disabled`），禁止裸奔上生产。"
+        "未配置 `API_KEY` 时仅限本地开发放行（响应头 `X-API-Auth: disabled`），禁止裸奔上生产。\n\n"
+        "## 限流\n"
+        "所有 `/api/**` 请求按客户端 IP 做滑动窗口限流，配额 `RATE_LIMIT_PER_MIN`（默认 60 次/分钟），"
+        "超限返回 `429` 且 `detail` 说明限额；`/health`、`/healthz`、`/ready` 探活端点不受限流。"
     ),
 )
 
@@ -86,9 +90,9 @@ async def auth_mode_headers(request: Request, call_next):
     return response
 
 
-# 路由统一挂鉴权依赖：配置了 API_KEY 则校验 X-API-Key / Authorization: Bearer，未配置放行
-# （危险端点 delete / resume delete / set-model-override / upload 均被覆盖）
-_AUTH_DEPS = [Depends(require_api_key)]
+# 路由统一挂公共依赖：限流（超限 429）+ 鉴权（配置了 API_KEY 则校验 X-API-Key / Authorization: Bearer，未配置放行）
+# 覆盖全部 /api/**（含 delete / resume delete / set-model-override / upload）；/health、/healthz、/ready 探活不限流不鉴权
+_API_DEPS = [Depends(rate_limit), Depends(require_api_key)]
 
 
 # ─── 统一错误响应（前端固定解析 response.data.detail） ──────────────
@@ -131,7 +135,7 @@ async def healthz():
     return {"status": "ok"}
 
 
-@app.get("/api/v1/health", tags=["ops"], dependencies=_AUTH_DEPS)
+@app.get("/api/v1/health", tags=["ops"], dependencies=_API_DEPS)
 async def health_v1():
     """文档与运维脚本约定的健康检查路径（与 /health 等价，受 API Key 保护）。
 
@@ -159,29 +163,29 @@ async def ready():
     return {"status": "ok", "checks": checks}
 
 
-# 路由统一挂鉴权依赖（_AUTH_DEPS 已在上方定义）
+# 路由统一挂公共依赖（限流+鉴权，_API_DEPS 已在上方定义）
 
-app.include_router(router, prefix="/api/v1", dependencies=_AUTH_DEPS)
+app.include_router(router, prefix="/api/v1", dependencies=_API_DEPS)
 
 # 注册阶段 3 新增路由（装饰器为相对路径，前缀在此统一挂载，避免双重前缀）
 from backend.routes_v3 import router as router_v3
-app.include_router(router_v3, prefix="/api/v3", dependencies=_AUTH_DEPS)
+app.include_router(router_v3, prefix="/api/v3", dependencies=_API_DEPS)
 
 # 注册博主多视频知识引擎路由
 from backend.routes_blogger import router as router_blogger
-app.include_router(router_blogger, prefix="/api/v1", dependencies=_AUTH_DEPS)
+app.include_router(router_blogger, prefix="/api/v1", dependencies=_API_DEPS)
 
 # 注册本地模型部署管理路由 (V3.2)
 from backend.routes_local_models import router as router_local_models
-app.include_router(router_local_models, dependencies=_AUTH_DEPS)
+app.include_router(router_local_models, dependencies=_API_DEPS)
 
 # 注册断点续传路由
 from backend.routes_resume import router as router_resume
-app.include_router(router_resume, prefix="/api/v1", dependencies=_AUTH_DEPS)
+app.include_router(router_resume, prefix="/api/v1", dependencies=_API_DEPS)
 
 # 注册人生故事生成路由（路由自身携带 prefix=/api/v1/story，此处不叠加前缀）
 from backend.routes_story import router as router_story
-app.include_router(router_story, dependencies=_AUTH_DEPS)
+app.include_router(router_story, dependencies=_API_DEPS)
 
 
 # ─── WebSocket端点 ────────────────────────────────────────────────

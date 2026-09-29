@@ -245,6 +245,10 @@ class FineGrainedPipeline:
                 anomaly_result = await self.temporal_detector.detect_from_scan(report.dense_scan)
                 report.temporal_anomaly = anomaly_result
 
+                if getattr(anomaly_result, "needs_review", False):
+                    needs_review = True
+                    key_findings.append("时序异常检测部分帧审核失败，结果未知需人工复核")
+
                 if anomaly_result.has_anomaly:
                     key_findings.append(f"时序异常检测发现{len(anomaly_result.anomalies)}处异常画面")
                     risk_upgrade += 10
@@ -257,6 +261,7 @@ class FineGrainedPipeline:
 
             except Exception as e:
                 logger.warning("时序异常检测失败: %s", e)
+                needs_review = True
 
         # Step 4: 结果融合
         report.has_fine_grained_risk = risk_upgrade > 0

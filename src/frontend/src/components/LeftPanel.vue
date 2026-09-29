@@ -147,7 +147,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { NTooltip, NAlert } from 'naive-ui'
 import { useReviewStore, useHistoryStore } from '../stores'
 import { api } from '../api'
@@ -177,6 +177,17 @@ const modes = [
   { key: 'video' as const, label: '视频' },
   { key: 'mixed' as const, label: '混合' },
 ]
+
+// 选题推荐等入口写入的草稿：填入输入框并切到文本模式
+watch(
+  () => reviewStore.draftText,
+  (draft) => {
+    if (!draft) return
+    if (inputMode.value === 'video') inputMode.value = 'text'
+    textContent.value = draft.slice(0, maxTextLength)
+    reviewStore.consumeDraft()
+  },
+)
 
 const isBusy = computed(() =>
   isUploading.value ||

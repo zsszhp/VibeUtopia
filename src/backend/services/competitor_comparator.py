@@ -28,6 +28,15 @@ class DimensionComparison:
 
 
 @dataclass
+class ImitableAction:
+    """可模仿动作"""
+    category: str = ""              # 选题角度 / 标题结构 / 发布节奏
+    action: str = ""                # 具体动作
+    reason: str = ""                # 为什么值得模仿
+    risk_impact: str = ""           # 对「能不能发」的影响
+
+
+@dataclass
 class CompetitorRiskReport:
     """竞品风险对比报告"""
     blogger_id: str = ""
@@ -40,6 +49,9 @@ class CompetitorRiskReport:
     total_in_field: int = 0
     risk_position: str = ""         # leading / average / lagging
     summary: str = ""
+    structure_diff: Dict[str, str] = field(default_factory=dict)
+    imitable_actions: List[ImitableAction] = field(default_factory=list)
+    risk_pattern_diff: Dict[str, str] = field(default_factory=dict)
     error: Optional[str] = None
 
 
@@ -55,7 +67,9 @@ class CompetitorComparator:
         self.config = config or {}
 
     def compare(self, blogger_id: str, competitor_ids: List[str],
-                field_name: str = "", db=None) -> CompetitorRiskReport:
+                field_name: str = "", db=None,
+                blogger_profile: Optional[Dict] = None,
+                competitor_profiles: Optional[List[Dict]] = None) -> CompetitorRiskReport:
         """对比博主与竞品的风险表现
 
         Args:
@@ -63,6 +77,8 @@ class CompetitorComparator:
             competitor_ids: 竞品ID列表
             field_name: 所属领域
             db: 数据库会话
+            blogger_profile: 博主风格画像（可选，用于结构/模仿分析）
+            competitor_profiles: 竞品风格画像列表（可选）
 
         Returns:
             CompetitorRiskReport
@@ -79,6 +95,7 @@ class CompetitorComparator:
         if not blogger_scores:
             report.error = "博主无历史风险数据"
             report.summary = "无法进行对比：博主缺少历史分析数据"
+            self._enrich_imitation_analysis(report, blogger_profile, competitor_profiles)
             return report
 
         field_avg = self._calc_field_average(blogger_scores, competitor_scores_list)
@@ -93,6 +110,7 @@ class CompetitorComparator:
         )
         report.risk_position = self._determine_risk_position(report.overall_risk_rank, report.total_in_field)
         report.summary = self._generate_summary(report)
+        self._enrich_imitation_analysis(report, blogger_profile, competitor_profiles)
 
         return report
 
@@ -270,3 +288,159 @@ class CompetitorComparator:
             parts.append(f"劣势维度: {', '.join(report.weaknesses[:3])}")
 
         return "；".join(parts)
+
+    # ------------------------------------------------------------------
+    # 结构差异 / 可模仿动作 / 风险模式差异（对标「怎么模仿」）
+    # ------------------------------------------------------------------
+
+    def _enrich_imitation_analysis(
+        self,
+        report: CompetitorRiskReport,
+        blogger_profile: Optional[Dict],
+        competitor_profiles: Optional[List[Dict]],
+    ) -> None:
+        b_profile = blogger_profile or {}
+        c_profiles = [p for p in (competitor_profiles or []) if isinstance(p, dict)]
+        c_profile = c_profiles[0] if c_profiles else {}
+
+        report.structure_diff = self._build_structure_diff(b_profile, c_profile)
+        report.imitable_actions = self._build_imitable_actions(b_profile, c_profile, report)
+        report.risk_pattern_diff = self._build_risk_pattern_diff(b_profile, c_profile, report)
+
+    @staticmethod
+    def _profile_topic_label(profile: Dict) -> str:
+        topics = profile.get("topics", {})
+        primary = topics.get("primary_topics", []) if isinstance(topics, dict) else []
+        names = []
+        for t in primary[:3]:
+            names.append(t.get("topic", "") if isinstance(t, dict) else str(t))
+        return "、".join(n for n in names if n) or "未识别"
+
+    @staticmethod
+    def _profile_tone(profile: Dict) -> str:
+        expr = profile.get("expression", {})
+        if isinstance(expr, dict):
+            return expr.get("tone_label") or expr.get("tone") or "未识别"
+        return "未识别"
+
+    @staticmethod
+    def _profile_pacing(profile: Dict) -> str:
+        expr = profile.get("expression", {})
+        if isinstance(expr, dict):
+            return expr.get("pacing") or "未识别"
+        return "未识别"
+
+    def _build_structure_diff(self, b: Dict, c: Dict) -> Dict[str, str]:
+        b_topic = self._profile_topic_label(b)
+        c_topic = self._profile_topic_label(c)
+        b_tone = self._profile_tone(b)
+        c_tone = self._profile_tone(c)
+        b_pacing = self._profile_pacing(b)
+        c_pacing = self._profile_pacing(c)
+
+        if b or c:
+            topic_desc = f"你主打{b_topic}，竞品主打{c_topic}"
+            if b_topic == c_topic:
+                topic_desc += "，主题重合度高，需靠切入角度差异化"
+            else:
+                topic_desc += "，主题有差异，可借竞品选题角度拓宽边界"
+            tone_desc = f"你的语气是{b_tone}，竞品是{c_tone}"
+            pacing_desc = f"你的节奏是{b_pacing}，竞品是{c_pacing}"
+            title_desc = (
+                "竞品标题更偏结果导向（数字/对比/悬念），可参考其信息密度"
+                if c_tone in ("幽默", "humorous", "轻松", "casual")
+                else "竞品标题更偏观点先行，可参考其立场表达清晰度"
+            )
+        else:
+            topic_desc = "缺少双方风格画像，暂按同领域处理：建议对比双方近 10 条内容的主题分布"
+            tone_desc = "暂无语气对比数据"
+            pacing_desc = "暂无节奏对比数据"
+            title_desc = "建议拆解竞品近 10 条标题的句式结构（疑问/数字/对比）后对齐"
+
+        return {
+            "主题结构": topic_desc,
+            "语气风格": tone_desc,
+            "内容节奏": pacing_desc,
+            "标题结构": title_desc,
+        }
+
+    def _build_imitable_actions(
+        self, b: Dict, c: Dict, report: CompetitorRiskReport
+    ) -> List[ImitableAction]:
+        actions: List[ImitableAction] = []
+
+        b_topic = self._profile_topic_label(b)
+        c_topic = self._profile_topic_label(c)
+        actions.append(ImitableAction(
+            category="选题角度",
+            action=f"参考竞品在「{c_topic}」上的切入角度，结合你擅长的「{b_topic}」做交叉选题",
+            reason="竞品已验证该角度有受众反馈，交叉后既借势又保留辨识度",
+            risk_impact="选题角度本身不引入额外法律风险，成稿后仍建议按常规流程预审",
+        ))
+
+        c_tone = self._profile_tone(c)
+        actions.append(ImitableAction(
+            category="标题结构",
+            action=(
+                "模仿竞品「结论前置 + 具体数字/对比」的标题句式，替换你的抽象表达"
+                if c_tone not in ("未识别",)
+                else "拆解竞品高播放标题的句式（疑问/数字/反转），挑 1 种句式套用到下条内容"
+            ),
+            reason="标题决定点击率，句式可迁移且不涉及观点抄袭",
+            risk_impact="标题句式模仿不增加风险，但避免使用竞品原句，防止被指洗稿",
+        ))
+
+        c_pacing = self._profile_pacing(c)
+        actions.append(ImitableAction(
+            category="发布节奏",
+            action=(
+                f"对齐竞品「{c_pacing}」的更新节奏，固定每周同一天发布以养成观众预期"
+                if c_pacing not in ("未识别",)
+                else "观察竞品近 30 天发布频率，把更新节奏固定到与其同频或略快"
+            ),
+            reason="稳定节奏提升推荐权重，是竞品可复制的运营动作",
+            risk_impact="发布节奏调整对「能不能发」无影响，不改变单条内容的风险结论",
+        ))
+
+        if report.weaknesses:
+            first_weak = report.weaknesses[0]
+            actions.append(ImitableAction(
+                category="风险规避",
+                action=f"重点自查竞品较少触碰的高危面：{first_weak}",
+                reason="你在该维度高于均值，是当前最需要补的短板",
+                risk_impact="落实后可直接降低该维度对「能不能发」的否决概率",
+            ))
+
+        return actions[:4]
+
+    def _build_risk_pattern_diff(
+        self, b: Dict, c: Dict, report: CompetitorRiskReport
+    ) -> Dict[str, str]:
+        b_risk = b.get("risk", {}) if isinstance(b.get("risk", {}), dict) else {}
+        c_risk = c.get("risk", {}) if isinstance(c.get("risk", {}), dict) else {}
+
+        b_tol = b_risk.get("risk_tolerance_label") or b_risk.get("risk_tolerance") or "未识别"
+        c_tol = c_risk.get("risk_tolerance_label") or c_risk.get("risk_tolerance") or "未识别"
+        b_danger = b_risk.get("danger_zones") or b_risk.get("sensitive_topics") or []
+        c_danger = c_risk.get("danger_zones") or c_risk.get("sensitive_topics") or []
+
+        if b_risk or c_risk:
+            pattern = f"你风险偏好{b_tol}，竞品{c_tol}"
+            danger_diff = f"你的高危区：{'、'.join(b_danger) or '暂无'}；竞品高危区：{'、'.join(c_danger) or '暂无'}"
+            impact = (
+                "双方高危区一致时，该话题对你们的「能不能发」结论同向，不必因竞品发过就放宽"
+                if set(b_danger) & set(c_danger)
+                else "高危区不同，竞品能发的话题对你未必安全，仍以自身画像为准判断能不能发"
+            )
+        else:
+            strengths = "；".join(report.strengths[:2]) or "暂无"
+            weaknesses = "；".join(report.weaknesses[:2]) or "暂无"
+            pattern = f"基于风险分对比：你相对优势 {strengths}；相对劣势 {weaknesses}"
+            danger_diff = "缺少双方风格画像，风险模式差异以维度分对比为准"
+            impact = "维度分显示劣势面更易触发「建议修改后再发」，优势面通常可直接发布"
+
+        return {
+            "风险偏好差异": pattern,
+            "高危区差异": danger_diff,
+            "对发布决策的影响": impact,
+        }

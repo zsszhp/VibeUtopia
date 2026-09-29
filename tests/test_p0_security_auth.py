@@ -5,7 +5,7 @@
 2. 已配置 API_KEY：无头请求 401；X-API-Key / Authorization: Bearer 正确放行；错误 Key 401
 3. 危险端点（upload / set-model-override / resume delete / blogger index delete）受同一套鉴权保护
 4. story user_id 路径遍历被拒绝
-5. symbol_detector / code_tracer 解析失败 → unknown + needs_review（不得判 safe）
+5. symbol_detector / code_tracer / temporal_anomaly 解析失败 → unknown + needs_review（不得判 safe）
 6. 红线维度高档 → overall ≥ 76
 
 可直接 `python tests/test_p0_security_auth.py` 运行，也可被 pytest 收集。
@@ -270,6 +270,46 @@ def test_code_tracer_fail_open():
     print("  ✓ code_tracer 解析/VLM 失败 → unknown + needs_review，聚合不误判安全")
 
 
+def test_temporal_anomaly_fail_open():
+    from backend.services.fine_grained.dense_frame_scanner import DenseFrame, DenseScanResult
+    from backend.services.fine_grained.temporal_anomaly import (
+        TemporalAnomalyDetector,
+        TemporalAnomalyResult,
+    )
+
+    detector = TemporalAnomalyDetector()
+
+    # 扫描失败/无结果 → unknown + needs_review，不得判 safe
+    r = asyncio.run(detector.detect_from_scan(None))
+    assert isinstance(r, TemporalAnomalyResult)
+    assert r.max_risk_level == "unknown", f"扫描缺失不得判 safe: {r.max_risk_level}"
+    assert r.needs_review is True
+
+    r_err = asyncio.run(detector.detect_from_scan(DenseScanResult(error="无法打开视频文件")))
+    assert r_err.max_risk_level == "unknown", f"扫描失败不得判 safe: {r_err.max_risk_level}"
+    assert r_err.needs_review is True
+
+    # VLM 审核失败（帧图片不存在）→ 未知区间置 unknown + needs_review，不计入 has_anomaly
+    frames = [
+        DenseFrame(
+            frame_id=f"f{i}",
+            video_path="probe.mp4",
+            timestamp=float(i),
+            image_path=f"no_such_frame_{i}.jpg",
+            anomaly_score=0.9,
+        )
+        for i in range(4)
+    ]
+    scan = DenseScanResult(video_path="probe.mp4", all_frames=frames)
+    agg = asyncio.run(detector.detect_from_scan(scan))
+    assert agg.needs_review is True, "VLM 失败必须置 needs_review"
+    assert agg.has_anomaly is False, "未知结果不得直接判为时序异常"
+    assert all(a.risk_level == "unknown" and a.needs_review for a in agg.anomalies), \
+        f"失败区间应全部 unknown+needs_review: {agg.anomalies}"
+    assert agg.max_risk_level == "safe" or agg.max_risk_level == "unknown"
+    print("  ✓ temporal_anomaly 解析/VLM 失败 → unknown + needs_review，聚合不误判安全")
+
+
 # ─── 红线 76+ ──────────────────────────────────────────────────────
 
 def test_redline_dimension_forces_overall_76():
@@ -332,6 +372,7 @@ def main():
         ("路径-video_path", test_video_path_validation_unchanged),
         ("fail-open-symbol_detector", test_symbol_detector_fail_open),
         ("fail-open-code_tracer", test_code_tracer_fail_open),
+        ("fail-open-temporal_anomaly", test_temporal_anomaly_fail_open),
         ("红线76+", test_redline_dimension_forces_overall_76),
     ]
     failed = []

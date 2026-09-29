@@ -85,6 +85,10 @@ class Settings:
     # 未配置时本地开发放行；生产环境必须配置，且不得写入仓库
     API_KEY: str = os.getenv("API_KEY", "")
 
+    # API 限流：每客户端每分钟最大请求数（滑动窗口，单进程内存计数）
+    # <= 0 表示不限流；覆盖 /api/**（/health 等探活端点除外）
+    RATE_LIMIT_PER_MIN: int = int(os.getenv("RATE_LIMIT_PER_MIN", "60"))
+
     # CORS 配置：逗号分隔的来源白名单，默认仅放行本地开发端口（Vite dev: 3000/5173）
     # 生产环境必须通过 CORS_ALLOW_ORIGINS 显式配置，禁止使用 *
     CORS_ALLOW_ORIGINS: list[str] = [

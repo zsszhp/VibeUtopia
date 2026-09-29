@@ -14,6 +14,8 @@ export const useReviewStore = defineStore('review', () => {
   const status = ref<TaskStatus>('idle')
   /** 提交时的原文，供反事实改写预估等下游使用 */
   const submittedText = ref('')
+  /** 待填入输入框的草稿（选题推荐「预审此选题草稿」等入口写入） */
+  const draftText = ref('')
   const currentStep = ref<'understanding' | 'assessment' | 'signal' | 'simulation' | 'report'>('understanding')
   const progressPercent = ref(0)
 
@@ -197,6 +199,7 @@ export const useReviewStore = defineStore('review', () => {
     loading.value = false
     status.value = 'idle'
     submittedText.value = ''
+    draftText.value = ''
     currentStep.value = 'understanding'
     progressPercent.value = 0
     clearError()
@@ -212,14 +215,25 @@ export const useReviewStore = defineStore('review', () => {
     result.value = null
   }
 
+  /** 将草稿写入输入框通道，由 LeftPanel 消费后清空 */
+  function applyDraft(text: string) {
+    draftText.value = text
+  }
+
+  function consumeDraft(): string {
+    const text = draftText.value
+    draftText.value = ''
+    return text
+  }
+
   const riskLevel = computed(() => result.value?.risk_level ?? 'green')
 
   return {
-    currentTaskId, result, progress, loading, status, submittedText, currentStep, progressPercent, riskLevel,
+    currentTaskId, result, progress, loading, status, submittedText, draftText, currentStep, progressPercent, riskLevel,
     error, errorTimestamp, wsConnected, wsFallbackPolling,
     frameProgress, sequenceDescriptions, riskAlerts, subTasks,
     submitReview, fetchResult, fetchProgress,
-    handleWsMessage, setError, clearError, reset, clearResult,
+    handleWsMessage, setError, clearError, reset, clearResult, applyDraft, consumeDraft,
   }
 })
 

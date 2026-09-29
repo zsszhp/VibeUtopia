@@ -27,6 +27,8 @@ class TemporalAnomaly:
     confidence: float = 0.0
     risk_level: str = "safe"
     frame_path: str = ""
+    # 失败策略：检测/解析失败不得判 safe，标记为 unknown + needs_review
+    needs_review: bool = False
 
 
 @dataclass
@@ -36,6 +38,8 @@ class TemporalAnomalyResult:
     anomalies: list = field(default_factory=list)
     has_anomaly: bool = False
     max_risk_level: str = "safe"
+    # 失败策略：检测器失败/解析异常时置 True，提示结果未知需人工复核
+    needs_review: bool = False
     error: Optional[str] = None
 
 
@@ -75,7 +79,10 @@ class TemporalAnomalyDetector:
             TemporalAnomalyResult
         """
         if dense_scan_result is None or dense_scan_result.error:
+            # 检测失败不得判 safe：置 unknown + 需人工复核
             return TemporalAnomalyResult(
+                max_risk_level="unknown",
+                needs_review=True,
                 error=dense_scan_result.error if dense_scan_result else "无扫描结果",
             )
 
@@ -100,7 +107,22 @@ class TemporalAnomalyDetector:
 
             vlm_result = await self._vlm_review_frame(peak_frame.image_path)
 
-            if vlm_result and vlm_result.get("has_anomaly", False):
+            if not vlm_result:
+                # 失败不得判 safe：置 unknown + 需人工复核，置信度记 0
+                anomalies.append(TemporalAnomaly(
+                    start_time=start_time,
+                    end_time=end_time,
+                    duration=round(duration, 2),
+                    anomaly_type="unknown",
+                    description="VLM审核失败，结果未知需人工复核",
+                    confidence=0.0,
+                    risk_level="unknown",
+                    frame_path=peak_frame.image_path,
+                    needs_review=True,
+                ))
+                continue
+
+            if vlm_result.get("has_anomaly", False):
                 anomalies.append(TemporalAnomaly(
                     start_time=start_time,
                     end_time=end_time,
@@ -112,18 +134,26 @@ class TemporalAnomalyDetector:
                     frame_path=peak_frame.image_path,
                 ))
 
-        has_anomaly = len(anomalies) > 0
-        risk_order = {"safe": 0, "medium": 1, "high": 2, "critical": 3}
+        has_anomaly = False
+        needs_review = False
+        # unknown 表示检测失败/结果未知，不参与风险升级，但会置 needs_review
+        risk_order = {"unknown": 0, "safe": 1, "low": 2, "medium": 3, "high": 4, "critical": 5}
         max_risk = "safe"
         for a in anomalies:
-            if risk_order.get(a.risk_level, 0) > risk_order.get(max_risk, 0):
-                max_risk = a.risk_level
+            if a.needs_review or a.risk_level == "unknown":
+                needs_review = True
+
+            if a.risk_level not in ("safe", "unknown"):
+                has_anomaly = True
+                if risk_order.get(a.risk_level, 0) > risk_order.get(max_risk, 0):
+                    max_risk = a.risk_level
 
         return TemporalAnomalyResult(
             video_path=dense_scan_result.video_path,
             anomalies=anomalies,
             has_anomaly=has_anomaly,
             max_risk_level=max_risk,
+            needs_review=needs_review,
         )
 
     def _cluster_anomaly_frames(self, frames, threshold: float = 0.5, gap_seconds: float = 2.0) -> list:
@@ -168,7 +198,8 @@ class TemporalAnomalyDetector:
             if result:
                 return result
 
-            return {"has_anomaly": False}
+            # 解析失败不得当作「无异常」，交由上层置 unknown + needs_review
+            return None
         except Exception as e:
             logger.warning("VLM异常帧审核失败: %s", e)
             return None

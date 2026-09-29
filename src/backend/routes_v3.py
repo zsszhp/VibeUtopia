@@ -814,11 +814,17 @@ class CompetitorCompareRequest(BaseModel):
     blogger_id: str = Field(..., description="博主ID")
     competitor_ids: List[str] = Field(..., description="竞品ID列表")
     field_name: str = Field(default="", description="所属领域")
+    blogger_profile: Optional[Dict[str, Any]] = Field(None, description="博主风格画像（可选）")
+    competitor_profiles: Optional[List[Dict[str, Any]]] = Field(None, description="竞品风格画像列表（可选）")
 
 
 @router.post("/competitor/compare")
 async def competitor_compare(req: CompetitorCompareRequest, db: Session = Depends(get_db)):
-    """竞品对比"""
+    """竞品对比
+
+    除风险维度对比外，输出结构差异、可模仿动作清单与风险模式差异，
+    每条建议带 risk_impact 决策映射。
+    """
     from backend.services.competitor_comparator import CompetitorComparator
 
     comparator = CompetitorComparator()
@@ -827,6 +833,8 @@ async def competitor_compare(req: CompetitorCompareRequest, db: Session = Depend
         competitor_ids=req.competitor_ids,
         field_name=req.field_name,
         db=db,
+        blogger_profile=req.blogger_profile,
+        competitor_profiles=req.competitor_profiles,
     )
 
     return {
@@ -851,6 +859,17 @@ async def competitor_compare(req: CompetitorCompareRequest, db: Session = Depend
         "total_in_field": report.total_in_field,
         "risk_position": report.risk_position,
         "summary": report.summary,
+        "structure_diff": report.structure_diff,
+        "imitable_actions": [
+            {
+                "category": a.category,
+                "action": a.action,
+                "reason": a.reason,
+                "risk_impact": a.risk_impact,
+            }
+            for a in report.imitable_actions
+        ],
+        "risk_pattern_diff": report.risk_pattern_diff,
         "error": report.error,
     }
 
@@ -899,6 +918,9 @@ async def recommend_topics(req: TopicRecommendRequest):
                 "risk_note": r.risk_note,
                 "estimated_reach": r.estimated_reach,
                 "priority": r.priority,
+                "safety_score": r.safety_score,
+                "brief": r.brief,
+                "risk_impact": r.risk_impact,
             }
             for r in result.recommendations
         ],
@@ -1320,6 +1342,7 @@ async def analyze_fine_grained(req: FineGrainedAnalysisRequest):
             "has_anomaly": report.temporal_anomaly.has_anomaly if report.temporal_anomaly else False,
             "max_risk_level": report.temporal_anomaly.max_risk_level if report.temporal_anomaly else "safe",
             "anomaly_count": len(report.temporal_anomaly.anomalies) if report.temporal_anomaly else 0,
+            "needs_review": report.temporal_anomaly.needs_review if report.temporal_anomaly else False,
         } if report.temporal_anomaly else None,
         "error": report.error,
     }

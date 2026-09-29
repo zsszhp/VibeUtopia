@@ -256,9 +256,21 @@ export const v3Api = {
   getBloggerRiskProfile: (bloggerId: string) =>
     axios.get(`${V3_BASE}/blogger/${bloggerId}/risk-profile`),
 
-  // 竞品对比
-  competitorCompare: (bloggerId: string, competitorIds: string[], fieldName?: string) =>
-    axios.post(`${V3_BASE}/competitor/compare`, { blogger_id: bloggerId, competitor_ids: competitorIds, field_name: fieldName || '' }),
+  // 竞品对比（含结构差异 / 可模仿动作 / 风险模式差异）
+  competitorCompare: (
+    bloggerId: string,
+    competitorIds: string[],
+    fieldName?: string,
+    bloggerProfile?: Record<string, any>,
+    competitorProfiles?: Record<string, any>[],
+  ) =>
+    axios.post(`${V3_BASE}/competitor/compare`, {
+      blogger_id: bloggerId,
+      competitor_ids: competitorIds,
+      field_name: fieldName || '',
+      blogger_profile: bloggerProfile,
+      competitor_profiles: competitorProfiles,
+    }),
 
   // 反事实改写预估
   counterfactualSimulate: (params: { text: string; risk_items: any[]; strategy_type: string }) =>
@@ -296,4 +308,22 @@ export const bloggerApi = {
 
   getTimeline: (bloggerId: string, topic: string) =>
     axios.post(`${API_BASE}/blogger/timeline`, { blogger_id: bloggerId, topic }),
+
+  /** 博主风格画像：输入历史文案/视频元数据 → 五维风格 */
+  getStyleProfile: (params: {
+    blogger_id?: string
+    blogger_name?: string
+    contents: string[]
+    video_metadata?: { title?: string; duration?: number; platform?: string; publish_date?: string }[]
+  }) =>
+    axios.post(`${API_BASE}/blogger/style-profile`, params),
+
+  /** 选题推荐：返回 3 张选题卡 */
+  recommendTopics: (params: {
+    blogger_profile?: Record<string, any>
+    hot_topics?: { title: string; platform?: string; strength?: number }[]
+    blogger_id?: string
+    blogger_name?: string
+  }) =>
+    axios.post(`${V3_BASE}/blogger/topics/recommend`, params),
 }

@@ -33,6 +33,9 @@ class TopicRecommendation:
     risk_note: str = ""              # 风险提示
     estimated_reach: str = ""        # 预估效果
     priority: int = 0                # 优先级 1-5
+    safety_score: float = 0.0        # 安全分 0-100，越高越安全
+    brief: str = ""                  # 选题简介草稿（可直接进入预审）
+    risk_impact: str = ""            # 对「能不能发」的决策映射
 
 
 @dataclass
@@ -79,7 +82,8 @@ class TopicRecommender:
       "style_match": 0.0-1.0,
       "risk_note": "风险提示",
       "estimated_reach": "预估效果",
-      "priority": 1-5
+      "priority": 1-5,
+      "brief": "30-80字选题简介草稿，可直接用于预审"
     }
   ],
   "summary": "推荐总结"
@@ -90,7 +94,8 @@ class TopicRecommender:
 1. 选题要与博主风格匹配，不要推荐风格差异过大的选题
 2. 切入点要独特，避免同质化
 3. 必须标注风险提示
-4. priority越高越推荐"""
+4. priority越高越推荐
+5. brief是给用户直接拿去预审的草稿简介"""
 
     async def recommend(self, blogger_profile: dict, hot_topics: list[dict] | None = None,
                          blogger_id: str = "", blogger_name: str = "") -> TopicRecommendResult:
@@ -137,8 +142,13 @@ class TopicRecommender:
         # 风险预筛
         await self._risk_screening(result.recommendations, blogger_profile)
 
-        # 按优先级排序
+        # 按优先级排序，取 3 张选题卡
         result.recommendations.sort(key=lambda r: r.priority, reverse=True)
+        result.recommendations = result.recommendations[:3]
+
+        # 补齐决策映射字段
+        for rec in result.recommendations:
+            self._fill_decision_fields(rec, blogger_profile)
 
         return result
 
@@ -220,6 +230,9 @@ class TopicRecommender:
                 risk_note=item.get("risk_note", ""),
                 estimated_reach=item.get("estimated_reach", ""),
                 priority=int(item.get("priority", 3)),
+                brief=item.get("brief", ""),
+                safety_score=float(item.get("safety_score", 0) or 0),
+                risk_impact=item.get("risk_impact", ""),
             ))
         return recs
 
@@ -253,9 +266,36 @@ class TopicRecommender:
                 risk_note="需进一步评估",
                 estimated_reach="中等",
                 priority=priority,
+                brief=f"围绕「{ht_title}」展开，结合个人经历给出真实看法，结尾引导理性讨论。",
             ))
 
         return recs[:5]
+
+    def _fill_decision_fields(self, rec: TopicRecommendation, blogger_profile: dict):
+        """补齐安全分、草稿与决策映射字段"""
+        risk_level = rec.risk_level or "safe"
+        level_score = {"safe": 90, "low": 75, "medium": 55, "high": 30, "critical": 15}
+        base = level_score.get(risk_level, 60)
+        # 风格匹配越高、热度越高，整体越值得发
+        rec.safety_score = round(
+            min(100.0, base * 0.7 + rec.style_match * 20 + rec.trend_score * 10), 1
+        )
+
+        if not rec.brief:
+            rec.brief = f"围绕「{rec.topic}」，从{rec.angle}展开，给出可落地的观点与建议。"
+
+        impact_map = {
+            "safe": "此选题法律与平台风险较低，可直接推进成稿",
+            "low": "此选题整体风险可控，成稿后建议快速过一遍预审即可发",
+            "medium": "此选题存在争议面，建议先预审草稿、按提示修改后再发",
+            "high": "此选题法律/舆情风险偏高，不建议原样发布，需改角度或暂缓",
+            "critical": "此选题命中高危维度，「能不能发」结论为否，建议放弃或彻底换角度",
+        }
+        risk_impact = impact_map.get(risk_level, "建议预审后再决定是否发布")
+        if rec.risk_note:
+            risk_impact = f"{risk_impact}（{rec.risk_note}）"
+        if not rec.risk_impact:
+            rec.risk_impact = risk_impact
 
     async def _risk_screening(self, recommendations: list[TopicRecommendation],
                                blogger_profile: dict):
