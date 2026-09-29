@@ -257,6 +257,8 @@ async def run_eval(mode: str, limit: int | None, source: str, sample_runs: int =
                 "predicted_level": pred["level"],
                 "score": pred["score"],
                 "level_hit": _hit_level(pred["level"], case["expected_level"]),
+                "confidence": pred.get("confidence"),
+                "confidence_level": pred.get("confidence_level"),
             })
             sr = _hit_score_range(pred["score"], case["risk_score_range"])
             if sr is not None:
