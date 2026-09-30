@@ -108,6 +108,13 @@
     <!-- 历史记录 -->
     <section class="history-section">
       <h3 class="section-title">历史记录</h3>
+      <select v-model="historyFilter" class="history-filter" @change="refreshHistory">
+        <option value="">全部</option>
+        <option value="green">安全</option>
+        <option value="yellow">注意</option>
+        <option value="orange">较高</option>
+        <option value="red">高危</option>
+      </select>
       <div v-if="historyStore.items.length" class="history-list">
         <div
           v-for="item in historyStore.items"
@@ -158,6 +165,11 @@ import { loadSettings } from '../utils/settings'
 
 const reviewStore = useReviewStore()
 const historyStore = useHistoryStore()
+const historyFilter = ref('')
+
+function refreshHistory() {
+  historyStore.fetchHistory(1, 20, historyFilter.value || undefined)
+}
 const settings = loadSettings()
 
 const inputMode = ref<'text' | 'video' | 'mixed'>('text')
@@ -591,6 +603,17 @@ historyStore.fetchHistory()
 }
 
 .history-list { max-height: 200px; overflow-y: auto; }
+
+.history-filter {
+  width: 100%;
+  margin-bottom: 6px;
+  background: var(--color-bg, #0a0a0f);
+  color: var(--color-text, #e0e0e0);
+  border: 1px solid var(--color-border, #1e1e2e);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 11px;
+}
 
 .history-item {
   display: flex;
