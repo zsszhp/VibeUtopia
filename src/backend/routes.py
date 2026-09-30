@@ -902,6 +902,25 @@ def _build_export_payload(task: Task, db: Session) -> dict[str, Any]:
     }
 
 
+def _level_zh(level: str | None) -> str:
+    """风险等级中文"""
+    mapping = {
+        "green": "安全",
+        "yellow": "需留意",
+        "orange": "较高风险",
+        "red": "高风险",
+        "low": "安全",
+        "medium": "需留意",
+        "high": "较高风险",
+        "critical": "高风险",
+    }
+    return mapping.get((level or "").lower(), level or "N/A")
+
+
+def _severity_zh(sev: str | None) -> str:
+    return _level_zh(sev)
+
+
 def _render_export_markdown(payload: dict[str, Any]) -> str:
     """Markdown 报告：Verdict + 分数 + Top 风险 + 改写 + 免责"""
     verdict = payload.get("verdict") or {}
@@ -922,7 +941,7 @@ def _render_export_markdown(payload: dict[str, Any]) -> str:
         "## 一、结论（Verdict）",
         "",
         f"- **总风险分**: {score_text}",
-        f"- **风险等级**: {verdict.get('risk_level', '')}",
+        f"- **风险等级**: {_level_zh(verdict.get('risk_level', ''))}",
         f"- **发布建议**: {verdict.get('suggestion', '') or 'N/A'}",
         f"- **置信度**: {conf_text}",
         "",
@@ -939,7 +958,7 @@ def _render_export_markdown(payload: dict[str, Any]) -> str:
             if len(evidence) > 60:
                 evidence = evidence[:57] + "..."
             lines.append(
-                f"| {d.get('name', '')} | {d.get('score', '')} | {d.get('severity', '')} | {evidence} |"
+                f"| {d.get('name', '')} | {d.get('score', '')} | {_severity_zh(d.get('severity', ''))} | {evidence} |"
             )
     else:
         lines.append("（暂无维度数据）")
