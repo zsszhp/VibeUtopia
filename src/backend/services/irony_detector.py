@@ -44,10 +44,13 @@ def apply_nihilism_floor(dimensions: list[dict], text: str) -> list[dict]:
             if score < 70:
                 d["score"] = 70
                 d["severity"] = "red"
+                d["nihilism_hit"] = True
                 ev = d.get("evidence") or ""
                 note = "【历史虚无兜底】检测到否定历史共识/英雄叙事表述"
                 if note not in ev:
                     d["evidence"] = (ev + note).strip()
+            else:
+                d["nihilism_hit"] = True
     return dimensions
 
 

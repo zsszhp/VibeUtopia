@@ -127,7 +127,7 @@ async def predict_live(text: str, sample_runs: int = 1) -> dict:
     dimensions = result.get("dimensions") or []
     if not dimensions:
         raise RuntimeError("assess_risks 返回空维度（视为 API/解析失败）")
-    overall, _weights, _cross = calculate_overall_score(dimensions)
+    overall, _weights, _cross = calculate_overall_score(dimensions, context_text=text)
     conf = ConfidenceCalculator().calculate(
         dimensions=dimensions,
         risk_sentences=result.get("risk_sentences") or [],
@@ -177,7 +177,7 @@ def predict_mock(text: str) -> dict:
             {"name": n, "score": 8, "severity": "green", "dimension_weight": 1.0}
             for n, _kw, _s in _KEYWORD_RULES
         ]
-    overall, _weights, _cross = calculate_overall_score(dimensions)
+    overall, _weights, _cross = calculate_overall_score(dimensions, context_text=text)
     conf = ConfidenceCalculator().calculate(dimensions=dimensions, risk_sentences=[])
     return {
         "score": int(overall),

@@ -198,6 +198,10 @@ def calculate_overall_score(dimensions: list[dict], context_text: str | None = N
     ):
         overall = max(overall, REDLINE_SCORE_FLOOR)
 
+    # 历史虚无：否定历史共识属价值观红线触碰，总体至少 76
+    if any(d.get("nihilism_hit") for d in dimensions or []):
+        overall = max(overall, REDLINE_SCORE_FLOOR)
+
     # 荐股/投资话术：无硬红线时橙档封顶 70（BT009 类）
     if context_text and detect_finance_pitch(context_text) and not hard_floor:
         overall = min(overall, 70)
