@@ -523,3 +523,12 @@ Agent åœ¨ä»»åŠ¡æ‰§è¡Œè¿‡ç¨‹ä¸­å‘ç°çš„æ¡ç›®åº”éµå¾ªä»¥ä¸‹æ ¼å¼ï¼š
   - prompt JSON Schema ²¹À©Õ¹ÈıÎ¬¶È£¬LLMÎÈ¶¨·µ»Ø14Î¬
   - confidence ¸²¸Ç±êÇ© core/full
   - live 3/3 ÃüÖĞ£¬pytest 152 passed
+
+### ÎÄµµ14Î¬¿Ú¾¶Í³Ò»£¨2026-09-30£©
+- Date: 2026-09-30
+- Context: ÎÄµµÓëÊµÏÖ¶ÔÆë
+- Category: ´úÂë½á¹¹
+- Instructions:
+  - README/PRD/¼Ü¹¹/¾ö²ß²ã/°×Æ¤Êé/À¶Í¼/ÊÖ²á È«²¿14Î¬
+  - report_optimizer RISK_DIMENSIONS ¶ÔÆë14Î¬
+  - pytest 152 passed
