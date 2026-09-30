@@ -60,3 +60,22 @@ export function scoreVerdict(score: number, topDims?: string[]): Verdict {
 export function scoreLevel(score: number): RiskLevelKey {
   return scoreVerdict(score).level
 }
+
+
+/** 维度简要说明（tooltip） */
+export const DIMENSION_HINTS: Record<string, string> = {
+  政治敏感: '涉政人物、领土主权、外交红线',
+  法律合规: '广告法、侵权、虚假宣传',
+  民族宗教: '民族歧视、宗教冒犯',
+  事实错误: '谣言、伪科学、虚假信息',
+  平台禁区: '规避审核、黑灰产',
+  性别议题: '性别对立、物化歧视',
+  群体冒犯: '地域/职业/年龄歧视',
+  道德伦理: '公序良俗、道德绑架',
+  时事踩雷: '蹭热点、关联翻车事件',
+  情绪极化: '煽动对立、极端言论',
+  价值观倾向: '历史虚无、拜金、反社会',
+  未成年人保护: '诱导未成年人、过度曝光儿童',
+  隐私侵犯: '人肉、偷拍、泄露隐私',
+  知识产权: '抄袭洗稿、假冒、未授权',
+}

@@ -78,7 +78,12 @@
               @click="expanded = expanded === dim.name ? '' : dim.name"
             >
               <div class="risk-header">
-                <span class="risk-name">{{ dim.name }}</span>
+                <NTooltip trigger="hover">
+                  <template #trigger>
+                    <span class="risk-name">{{ dim.name }}</span>
+                  </template>
+                  {{ dimensionHint(dim.name) }}
+                </NTooltip>
                 <span class="risk-score tabular-nums">{{ dim.score }}</span>
                 <span class="severity-badge" :class="dim.severity">{{ severityLabel(dim.severity) }}</span>
               </div>
@@ -286,7 +291,11 @@
 import { ref, computed, watch } from 'vue'
 import { NTag, NTooltip, NTabs, NTabPane, NSelect, NInput } from 'naive-ui'
 import { useReviewStore, useHistoryStore } from '../stores'
-import { severityLabel } from '../utils/labels'
+import { severityLabel, DIMENSION_HINTS } from '../utils/labels'
+
+function dimensionHint(name: string) {
+  return DIMENSION_HINTS[name] || name
+}
 import type { ReviewResult } from '../api'
 import PropagationGraph from './PropagationGraph.vue'
 import PolarizationChart from './PolarizationChart.vue'
