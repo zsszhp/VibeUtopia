@@ -28,7 +28,7 @@ English | [中文](README.md)
 
 | Feature | Description |
 |---------|-------------|
-| 11-Dimension Risk Assessment | Independent scoring across 11 dimensions + overall score with "Safe / Revise / Don't Publish" verdict |
+| 14-Dimension Risk Assessment | Independent scoring across 14 dimensions + overall score with "Safe / Revise / Don't Publish" verdict |
 | Sentence-Level Localization | Precise identification of risky sentences, risk category, and reasoning |
 | Multi-Platform Persona Simulation | Simulated positive/neutral/negative reactions from Bilibili/Xiaohongshu/Zhihu/Douyin users |
 | Safe Rewrite Suggestions | 2+ safe rewrite alternatives for high-risk sentences |
