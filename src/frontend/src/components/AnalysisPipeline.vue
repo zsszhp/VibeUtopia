@@ -8,7 +8,7 @@
     >
       <div class="node-dot"></div>
       <span class="node-label">{{ step.label }}</span>
-      <span v-if="step.key === currentStep" class="progress-pct">{{ Math.round(progress * 100) }}%</span>
+      <span v-if="step.key === currentStep" class="progress-pct">{{ Math.round(progress) }}%</span>
       <div v-if="idx < steps.length - 1" class="node-line"></div>
     </div>
   </div>
