@@ -1462,3 +1462,28 @@ WS /ws/review/{task_id}
 ```
 
 所有 4xx/5xx 响应均使用 `{"detail": "<字符串>"}` 格式，前端通过 `response.data.detail` 取错误信息。未处理异常的 500 响应不包含内部堆栈；完整堆栈仅记录在服务端日志。
+
+
+## 扩展端点（R4/R5/批量）
+
+### 批量预审
+POST /api/v1/review/batch
+Body: items[{client_id, text}]，最多 20 条
+返回: total/ok/failed + 每项 overall_score/risk_level/suggestion/top_dimensions
+
+### 批量审核流转
+PATCH /api/v1/review/workflow/batch
+Body: items[{task_id, note}] + status
+
+### 报告导出
+GET /api/v1/review/{task_id}/export?format=md|json|html|pdf
+
+### 账号
+POST /api/v1/auth/register  {username, password}
+POST /api/v1/auth/token     {username, password}
+
+### 健康检查（免鉴权）
+GET /health、GET /healthz、GET /ready、GET /api/v1/health
+
+### 限流
+默认 60 req/min/客户端；429 时 body.detail 说明；RATE_LIMIT_BACKEND=file 可跨进程。
