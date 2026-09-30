@@ -28,6 +28,7 @@
           rows="6"
           class="text-input"
           :disabled="isBusy"
+          @keydown.ctrl.enter.prevent="handleSubmit"
         ></textarea>
         <div class="char-counter" :class="{ over: textContent.length > maxTextLength }">
           {{ textContent.length }} / {{ maxTextLength }} 字
