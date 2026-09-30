@@ -82,6 +82,13 @@
                 <span class="risk-score tabular-nums">{{ dim.score }}</span>
                 <span class="severity-badge" :class="dim.severity">{{ severityLabel(dim.severity) }}</span>
               </div>
+              <div class="score-track">
+                <div
+                  class="score-fill"
+                  :class="dim.severity"
+                  :style="{ width: Math.min(100, dim.score || 0) + '%' }"
+                />
+              </div>
               <div v-if="expanded === dim.name" class="risk-body">
                 <p class="evidence">{{ dim.evidence }}</p>
                 <div class="confidence">
@@ -560,6 +567,19 @@ watch(compareTaskId, async (taskId) => {
 .risk-item.yellow { border-left-color: var(--risk-warn); }
 .risk-item.orange { border-left-color: var(--risk-high); }
 .risk-item.red { border-left-color: var(--risk-critical); }
+
+.score-track {
+  height: 3px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  margin: 4px 0 2px;
+  overflow: hidden;
+}
+.score-fill { height: 100%; border-radius: 2px; background: var(--brand-500, #6366f1); }
+.score-fill.green { background: var(--risk-safe, #22c55e); }
+.score-fill.yellow { background: var(--risk-warn, #eab308); }
+.score-fill.orange { background: var(--risk-high, #f97316); }
+.score-fill.red { background: var(--risk-critical, #ef4444); }
 
 .risk-header {
   display: flex;
