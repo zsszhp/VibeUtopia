@@ -21,11 +21,13 @@ from backend.services.severity import (
     REDLINE_SCORE_FLOOR,
     enforce_redline_dim_score,
     is_high_severity,
+    is_redline_dimension,
     needs_rewrite,
     normalize_severity,
     redline_triggers_floor,
     score_from_severity,
 )
+from backend.services.irony_detector import detect_finance_pitch
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +97,7 @@ DIMENSION_WEIGHTS = {
 }
 
 
-def calculate_overall_score(dimensions: list[dict]) -> tuple[int, dict, list[dict]]:
+def calculate_overall_score(dimensions: list[dict], context_text: str | None = None) -> tuple[int, dict, list[dict]]:
     """根据各维度分数计算总体风险分 (0-100) — 加权评分算法
 
     改进点：
@@ -183,13 +185,27 @@ def calculate_overall_score(dimensions: list[dict]) -> tuple[int, dict, list[dic
 
     # 规则3（红线代码化）：任一红线维度 red/high → 总体至少 76
     # 与 30/60/80 展示阈值语义一致：76+ 落在 red 档（高风险）
-    if redline_triggers_floor(dimensions):
+    hard_floor = any(
+        is_redline_dimension(d.get("name"))
+        and (is_high_severity(d.get("severity"), d.get("score", 0)) or int(d.get("score", 0) or 0) >= 70)
+        and d.get("name") in {"政治敏感", "民族宗教", "平台禁区"}
+        for d in dimensions or []
+    )
+    if redline_triggers_floor(dimensions) and not (
+        context_text
+        and detect_finance_pitch(context_text)
+        and not hard_floor
+    ):
         overall = max(overall, REDLINE_SCORE_FLOOR)
+
+    # 荐股/投资话术：无硬红线时橙档封顶 70（BT009 类）
+    if context_text and detect_finance_pitch(context_text) and not hard_floor:
+        overall = min(overall, 70)
 
     # 反讽/寓言兜底：至少 orange 起评（55），封顶 70，避免强制进 red
     if any(d.get("irony_lifted") for d in dimensions or []):
         overall = max(overall, 55)
-        if not redline_triggers_floor(dimensions):
+        if not redline_triggers_floor(dimensions) and not (context_text and detect_finance_pitch(context_text)):
             overall = min(overall, 70)
 
     return overall, dimension_weights, cross_effects
@@ -496,7 +512,7 @@ async def run_analysis(
         await _broadcast_step(task_id, "report", 0.96, "正在计算综合评分...")
 
         # 5.3 加权评分
-        overall_score, dimension_weights, auto_cross_effects = calculate_overall_score(dimensions)
+        overall_score, dimension_weights, auto_cross_effects = calculate_overall_score(dimensions, context_text=text)
 
         # 跨模态冲突分数集成
         if cross_modal_result:

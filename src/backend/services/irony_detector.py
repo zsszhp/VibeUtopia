@@ -23,6 +23,41 @@ ETHNIC_BELITTLE = (
     "劣根", "野蛮", "不开化", "应该用先进",
 )
 
+# 历史虚无主义话术（硬抬价值观倾向）
+HISTORICAL_NIHILISM = (
+    "编出来的", "胜利者写的", "英雄事迹都是", "根本不存在",
+    "历史书上", "光辉历史", "所谓英雄", "都是假的",
+)
+
+
+def apply_nihilism_floor(dimensions: list[dict], text: str) -> list[dict]:
+    """历史虚无话术 → 价值观倾向≥70 red（BT011 类）"""
+    text = text or ""
+    if not any(k in text for k in HISTORICAL_NIHILISM):
+        return dimensions
+    for d in dimensions or []:
+        if d.get("name") == "价值观倾向":
+            try:
+                score = int(d.get("score", 0) or 0)
+            except (TypeError, ValueError):
+                score = 0
+            if score < 70:
+                d["score"] = 70
+                d["severity"] = "red"
+                ev = d.get("evidence") or ""
+                note = "【历史虚无兜底】检测到否定历史共识/英雄叙事表述"
+                if note not in ev:
+                    d["evidence"] = (ev + note).strip()
+    return dimensions
+
+
+def detect_finance_pitch(text: str) -> bool:
+    """荐股/投资话术识别（BT009 类：无硬红线时橙档封顶）"""
+    text = text or ""
+    markers = ("内部消息", "暴涨", "全仓", "买入", "赚钱", "股票", "建仓", "抄底", "翻倍", "稳赚")
+    hits = sum(1 for m in markers if m in text)
+    return hits >= 2
+
 
 def apply_ethnic_floor(dimensions: list[dict], text: str) -> list[dict]:
     """民族贬损/文明改造话语 → 民族宗教维度至少 70（硬红线软阈）"""
