@@ -107,7 +107,7 @@
       </div>
     </div>
 
-    <p v-else-if="!topicLoading" class="empty-hint">
+    <p v-if="!recommendations.length && !topicLoading" class="empty-hint">
       点击「获取选题推荐」生成 3 张选题卡，每张含切入点、预期效果、风险预估与发布判断
     </p>
   </div>

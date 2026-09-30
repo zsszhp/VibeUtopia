@@ -253,6 +253,7 @@
           </div>
           <BloggerProfile v-if="bloggerId" :blogger-id="bloggerId" />
           <p v-else class="empty-hint">输入博主 ID 可查看画像、趋势与知识问答</p>
+          <TopicRecommendPanel />
         </section>
 
         <!-- 知识图谱 -->
@@ -287,6 +288,7 @@ import AnalysisPipeline from './AnalysisPipeline.vue'
 import SignalPanel from './SignalPanel.vue'
 import BatchReviewPanel from './BatchReviewPanel.vue'
 import BloggerProfile from './BloggerProfile.vue'
+import TopicRecommendPanel from './TopicRecommendPanel.vue'
 import KnowledgeGraph from './KnowledgeGraph.vue'
 
 const reviewStore = useReviewStore()
