@@ -23,9 +23,13 @@ async function render() {
     chart = echarts.init(radarRef.value, 'dark')
     window.addEventListener('resize', handleResize)
   }
+  // 14 维过密时优先展示高分维度，保证可读
+  const dims = [...props.dimensions]
+    .sort((a, b) => (b.score || 0) - (a.score || 0))
+    .slice(0, 12)
   chart.setOption({
     radar: {
-      indicator: props.dimensions.map(d => ({
+      indicator: dims.map(d => ({
         name: d.name.length > 5 ? d.name.slice(0, 5) + '…' : d.name,
         max: 100,
         color: (d.score || 0) >= 60 ? '#f97316' : undefined,
@@ -41,7 +45,7 @@ async function render() {
     series: [{
       type: 'radar',
       data: [{
-        value: props.dimensions.map(d => d.score),
+        value: dims.map(d => d.score),
         name: '风险评分',
         areaStyle: { color: 'rgba(99,102,241,0.2)' },
         lineStyle: { color: '#6366f1', width: 2 },
