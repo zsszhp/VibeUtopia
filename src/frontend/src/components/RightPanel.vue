@@ -126,14 +126,15 @@
           <div class="evidence-list">
             <details v-for="(ec, i) in evidenceChains.slice(0, 8)" :key="i" class="evidence-item">
               <summary>
-                <span class="ec-dim">{{ ec.dimension || '未知维度' }}</span>
-                <span class="ec-trigger">{{ (ec.trigger || ec.sentence || '').slice(0, 28) }}</span>
+                <span class="ec-dim">{{ (ec as any).dimension || ec.source || '未知维度' }}</span>
+                <span class="ec-trigger">{{ ((ec as any).trigger || ec.content || '').slice(0, 28) }}</span>
               </summary>
               <div class="ec-body">
-                <p v-if="ec.trigger"><b>触发：</b>{{ ec.trigger }}</p>
-                <p v-if="ec.context"><b>语境：</b>{{ ec.context }}</p>
-                <p v-if="ec.mechanism"><b>机制：</b>{{ ec.mechanism }}</p>
-                <p v-if="ec.impact"><b>影响：</b>{{ ec.impact }}</p>
+                <p v-if="(ec as any).trigger"><b>触发：</b>{{ (ec as any).trigger }}</p>
+                <p v-if="(ec as any).context"><b>语境：</b>{{ (ec as any).context }}</p>
+                <p v-if="(ec as any).mechanism"><b>机制：</b>{{ (ec as any).mechanism }}</p>
+                <p v-if="(ec as any).impact"><b>影响：</b>{{ (ec as any).impact }}</p>
+                <p v-if="ec.content"><b>内容：</b>{{ ec.content }}</p>
                 <p v-if="ec.cross_validation?.length"><b>交叉验证：</b>{{ ec.cross_validation.length }} 条</p>
               </div>
             </details>
