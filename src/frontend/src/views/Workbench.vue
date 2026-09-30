@@ -66,6 +66,18 @@
       </div>
     </div>
 
+    <!-- 视频事件理解（L6/L7） -->
+    <div v-if="videoEvents.length" class="signal-summary">
+      <h3 class="summary-title">视频事件与语用提示</h3>
+      <div class="signal-chips">
+        <span v-for="(ev, i) in videoEvents.slice(0, 8)" :key="i" class="signal-chip">
+          {{ ev.kind || 'event' }} {{ ev.start ?? '' }}-{{ ev.end ?? '' }}
+          <small v-if="ev.summary">{{ String(ev.summary).slice(0, 16) }}</small>
+        </span>
+      </div>
+      <p v-if="narrativeNote" class="empty-hint">{{ narrativeNote }}</p>
+    </div>
+
     <!-- 空状态 -->
     <div v-if="!reviewStore.result && !reviewStore.loading" class="empty-state">
       <p>在左侧输入文案或上传视频开始预审</p>
@@ -88,6 +100,20 @@ const EXAMPLE_TEXT =
 function loadExample() {
   reviewStore.applyDraft(EXAMPLE_TEXT)
 }
+
+const videoEvents = computed(() => {
+  const r = reviewStore.result as any
+  return r?.events_summary || r?.event_understanding_meta?.events || []
+})
+
+const narrativeNote = computed(() => {
+  const r = reviewStore.result as any
+  const n = r?.narrative_pragmatics
+  if (!n) return ''
+  if (Array.isArray(n?.notes) && n.notes.length) return n.notes.slice(0, 2).join('；')
+  if (n?.summary) return String(n.summary).slice(0, 80)
+  return ''
+})
 import AnalysisDashboard from '../components/AnalysisDashboard.vue'
 import RiskGauge from '../components/RiskGauge.vue'
 import DimensionRadar from '../components/DimensionRadar.vue'
