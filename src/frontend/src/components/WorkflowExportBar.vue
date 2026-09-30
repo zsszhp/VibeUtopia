@@ -1,6 +1,11 @@
 <template>
   <div v-if="taskId" class="workflow-export">
     <div class="row">
+      <span class="label">任务 ID</span>
+      <code class="task-id">{{ taskId }}</code>
+      <button class="btn ghost" @click="copyTaskId">复制</button>
+    </div>
+    <div class="row">
       <span class="label">审核状态</span>
       <select v-model="status" class="status-select" @change="onStatusChange">
         <option value="draft">草稿</option>
@@ -61,6 +66,18 @@ function onStatusChange() {
   message.value = ''
 }
 
+function copyTaskId() {
+  if (!taskId.value) return
+  navigator.clipboard?.writeText(taskId.value).then(
+    () => {
+      message.value = '任务 ID 已复制'
+    },
+    () => {
+      message.value = '复制失败'
+    }
+  )
+}
+
 async function exportAs(format: 'md' | 'json' | 'html' | 'pdf') {
   if (!taskId.value) return
   message.value = ''
@@ -119,6 +136,15 @@ function statusLabel(s: string) {
   font-size: 12px;
   color: var(--color-text-secondary, #888);
   min-width: 64px;
+}
+
+.task-id {
+  font-size: 11px;
+  color: var(--color-text-tertiary, #aaa);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+  white-space: nowrap;
 }
 .status-select {
   background: var(--color-bg, #0a0a0f);
