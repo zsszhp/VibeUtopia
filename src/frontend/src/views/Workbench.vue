@@ -69,6 +69,10 @@
     <!-- 空状态 -->
     <div v-if="!reviewStore.result && !reviewStore.loading" class="empty-state">
       <p>在左侧输入文案或上传视频开始预审</p>
+      <button class="example-btn" @click="loadExample">
+        填入示例文案
+      </button>
+      <p class="empty-hint">发布前 3 分钟自查：能不能发、哪里改、怎么改</p>
     </div>
   </div>
 </template>
@@ -77,6 +81,13 @@
 import { computed } from 'vue'
 import { useReviewStore } from '../stores'
 import { scoreVerdict, RISK_THRESHOLDS } from '../utils/labels'
+
+const EXAMPLE_TEXT =
+  '好一个为人民服务，真是优秀，懂的都懂。所谓的英雄事迹都是编出来的，历史书上的内容都是胜利者写的。某地区的习俗实在太落后了，我们应该用先进的方式去改造他们。我有内部消息某只股票下周会暴涨，赶紧全仓买入！'
+
+function loadExample() {
+  reviewStore.applyDraft(EXAMPLE_TEXT)
+}
 import AnalysisDashboard from '../components/AnalysisDashboard.vue'
 import RiskGauge from '../components/RiskGauge.vue'
 import DimensionRadar from '../components/DimensionRadar.vue'
@@ -266,10 +277,28 @@ const thresholdSegments = computed(() => {
 
 .empty-state {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 12px;
   height: 300px;
   color: var(--text-tertiary);
   font-size: var(--fs-lg);
+}
+
+.example-btn {
+  background: var(--color-brand, #6366f1);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.empty-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin: 0;
 }
 </style>
