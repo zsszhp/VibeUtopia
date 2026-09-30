@@ -59,6 +59,14 @@
         </div>
         <span class="setting-hint">{{ auth.message || (auth.token ? `已登录：${auth.username}` : '配置 JWT 后可用；本地开发可跳过') }}</span>
       </div>
+      <div class="setting-item">
+        <label class="setting-label">服务状态</label>
+        <div class="auth-row">
+          <NButton size="small" :loading="health.loading" @click="checkHealth">检查后端</NButton>
+          <NButton size="small" quaternary @click="loadMetrics">查看用量</NButton>
+        </div>
+        <span class="setting-hint">{{ health.message }}</span>
+      </div>
     </div>
 
     <template #footer>
@@ -128,6 +136,36 @@ const auth = reactive({
   loading: false,
   message: '',
 })
+
+const health = reactive({ loading: false, message: '' })
+
+async function checkHealth() {
+  health.loading = true
+  health.message = ''
+  try {
+    const r = await axios.get('/health')
+    health.message = `后端正常：${r.data?.status || 'ok'} v${r.data?.version || ''}`
+  } catch (e: any) {
+    health.message = e?.response?.data?.detail || e?.message || '无法连接后端'
+  } finally {
+    health.loading = false
+  }
+}
+
+async function loadMetrics() {
+  health.loading = true
+  try {
+    const r = await axios.get('/api/v1/metrics/summary', { params: { n: 5 } })
+    const d = r.data || {}
+    health.message = d.available
+      ? `近${d.window ?? 5}次：调用 ${d.total_calls ?? '—'}，失败率 ${((d.failure_rate ?? 0) * 100).toFixed(0)}%`
+      : '暂无计量数据（需先跑分析）'
+  } catch (e: any) {
+    health.message = e?.response?.data?.detail || e?.message || '获取用量失败'
+  } finally {
+    health.loading = false
+  }
+}
 
 async function handleLogin() {
   auth.loading = true
