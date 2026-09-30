@@ -99,6 +99,7 @@
       >
         {{ submitBtnText }}
       </button>
+      <p v-if="!isBusy" class="eta-hint">预计耗时 {{ depthEta }}（Ctrl+Enter 提交）</p>
 
       <p class="submit-disclaimer">
         风险提示由自动化模型生成，仅供参考，不构成法律意见；内容仅用于本地分析；预测结果存在不确定性。
@@ -213,6 +214,16 @@ const canSubmit = computed(() => {
   if (inputMode.value === 'text') return textContent.value.trim().length >= 10
   if (inputMode.value === 'video') return videoFiles.value.length > 0
   return textContent.value.trim().length >= 10 || videoFiles.value.length > 0
+})
+
+const depthEta = computed(() => {
+  const map: Record<string, string> = {
+    quick: '约 1 分钟',
+    standard: '约 3 分钟',
+    deep: '约 10 分钟',
+    large_scale: '约 30 分钟',
+  }
+  return map[depth.value] || '约 3 分钟'
 })
 
 const submitBtnText = computed(() => {
@@ -586,6 +597,13 @@ historyStore.fetchHistory()
 
 .submit-btn.is-error {
   background: var(--risk-critical);
+}
+
+.eta-hint {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-align: center;
 }
 
 .submit-disclaimer {
