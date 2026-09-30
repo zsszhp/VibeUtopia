@@ -762,6 +762,62 @@ async def update_review_workflow(
     }
 
 
+class BatchWorkflowItem(BaseModel):
+    task_id: str
+    note: str = ""
+
+
+class BatchWorkflowRequest(BaseModel):
+    items: list[BatchWorkflowItem] = Field(..., min_length=1, max_length=50)
+    status: str = Field(..., description="draft/pending_review/approved/rejected")
+
+
+@router.patch("/review/workflow/batch")
+async def update_review_workflow_batch(
+    req: BatchWorkflowRequest,
+    db: Session = Depends(get_db),
+    identity: AuthIdentity = Depends(get_identity),
+):
+    """批量审核流转（MCN）：多任务同状态，单条失败不阻断"""
+    target = (req.status or "").strip()
+    if target not in WORKFLOW_STATUSES:
+        raise HTTPException(status_code=400, detail=f"非法状态: {target}")
+
+    results = []
+    for item in req.items:
+        try:
+            task = db.query(Task).filter(Task.id == item.task_id).first()
+            if not task:
+                results.append({"task_id": item.task_id, "status": "error", "error": "任务不存在"})
+                continue
+            _check_task_access(task, identity)
+            current = task.workflow_status or "draft"
+            if target != current and target not in WORKFLOW_TRANSITIONS.get(current, set()):
+                results.append({
+                    "task_id": item.task_id,
+                    "status": "error",
+                    "error": f"非法流转 {current}→{target}",
+                })
+                continue
+            history = _load_workflow_history(task)
+            history.append({
+                "from": current,
+                "to": target,
+                "note": (item.note or "").strip(),
+                "actor": identity.owner_id or identity.auth_type,
+                "at": datetime.now(timezone.utc).isoformat(),
+            })
+            task.workflow_status = target
+            task.workflow_history_json = json.dumps(history, ensure_ascii=False)
+            results.append({"task_id": item.task_id, "status": "ok", "previous_status": current})
+        except Exception as e:
+            results.append({"task_id": item.task_id, "status": "error", "error": str(e)[:160]})
+
+    db.commit()
+    ok = sum(1 for r in results if r.get("status") == "ok")
+    return {"total": len(req.items), "ok": ok, "failed": len(req.items) - ok, "results": results}
+
+
 def _build_export_payload(task: Task, db: Session) -> dict[str, Any]:
     """汇总导出所需数据：结论 / 分数 / Top 风险 / 改写 / 工作流留痕"""
     summary = db.query(AnalysisSummary).filter(AnalysisSummary.task_id == task.id).first()
