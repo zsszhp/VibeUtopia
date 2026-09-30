@@ -181,7 +181,10 @@
             <div class="original-text">{{ s.original }}</div>
             <div class="arrow">↓</div>
             <div class="suggested-text">{{ s.suggestion }}</div>
-            <span class="dim-tag">{{ s.dimension }}</span>
+            <div class="suggestion-actions">
+              <span class="dim-tag">{{ s.dimension }}</span>
+              <button class="mini-btn" @click="applySuggestion(s)">采用此改写</button>
+            </div>
           </div>
         </section>
 
@@ -301,6 +304,18 @@ const bloggerId = ref('')
 
 const dimensions = computed(() => reviewStore.result?.dimensions)
 const suggestions = computed(() => reviewStore.result?.suggestions)
+
+function applySuggestion(s: any) {
+  const src = s?.original
+  const dst = s?.suggestion
+  if (!src || !dst) return
+  const base = reviewStore.submittedText || (reviewStore.result as any)?.text || ''
+  if (base && base.includes(src)) {
+    reviewStore.applyDraft(base.split(src).join(dst))
+  } else {
+    reviewStore.applyDraft(dst)
+  }
+}
 const signalCorrelations = computed(() => reviewStore.result?.signal_correlations)
 const crossEffects = computed(() => reviewStore.result?.cross_effects)
 
@@ -715,13 +730,33 @@ watch(compareTaskId, async (taskId) => {
 .suggested-text { font-size: var(--fs-sm); color: var(--risk-safe); }
 
 .dim-tag {
-  display: inline-block;
-  margin-top: var(--sp-1);
-  font-size: var(--fs-2xs);
-  color: var(--text-tertiary);
-  background: var(--border-default);
-  padding: 2px 6px;
-  border-radius: 3px;
+  font-size: 10px;
+  padding: 2px 8px;
+  background: rgba(99,102,241,0.15);
+  color: #a5b4fc;
+  border-radius: 4px;
+}
+
+.suggestion-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.mini-btn {
+  background: transparent;
+  border: 1px solid var(--color-border, #2a2a3e);
+  color: var(--color-text, #e0e0e0);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.mini-btn:hover {
+  border-color: var(--color-brand, #6366f1);
+  color: var(--color-brand, #6366f1);
 }
 
 .empty-hint { font-size: var(--fs-sm); color: var(--text-tertiary); }
