@@ -123,6 +123,21 @@
               <span class="stat-label">平均分析完整度</span>
             </div>
           </div>
+          <div class="evidence-list">
+            <details v-for="(ec, i) in evidenceChains.slice(0, 8)" :key="i" class="evidence-item">
+              <summary>
+                <span class="ec-dim">{{ ec.dimension || '未知维度' }}</span>
+                <span class="ec-trigger">{{ (ec.trigger || ec.sentence || '').slice(0, 28) }}</span>
+              </summary>
+              <div class="ec-body">
+                <p v-if="ec.trigger"><b>触发：</b>{{ ec.trigger }}</p>
+                <p v-if="ec.context"><b>语境：</b>{{ ec.context }}</p>
+                <p v-if="ec.mechanism"><b>机制：</b>{{ ec.mechanism }}</p>
+                <p v-if="ec.impact"><b>影响：</b>{{ ec.impact }}</p>
+                <p v-if="ec.cross_validation?.length"><b>交叉验证：</b>{{ ec.cross_validation.length }} 条</p>
+              </div>
+            </details>
+          </div>
         </section>
 
         <!-- 传播推演可视化 -->
@@ -601,6 +616,15 @@ watch(compareTaskId, async (taskId) => {
 }
 
 .evidence-section { margin-top: var(--sp-1); }
+
+.evidence-list { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.evidence-item { background: rgba(255,255,255,0.03); border-radius: 4px; padding: 4px 8px; }
+.evidence-item summary { cursor: pointer; font-size: 11px; display: flex; gap: 8px; }
+.ec-dim { color: var(--color-brand, #6366f1); font-weight: 600; }
+.ec-trigger { color: var(--color-text-secondary, #888); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ec-body { font-size: 11px; color: var(--color-text-secondary, #aaa); padding: 6px 0 2px; line-height: 1.55; }
+.ec-body p { margin: 2px 0; }
+
 
 .evidence-summary {
   display: grid;
