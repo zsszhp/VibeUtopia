@@ -1487,3 +1487,5 @@ GET /health、GET /healthz、GET /ready、GET /api/v1/health
 
 ### 限流
 默认 60 req/min/客户端；429 时 body.detail 说明；RATE_LIMIT_BACKEND=file 可跨进程。
+
+批量响应字段：client_id, status, overall_score, risk_level, risk_level_zh, suggestion, top_dimensions
