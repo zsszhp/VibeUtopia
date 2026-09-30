@@ -84,10 +84,10 @@
       <div class="options">
         <label class="option-label">分析深度</label>
         <select v-model="depth" class="depth-select" :disabled="isBusy">
-          <option value="quick">快速 (60s)</option>
-          <option value="standard">标准 (3min)</option>
-          <option value="deep">深度 (10min)</option>
-          <option value="large_scale">大规模 (30min)</option>
+          <option value="quick">快速 (~1分钟 · 文本快筛)</option>
+          <option value="standard">标准 (~3分钟 · 含仿真)</option>
+          <option value="deep">深度 (~10分钟 · 更多Agent)</option>
+          <option value="large_scale">大规模 (~30分钟 · 机构级)</option>
         </select>
       </div>
 
