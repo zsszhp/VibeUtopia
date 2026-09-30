@@ -484,8 +484,13 @@ def test_export_markdown_and_json():
             assert isinstance(data["rewrites"], list) and data["rewrites"]
             assert data["disclaimer"]
 
-            # 非法 format
+            # PDF 导出
             r = client.get(f"/api/v1/review/{task_id}/export?format=pdf")
+            assert r.status_code == 200, r.text
+            assert r.content[:4] == b"%PDF"
+
+            # 非法 format
+            r = client.get(f"/api/v1/review/{task_id}/export?format=xyz")
             assert r.status_code == 400
 
             # 404
