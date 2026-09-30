@@ -131,7 +131,18 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 @app.get("/health", tags=["ops"])
 async def health():
     """存活探活端点：供 Docker/K8s/SLB 与一键启动脚本探测服务状态"""
-    return {"status": "ok", "service": "vibeutopia", "version": app.version}
+    try:
+        from backend.services.llm_client import registry
+
+        models = len(registry.endpoints)
+    except Exception:
+        models = 0
+    return {
+        "status": "ok",
+        "service": "vibeutopia",
+        "version": app.version,
+        "model_endpoints": models,
+    }
 
 
 @app.get("/healthz", tags=["ops"], include_in_schema=False)
