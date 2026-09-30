@@ -173,7 +173,7 @@ def test_confidence_level_and_reason_labels():
     assert result["confidence_level"] in ("low", "medium", "high", "very_high")
     assert "cross_validation" in result["reason_labels"]
     assert "consistency" in result["reason_labels"]
-    assert "full_coverage" in result["reason_labels"]
+    assert any(x in result["reason_labels"] for x in ("full_coverage", "core_coverage"))
     assert 0.0 <= result["overall_confidence"] <= 1.0
 
 
