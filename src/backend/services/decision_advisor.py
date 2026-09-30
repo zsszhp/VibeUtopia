@@ -272,7 +272,7 @@ class DecisionAdvisor:
         elif advice.advice_type == "publish_with_modification":
             parts.append(f"存在{len(advice.modification_priorities)}项需修改的内容")
             if advice.estimated_risk_reduction > 0:
-                parts.append(f"预计修改后风险可降低{advice.estimated_risk_reduction:.0f}分至{advice.estimated_final_risk:.0f}分")
+                parts.append(f"启发式预估：修改后风险可能下降约{advice.estimated_risk_reduction:.0f}分至{advice.estimated_final_risk:.0f}分（非精确预测）")
         elif advice.advice_type == "postpone":
             parts.append("存在较高风险因素，建议暂缓发布并重新评估")
         elif advice.advice_type == "do_not_publish":
@@ -296,7 +296,7 @@ class DecisionAdvisor:
             recs.append("按优先级修改高风险内容后发布")
             for p in advice.modification_priorities[:3]:
                 recs.append(f"[P{p.priority}] {p.suggested_action}")
-            recs.append(f"预计修改后风险降至{advice.estimated_final_risk:.0f}分")
+            recs.append(f"启发式预估：修改后风险约至{advice.estimated_final_risk:.0f}分（需复验确认）")
         elif advice.advice_type == "postpone":
             recs.append("暂缓发布，等待热点降温或重新评估")
             recs.append("重点关注高风险维度并考虑彻底重写")
