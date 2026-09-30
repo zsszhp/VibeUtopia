@@ -221,6 +221,7 @@
         <!-- 信号采集 -->
         <section class="tool-section">
           <SignalPanel />
+          <BatchReviewPanel />
         </section>
 
         <!-- 博主画像 -->
@@ -268,6 +269,7 @@ import CounterfactualPanel from './CounterfactualPanel.vue'
 import HistoryComparison from './HistoryComparison.vue'
 import AnalysisPipeline from './AnalysisPipeline.vue'
 import SignalPanel from './SignalPanel.vue'
+import BatchReviewPanel from './BatchReviewPanel.vue'
 import BloggerProfile from './BloggerProfile.vue'
 import KnowledgeGraph from './KnowledgeGraph.vue'
 

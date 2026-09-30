@@ -191,6 +191,10 @@ export const api = {
       password,
     }),
 
+  /** 批量快筛（MCN） */
+  batchReview: (items: Array<{ client_id?: string; text: string }>) =>
+    axios.post(`${API_BASE}/review/batch`, { items, depth: 'quick' }),
+
   /** 提交内容预审（统一入口） */
   submitReview: (req: ReviewRequest) =>
     axios.post<ReviewResponse>(`${API_BASE}/review`, req),
