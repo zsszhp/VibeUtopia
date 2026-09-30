@@ -461,3 +461,14 @@ Agent åœ¨ä»»åŠ¡æ‰§è¡Œè¿‡ç¨‹ä¸­å‘ç°çš„æ¡ç›®åº”éµå¾ªä»¥ä¸‹æ ¼å¼ï¼š
   - ECE=0.224£¨236Ñù±¾£©£¬UI¸ÄÎª·ÖÎöÍêÕû¶È
   - paperworkÔ´¸üÄÑ£¬Óëbacktest·ÖÔ´
   - pytest 145 passed
+
+### ÊÕ¿Ú£ºÖÃĞÅ¶ÈÖØ±ê¶¨/ÅúÁ¿Á÷×ª/paperwork·ÖÎö£¨2026-09-30£©
+- Date: 2026-09-30
+- Context: È«²¿Íê³É
+- Category: ´úÂë½á¹¹
+- Instructions:
+  - apply_empirical_calibration µ¥µ÷ÖØ±ê¶¨ÖÃĞÅ¶È
+  - PATCH /review/workflow/batch MCNÅúÁ¿Á÷×ª
+  - paperwork 36°¸±êÇ©Óë11Î¬´íÎ»£¬·ÖÔ´¹ÜÀí
+  - pytest 145 passed£»live backtest »ùÏß 0.96
+  - ´ı°ì£ºÀ©Õ¹Î´³ÉÄêÈË/ÒşË½Î¬¶È¡¢paperworkÖØ±ê¡¢PDFµ¼³ö
