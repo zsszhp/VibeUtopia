@@ -229,8 +229,10 @@ class ConfidenceCalculator:
         elif factors.get("platform_validation", 1) < 0.5:
             labels.append("weak_platform_validation")
 
-        if len(dimensions or []) >= 11:
+        if len(dimensions or []) >= 14:
             labels.append("full_coverage")
+        elif len(dimensions or []) >= 11:
+            labels.append("core_coverage")
         elif len(dimensions or []) < 7:
             labels.append("partial_coverage")
 
