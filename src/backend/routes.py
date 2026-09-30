@@ -175,6 +175,95 @@ def _score_to_risk_level(score: int | None) -> str:
         return "orange"
     return "red"
 
+class BatchReviewItem(BaseModel):
+    """批量预审单项（MCN 场景）"""
+    client_id: str = ""
+    text: str = Field(..., min_length=10)
+
+
+class BatchReviewRequest(BaseModel):
+    items: list[BatchReviewItem] = Field(..., min_length=1, max_length=20)
+    depth: str = "quick"
+
+
+class BatchReviewResult(BaseModel):
+    client_id: str
+    status: str
+    overall_score: int | None = None
+    risk_level: str | None = None
+    suggestion: str | None = None
+    top_dimensions: list[dict] = []
+    error: str | None = None
+
+
+class BatchReviewResponse(BaseModel):
+    total: int
+    ok: int
+    failed: int
+    results: list[BatchReviewResult]
+    disclaimer: str = EXPORT_DISCLAIMER
+
+
+@router.post("/review/batch", response_model=BatchReviewResponse)
+async def submit_review_batch(
+    req: BatchReviewRequest,
+    db: Session = Depends(get_db),
+    identity: AuthIdentity = Depends(get_identity),
+):
+    """批量快速预审（MCN/机构）：对多条文案做 11 维快筛
+
+    - 单条失败不阻断整批
+    - 返回 overall/level/top 维度，便于人工复核队列排序
+    """
+    from backend.services.risk_assessor import assess_risks
+    from backend.services.analyzer import calculate_overall_score, get_suggestion
+
+    results: list[BatchReviewResult] = []
+    ok = 0
+    for item in req.items:
+        try:
+            assessment = await assess_risks(item.text)
+            dimensions = assessment.get("dimensions") or []
+            if not dimensions:
+                raise RuntimeError("空维度")
+            overall, _w, _c = calculate_overall_score(dimensions, context_text=item.text)
+            score = int(overall)
+            if score >= 76:
+                level = "red"
+            elif score >= 61:
+                level = "orange"
+            elif score >= 31:
+                level = "yellow"
+            else:
+                level = "green"
+            top = sorted(dimensions, key=lambda d: int(d.get("score") or 0), reverse=True)[:3]
+            results.append(BatchReviewResult(
+                client_id=item.client_id,
+                status="ok",
+                overall_score=score,
+                risk_level=level,
+                suggestion=get_suggestion(score),
+                top_dimensions=[
+                    {"name": d.get("name"), "score": d.get("score"), "severity": d.get("severity")}
+                    for d in top
+                ],
+            ))
+            ok += 1
+        except Exception as e:
+            results.append(BatchReviewResult(
+                client_id=item.client_id,
+                status="error",
+                error=str(e)[:200],
+            ))
+
+    return BatchReviewResponse(
+        total=len(req.items),
+        ok=ok,
+        failed=len(req.items) - ok,
+        results=results,
+    )
+
+
 @router.post("/review", response_model=ReviewResponse)
 async def submit_review(
     req: ReviewRequest,
