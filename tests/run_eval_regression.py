@@ -13,6 +13,7 @@
   PYTHONPATH=src python tests/run_eval_regression.py --save-baseline # 记录基线
   PYTHONPATH=src python tests/run_eval_regression.py --baseline data/eval/baseline.json
 
+mock 结果不与 live 基线直接比较（仅验链路）。
 门禁: 提供 --baseline 且 valid_accuracy 跌幅超过 --max-drop（默认 5 个百分点）时退出码 2。
 
 输出: data/eval/eval_<时间戳>.json/.md 以及 data/eval/latest.json/.md
