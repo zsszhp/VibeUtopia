@@ -4,6 +4,7 @@
     <div
       v-if="reviewStore.result"
       class="verdict-banner"
+      aria-label="风险结论"
       :class="`verdict-${verdict.level}`"
     >
       <div class="verdict-left">
