@@ -144,7 +144,7 @@ async function checkHealth() {
   health.message = ''
   try {
     const r = await axios.get('/health')
-    health.message = `后端正常：${r.data?.status || 'ok'} v${r.data?.version || ''}`
+    health.message = `后端正常：${r.data?.status || 'ok'} v${r.data?.version || ''}` + (r.data?.model_endpoints != null ? ` · 模型端点 ${r.data.model_endpoints}` : '')
   } catch (e: any) {
     health.message = e?.response?.data?.detail || e?.message || '无法连接后端'
   } finally {
