@@ -189,3 +189,5 @@ data/eval/live_run.log
 data/eval/live_run.err
 
 data/eval/calibration_report.md
+
+data/rate_limit.sqlite3
