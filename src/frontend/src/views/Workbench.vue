@@ -85,7 +85,7 @@
       <button class="example-btn" @click="loadExample">
         填入示例文案
       </button>
-      <p class="empty-hint">发布前 3 分钟自查：能不能发、哪里改、怎么改</p>
+      <p class="empty-hint">发布前 3 分钟自查：能不能发、哪里改、怎么改 · 14 维风险</p>
     </div>
   </div>
 </template>
