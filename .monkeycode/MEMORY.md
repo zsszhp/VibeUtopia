@@ -514,3 +514,12 @@ Agent åœ¨ä»»åŠ¡æ‰§è¡Œè¿‡ç¨‹ä¸­å‘ç°çš„æ¡ç›®åº”éµå¾ªä»¥ä¸‹æ ¼å¼ï¼š
   - ÅúÁ¿ÖĞÎÄµÈ¼¶¡¢ÀúÊ·É¸Ñ¡¡¢ETA¡¢¿ì½İ¼ü
   - °æ±¾0.6.0£¬pytest 152 passed
   - Ë«Ô¶¶ËÒÑÍ¬²½
+
+### 14Î¬SchemaĞŞ¸´£¨2026-09-30£©
+- Date: 2026-09-30
+- Context: promptÊä³ö²¹È«
+- Category: ´úÂë½á¹¹
+- Instructions:
+  - prompt JSON Schema ²¹À©Õ¹ÈıÎ¬¶È£¬LLMÎÈ¶¨·µ»Ø14Î¬
+  - confidence ¸²¸Ç±êÇ© core/full
+  - live 3/3 ÃüÖĞ£¬pytest 152 passed
