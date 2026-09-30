@@ -158,7 +158,7 @@ async function loadMetrics() {
     const r = await axios.get('/api/v1/metrics/summary', { params: { n: 5 } })
     const d = r.data || {}
     health.message = d.available
-      ? `近${d.window ?? 5}次：调用 ${d.total_calls ?? '—'}，失败率 ${((d.failure_rate ?? 0) * 100).toFixed(0)}%`
+      ? `近${d.window ?? 5}次：调用 ${d.calls ?? d.total_calls ?? '—'}，失败率 ${((d.failure_rate ?? 0) * 100).toFixed(0)}%，p50 ${Math.round(d.latency_ms?.p50 ?? 0)}ms`
       : '暂无计量数据（需先跑分析）'
   } catch (e: any) {
     health.message = e?.response?.data?.detail || e?.message || '获取用量失败'
