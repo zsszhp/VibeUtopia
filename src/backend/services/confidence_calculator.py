@@ -39,6 +39,29 @@ def confidence_level(score: float) -> str:
     return "low"
 
 
+def apply_empirical_calibration(raw: float) -> float:
+    """按 236 样本 ECE 观测做单调重标定（非概率保证，改善分档区分度）
+
+    观测（docs/06_实施记录/19）：
+    - [0.50,0.70) 拥挤且整体低估（conf~0.61 vs hit~0.83）→ 上抬
+    - [0.70,0.85) 样本少且可能反向 → 轻微下压
+    """
+    try:
+        s = float(raw)
+    except (TypeError, ValueError):
+        return 0.0
+    s = max(0.0, min(1.0, s))
+    if s < 0.50:
+        return round(s, 2)
+    if s < 0.70:
+        # 0.50-0.70 → 0.58-0.88（贴近命中率）
+        return round(0.58 + (s - 0.50) * (0.88 - 0.58) / 0.20, 2)
+    if s < 0.85:
+        # 0.70-0.85 → 0.88-0.93（单调衔接）
+        return round(0.88 + (s - 0.70) * (0.93 - 0.88) / 0.15, 2)
+    return round(min(0.98, 0.93 + (s - 0.85) * 0.3), 2)
+
+
 class ConfidenceCalculator:
     """计算风险评估的置信度
     
@@ -118,7 +141,9 @@ class ConfidenceCalculator:
             + evidence_score * weights["evidence"]
             + platform_validation_score * weights["platform_validation"]
         )
-        
+        raw_confidence = overall_confidence
+        overall_confidence = apply_empirical_calibration(overall_confidence)
+
         self.confidence_factors = {
             "data_quality": data_quality_score,
             "consistency": consistency_score,
@@ -134,6 +159,7 @@ class ConfidenceCalculator:
 
         result = {
             "overall_confidence": round(overall_confidence, 2),
+            "raw_confidence": round(raw_confidence, 2),
             "confidence_level": confidence_level(overall_confidence),
             "reason_labels": reason_labels,
             "factors": self.confidence_factors,
