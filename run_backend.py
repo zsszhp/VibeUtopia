@@ -15,6 +15,22 @@ os.environ.setdefault("PYTHONPATH", str(SRC))
 
 
 def main() -> None:
+    # MySQL 不可达时自动降级 SQLite，避免本地启动即崩
+    if os.getenv("DATABASE_URL", "").startswith("mysql"):
+        try:
+            import socket
+            from urllib.parse import urlparse
+
+            url = os.environ["DATABASE_URL"]
+            host = urlparse(url).hostname or "localhost"
+            port = urlparse(url).port or 3306
+            with socket.create_connection((host, port), timeout=1.5):
+                pass
+        except Exception:
+            os.environ["DATABASE_URL"] = "sqlite:///./data/vibeutopia.db"
+            os.environ["MYSQL_HOST"] = ""
+            print("[run_backend] MySQL 不可达，已降级为 SQLite: data/vibeutopia.db")
+
     import uvicorn
 
     uvicorn.run(
