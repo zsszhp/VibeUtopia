@@ -53,6 +53,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="VibeUtopia",
     version="0.6.0",
+    openapi_tags=[
+        {"name": "review", "description": "内容预审与批量快筛"},
+        {"name": "auth", "description": "账号与 JWT"},
+        {"name": "ops", "description": "健康检查与就绪探针"},
+        {"name": "blogger-knowledge", "description": "博主画像与知识"},
+    ],
     lifespan=lifespan,
     description=(
         "内容预审风控平台 API。\n\n"
