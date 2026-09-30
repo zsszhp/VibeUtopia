@@ -13,6 +13,7 @@
     </button>
     <p v-if="message" class="msg">{{ message }}</p>
     <div v-if="results.length" class="results">
+      <button class="btn ghost" @click="copyCsv">复制结果 CSV</button>
       <div
         v-for="(r, i) in results"
         :key="i"
@@ -76,6 +77,28 @@ async function runBatch() {
   } finally {
     loading.value = false
   }
+}
+
+function copyCsv() {
+  const rows = [['行号', '等级', '分数', '建议', '文案摘要']]
+  for (const r of results.value) {
+    rows.push([
+      r.client_id,
+      levelLabel(r.risk_level),
+      String(r.overall_score ?? ''),
+      r.suggestion || r.error || '',
+      r.text_preview,
+    ])
+  }
+  const csv = rows.map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+  navigator.clipboard?.writeText(csv).then(
+    () => {
+      message.value = '已复制 CSV'
+    },
+    () => {
+      message.value = '复制失败，请手动选择'
+    }
+  )
 }
 </script>
 
