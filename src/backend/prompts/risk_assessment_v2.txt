@@ -92,7 +92,7 @@
 - 如无风险，evidence填'未检测到相关风险'
 - 转写错误需标注'疑似转写错误，不作为风险依据'
 - affected_groups必须列出具体受影响群体，无则填空列表
-- 必须对所有11个维度进行评分，不得遗漏
+- 必须对所有14个维度进行评分，不得遗漏（含未成年人保护/隐私侵犯/知识产权）
 
 请严格按照以下JSON格式输出（不要输出其他内容）：
 {
@@ -261,7 +261,10 @@
         "mechanism": "",
         "impact": ""
       }
-    }
+    },
+    {"name": "未成年人保护", "score": 0, "severity": "green", "evidence": "未检测到相关风险", "affected_groups": [], "dimension_weight": 1.4, "confidence": 0.9, "evidence_chain": {"trigger": "", "context": "", "mechanism": "", "impact": ""}},
+    {"name": "隐私侵犯", "score": 0, "severity": "green", "evidence": "未检测到相关风险", "affected_groups": [], "dimension_weight": 1.3, "confidence": 0.9, "evidence_chain": {"trigger": "", "context": "", "mechanism": "", "impact": ""}},
+    {"name": "知识产权", "score": 0, "severity": "green", "evidence": "未检测到相关风险", "affected_groups": [], "dimension_weight": 1.2, "confidence": 0.9, "evidence_chain": {"trigger": "", "context": "", "mechanism": "", "impact": ""}}
   ],
   "risk_sentences": [
     {
