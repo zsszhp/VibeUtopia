@@ -86,6 +86,60 @@ def apply_polarization_floor(dimensions: list[dict], text: str) -> list[dict]:
     return dimensions
 
 
+# 扩展维度关键词兜底（未成年人/隐私/知产）
+EXTENDED_RISK_KEYWORDS = {
+    "未成年人保护": (
+        "未成年", "儿童", "小学生", "孩子直播", "娃直播", "诱导孩子",
+        "毒教材", "幼女", "恋童", "学生坠亡", "校园霸凌",
+    ),
+    "隐私侵犯": (
+        "人肉", "开盒", "住址", "身份证号", "手机号泄露", "偷拍",
+        "侵入式监控", "跟踪", "曝光隐私", "私密照片",
+    ),
+    "知识产权": (
+        "抄袭", "洗稿", "盗用", "搬运", "假冒", "山寨", "未授权",
+        "洗稿", "照搬", "侵权",
+    ),
+}
+
+
+def apply_extended_dim_floor(dimensions: list[dict], text: str) -> list[dict]:
+    """扩展维度关键词兜底：命中即至少 orange(55)，双命中≥70 red"""
+    text = text or ""
+    existing = {d.get("name") for d in dimensions or []}
+    for dim_name, keys in EXTENDED_RISK_KEYWORDS.items():
+        hits = sum(1 for k in keys if k in text)
+        if hits <= 0:
+            continue
+        score_floor = 70 if hits >= 2 else 55
+        found = False
+        for d in dimensions or []:
+            if d.get("name") == dim_name:
+                found = True
+                try:
+                    score = int(d.get("score", 0) or 0)
+                except (TypeError, ValueError):
+                    score = 0
+                if score < score_floor:
+                    d["score"] = score_floor
+                    d["severity"] = "red" if score_floor >= 70 else "orange"
+                    ev = d.get("evidence") or ""
+                    note = f"【扩展维度兜底】检测到{dim_name}相关表述"
+                    if note not in ev:
+                        d["evidence"] = (ev + note).strip()
+                break
+        if not found and dim_name not in existing:
+            dimensions = dimensions or []
+            dimensions.append({
+                "name": dim_name,
+                "score": score_floor,
+                "severity": "red" if score_floor >= 70 else "orange",
+                "evidence": f"【扩展维度兜底】检测到{dim_name}相关表述",
+                "affected_groups": [],
+            })
+    return dimensions
+
+
 def detect_finance_pitch(text: str) -> bool:
     """荐股/投资话术识别（BT009 类：无硬红线时橙档封顶）"""
     text = text or ""

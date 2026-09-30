@@ -82,6 +82,7 @@ async def _broadcast_complete(task_id: str, risk_level: str, overall_risk: int, 
 MAX_TEXT_LENGTH = 5000
 
 # 维度默认权重（高风险维度权重更高）
+# 核心 11 维 + 扩展 3 维（未成年人保护/隐私侵犯/知识产权），兼容旧 11 维输出
 DIMENSION_WEIGHTS = {
     "政治敏感": 1.5,
     "法律合规": 1.5,
@@ -94,7 +95,13 @@ DIMENSION_WEIGHTS = {
     "道德伦理": 1.0,
     "群体冒犯": 1.0,
     "时事踩雷": 1.0,
+    "未成年人保护": 1.4,
+    "隐私侵犯": 1.3,
+    "知识产权": 1.2,
 }
+
+# 扩展高敏维度（严重时按红线倍率计入）
+EXTENDED_HIGH_DIMS = {"未成年人保护", "隐私侵犯", "知识产权"}
 
 
 def calculate_overall_score(dimensions: list[dict], context_text: str | None = None) -> tuple[int, dict, list[dict]]:
@@ -137,8 +144,8 @@ def calculate_overall_score(dimensions: list[dict], context_text: str | None = N
         weight = d.get("dimension_weight", DIMENSION_WEIGHTS.get(name, 1.0))
         dimension_weights[name] = weight
 
-        # 红线维度分数放大1.5倍
-        if name in REDLINE_DIMS:
+        # 红线/扩展高敏维度分数放大1.5倍
+        if name in REDLINE_DIMS or name in EXTENDED_HIGH_DIMS:
             adjusted_score = min(100, int(score * 1.5))
             redline_max = max(redline_max, adjusted_score)
         else:
@@ -200,6 +207,13 @@ def calculate_overall_score(dimensions: list[dict], context_text: str | None = N
 
     # 历史虚无/煽动动员：总体至少 76
     if any(d.get("nihilism_hit") or d.get("polarization_hit") for d in dimensions or []):
+        overall = max(overall, REDLINE_SCORE_FLOOR)
+
+    # 扩展高敏（未成年/隐私/知产）任一 red → 总体至少 76
+    if any(
+        d.get("name") in EXTENDED_HIGH_DIMS and is_high_severity(d.get("severity"), d.get("score", 0))
+        for d in dimensions or []
+    ):
         overall = max(overall, REDLINE_SCORE_FLOOR)
 
     # 荐股/投资话术：无硬红线时橙档封顶 70（BT009 类）

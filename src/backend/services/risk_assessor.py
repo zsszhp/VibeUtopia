@@ -9,6 +9,7 @@ from backend.services.irony_detector import (
     apply_ethnic_floor,
     apply_nihilism_floor,
     apply_polarization_floor,
+    apply_extended_dim_floor,
 )
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,7 @@ async def assess_risks(text: str, transcript_quality: dict | None = None, prompt
     result["dimensions"] = apply_ethnic_floor(result["dimensions"], text)
     result["dimensions"] = apply_nihilism_floor(result["dimensions"], text)
     result["dimensions"] = apply_polarization_floor(result["dimensions"], text)
+    result["dimensions"] = apply_extended_dim_floor(result["dimensions"], text)
 
     # 为每个risk_sentence补充默认字段
     for rs in result.get("risk_sentences", []):
