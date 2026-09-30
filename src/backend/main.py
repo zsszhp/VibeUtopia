@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="VibeUtopia",
-    version="0.5.0",
+    version="0.6.0",
     lifespan=lifespan,
     description=(
         "内容预审风控平台 API。\n\n"
