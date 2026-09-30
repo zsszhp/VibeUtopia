@@ -81,9 +81,22 @@ def load_backtest_cases() -> list[dict]:
 
 
 def load_paperwork_cases() -> list[dict]:
-    """从案例库索引解析期望等级，再读取对应文案。"""
+    """从案例库索引解析期望等级，再读取对应文案。
+
+    若存在 paperwork_expected.json（14 维对齐重标），优先使用其中映射。
+    """
     label_map: dict[str, str] = {}
-    if CASES_INDEX.exists():
+    expected_json = CASES_DIR / "paperwork_expected.json"
+    if expected_json.exists():
+        try:
+            data = json.loads(expected_json.read_text(encoding="utf-8"))
+            for row in data.get("mapping") or []:
+                if row.get("file") and row.get("expected_level"):
+                    label_map[row["file"]] = row["expected_level"]
+        except Exception:
+            label_map = {}
+
+    if not label_map and CASES_INDEX.exists():
         pattern = re.compile(r"`([^`]+\.md)`[^\n（]*（(高|中|低)）")
         for match in pattern.finditer(CASES_INDEX.read_text(encoding="utf-8")):
             label_map[match.group(1)] = INDEX_LEVEL_MAP.get(match.group(2), "green")

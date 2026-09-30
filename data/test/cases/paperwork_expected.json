@@ -1,0 +1,150 @@
+{
+  "note": "paperwork期望重标（对齐14维可判定范围，学术诚信/消费欺诈等不强制red）",
+  "mapping": [
+    {
+      "file": "网红小英卖惨塌房.md",
+      "index_label": "高",
+      "expected_level": "red"
+    },
+    {
+      "file": "张雨绮代孕风波.md",
+      "index_label": "高",
+      "expected_level": "red"
+    },
+    {
+      "file": "哈佛蒋雨融演讲争议.md",
+      "index_label": "高",
+      "expected_level": "red"
+    },
+    {
+      "file": "王妈背刺打工人.md",
+      "index_label": "中",
+      "expected_level": "orange"
+    },
+    {
+      "file": "闫学晶直播翻车.md",
+      "index_label": "中",
+      "expected_level": "orange"
+    },
+    {
+      "file": "优思益假洋牌事件.md",
+      "index_label": "中",
+      "expected_level": "orange"
+    },
+    {
+      "file": "AI 一键脱衣黑产.md",
+      "index_label": "高",
+      "expected_level": "red"
+    },
+    {
+      "file": "全红婵饭圈侵入式监控.md",
+      "index_label": "高",
+      "expected_level": "red"
+    },
+    {
+      "file": "同济大学教师论文造假.md",
+      "index_label": "中",
+      "expected_level": "orange"
+    },
+    {
+      "file": "地域歧视言论翻车.md",
+      "index_label": "高",
+      "expected_level": "red"
+    },
+    {
+      "file": "宗教 cos 亵渎争议.md",
+      "index_label": "高",
+      "expected_level": "red"
+    },
+    {
+      "file": "历史虚无主义被点名.md",
+      "index_label": "高",
+      "expected_level": "red"
+    },
+    {
+      "file": "医疗谣言伪科学养生.md",
+      "index_label": "高",
+      "expected_level": "red"
+    },
+    {
+      "file": "金融诈骗荐股割韭菜.md",
+      "index_label": "高",
+      "expected_level": "red"
+    },
+    {
+      "file": "软色情 ASMR 封禁.md",
+      "index_label": "高",
+      "expected_level": "red"
+    },
+    {
+      "file": "虐猫视频争议.md",
+      "index_label": "中",
+      "expected_level": "orange"
+    },
+    {
+      "file": "手工酸奶造假.md",
+      "index_label": "中",
+      "expected_level": "orange"
+    },
+    {
+      "file": "破坏原始森林.md",
+      "index_label": "中",
+      "expected_level": "orange"
+    },
+    {
+      "file": "文案抄袭被实锤.md",
+      "index_label": "中",
+      "expected_level": "orange"
+    },
+    {
+      "file": "带娃直播过度曝光.md",
+      "index_label": "高",
+      "expected_level": "red"
+    },
+    {
+      "file": "自残 ASMR 封禁.md",
+      "index_label": "高",
+      "expected_level": "red"
+    },
+    {
+      "file": "炫富拜金被点名.md",
+      "index_label": "中",
+      "expected_level": "orange"
+    },
+    {
+      "file": "毒教材插图事件.md",
+      "index_label": "高",
+      "expected_level": "red"
+    },
+    {
+      "file": "铁头日本核污水事件.md",
+      "index_label": "高",
+      "expected_level": "red"
+    },
+    {
+      "file": "东方甄选小作文风波.md",
+      "index_label": "中",
+      "expected_level": "orange"
+    },
+    {
+      "file": "钟薛高火烧不化.md",
+      "index_label": "中",
+      "expected_level": "orange"
+    },
+    {
+      "file": "花西子眉笔事件.md",
+      "index_label": "高",
+      "expected_level": "red"
+    },
+    {
+      "file": "瑞幸咖啡造假.md",
+      "index_label": "高",
+      "expected_level": "red"
+    },
+    {
+      "file": "成都 49 中坠亡事件.md",
+      "index_label": "高",
+      "expected_level": "red"
+    }
+  ]
+}
