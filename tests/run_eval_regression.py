@@ -128,6 +128,10 @@ async def predict_live(text: str, sample_runs: int = 1) -> dict:
     if not dimensions:
         raise RuntimeError("assess_risks 返回空维度（视为 API/解析失败）")
     overall, _weights, _cross = calculate_overall_score(dimensions, context_text=text)
+    level = _score_to_level(int(overall))
+    # 多次采样时以多数 level 为准，降低 LLM 波动
+    if sampling and sampling.get("majority_level") and sampling.get("runs", 0) >= 2:
+        level = sampling["majority_level"]
     conf = ConfidenceCalculator().calculate(
         dimensions=dimensions,
         risk_sentences=result.get("risk_sentences") or [],
@@ -135,7 +139,7 @@ async def predict_live(text: str, sample_runs: int = 1) -> dict:
     )
     return {
         "score": int(overall),
-        "level": _score_to_level(int(overall)),
+        "level": level,
         "dimensions": dimensions,
         "confidence": conf["overall_confidence"],
         "confidence_level": conf.get("confidence_level"),
@@ -251,7 +255,7 @@ async def run_eval(mode: str, limit: int | None, source: str, sample_runs: int =
             if use_mock:
                 pred = predict_mock(case["text"])
             else:
-                pred = await predict_live(case["text"])
+                pred = await predict_live(case["text"], sample_runs=sample_runs)
             rec.update({
                 "status": "ok",
                 "predicted_level": pred["level"],
@@ -375,13 +379,14 @@ def main() -> int:
     parser.add_argument("--save-baseline", action="store_true", help="把本次结果写入 baseline.json")
     parser.add_argument("--baseline", default=str(OUT_DIR / "baseline.json"), help="门禁对比基线路径")
     parser.add_argument("--max-drop", type=float, default=5.0, help="允许的 valid_accuracy 跌幅（百分点）")
+    parser.add_argument("--sample-runs", type=int, default=1, help="live 模式下每案评估次数，≥2 取多数等级（更稳、更慢）")
     args = parser.parse_args()
 
     limit = args.limit
     if limit is None and args.mode == "mock":
         limit = 6  # 离线 demo 子集
 
-    report = asyncio.run(run_eval(args.mode, limit, args.source))
+    report = asyncio.run(run_eval(args.mode, limit, args.source, sample_runs=max(1, args.sample_runs)))
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
