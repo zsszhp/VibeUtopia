@@ -242,7 +242,7 @@ export const api = {
     ),
 
   /** 导出报告 */
-  exportReview: (taskId: string, format: 'md' | 'json' | 'html' = 'md') =>
+  exportReview: (taskId: string, format: 'md' | 'json' | 'html' | 'pdf' = 'md') =>
     axios.get(`${API_BASE}/review/${taskId}/export`, {
       params: { format },
       responseType: 'blob',

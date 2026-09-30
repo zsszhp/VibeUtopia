@@ -1008,6 +1008,44 @@ def _render_export_markdown(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _render_export_pdf(payload: dict[str, Any]) -> bytes:
+    """PDF 报告（fpdf2 + 系统中文字体；无字体时回退拉丁摘要）"""
+    from fpdf import FPDF
+
+    markdown = _render_export_markdown(payload)
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    font_candidates = (
+        r"C:\Windows\Fonts\simhei.ttf",
+        r"C:\Windows\Fonts\msyh.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/System/Library/Fonts/PingFang.ttc",
+    )
+    font_ok = False
+    for path in font_candidates:
+        if os.path.exists(path):
+            try:
+                pdf.add_font("cjk", "", path)
+                pdf.set_font("cjk", size=11)
+                font_ok = True
+                break
+            except Exception:
+                continue
+    if not font_ok:
+        pdf.set_font("Helvetica", size=11)
+
+    for line in markdown.splitlines():
+        text = line if font_ok else line.encode("ascii", "replace").decode("ascii")
+        if not text.strip():
+            pdf.ln(4)
+            continue
+        pdf.multi_cell(w=0, h=6, text=text, new_x="LMARGIN", new_y="NEXT")
+
+    return bytes(pdf.output())
+
+
 def _render_export_html(payload: dict[str, Any]) -> str:
     """可打印 HTML 报告（浏览器打开后可另存为 PDF）"""
     md = _render_export_markdown(payload)
@@ -1066,10 +1104,11 @@ async def export_review(
     - format=md：Markdown 报告（Verdict + 分数 + Top 风险 + 改写 + 免责）
     - format=json：结构化报告数据（含同一免责声明）
     - format=html：可打印 HTML（浏览器可另存 PDF）
+    - format=pdf：PDF 文件（fpdf2 + 系统中文字体）
     """
     fmt = (format or "md").strip().lower()
-    if fmt not in ("md", "json", "html"):
-        raise HTTPException(status_code=400, detail="format 仅支持 md、json 或 html")
+    if fmt not in ("md", "json", "html", "pdf"):
+        raise HTTPException(status_code=400, detail="format 仅支持 md、json、html 或 pdf")
 
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
@@ -1079,6 +1118,19 @@ async def export_review(
     payload = _build_export_payload(task, db)
     if fmt == "json":
         return payload
+
+    if fmt == "pdf":
+        try:
+            pdf_bytes = _render_export_pdf(payload)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"PDF 生成失败: {e}")
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="review_{task_id}.pdf"',
+            },
+        )
 
     if fmt == "html":
         html = _render_export_html(payload)

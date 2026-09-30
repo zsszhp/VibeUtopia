@@ -42,3 +42,6 @@ pytest-asyncio>=0.21.0
 # faster-whisper>=0.10.0  # 需要 PyTorch 环境
 
 # 开发/测试增强见 requirements-dev.txt（pytest-cov 等，不装不影响运行）
+
+# PDF ��������ѡ��
+fpdf2>=2.7.0

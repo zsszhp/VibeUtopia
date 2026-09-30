@@ -13,6 +13,7 @@
     <div class="row">
       <span class="label">导出报告</span>
       <button class="btn" @click="exportAs('md')">导出 Markdown</button>
+      <button class="btn ghost" @click="exportAs('pdf')">导出 PDF</button>
       <button class="btn ghost" @click="exportAs('html')">导出 HTML</button>
       <button class="btn ghost" @click="exportAs('json')">导出 JSON</button>
     </div>
@@ -60,7 +61,7 @@ function onStatusChange() {
   message.value = ''
 }
 
-async function exportAs(format: 'md' | 'json' | 'html') {
+async function exportAs(format: 'md' | 'json' | 'html' | 'pdf') {
   if (!taskId.value) return
   message.value = ''
   try {
@@ -70,7 +71,9 @@ async function exportAs(format: 'md' | 'json' | 'html') {
         ? 'text/markdown;charset=utf-8'
         : format === 'html'
           ? 'text/html;charset=utf-8'
-          : 'application/json'
+          : format === 'pdf'
+            ? 'application/pdf'
+            : 'application/json'
     const blob = new Blob([resp.data as BlobPart], { type: mime })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
