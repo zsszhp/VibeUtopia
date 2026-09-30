@@ -230,13 +230,15 @@ def calculate_overall_score(dimensions: list[dict], context_text: str | None = N
 
 
 def get_suggestion(score: int) -> str:
-    """根据总分给出发布建议"""
-    if score <= 25:
+    """根据总分给出发布建议（阈值与 UI 30/60/80 对齐）"""
+    if score < 30:
         return "可发"
-    elif score <= 55:
-        return "建议修改"
+    elif score < 60:
+        return "可发但建议留意"
+    elif score < 80:
+        return "建议修改后发布"
     else:
-        return "不建议发"
+        return "不建议发布"
 
 
 def _compute_sentiment_ratios(pr: dict) -> tuple[float, float, float]:
