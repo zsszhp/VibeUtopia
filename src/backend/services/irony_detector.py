@@ -54,6 +54,38 @@ def apply_nihilism_floor(dimensions: list[dict], text: str) -> list[dict]:
     return dimensions
 
 
+# 煽动对立/阶级动员话术（硬抬情绪极化）
+POLARIZATION_CALL = (
+    "忍无可忍", "总有一天", "没救了", "压榨", "联合起来",
+    "抵制", "反抗", "推翻", "血债", "算总账", "走着瞧",
+)
+
+
+def apply_polarization_floor(dimensions: list[dict], text: str) -> list[dict]:
+    """煽动动员话术 → 情绪极化≥76 red（BT013 类）"""
+    text = text or ""
+    hits = sum(1 for k in POLARIZATION_CALL if k in text)
+    if hits < 2:
+        return dimensions
+    for d in dimensions or []:
+        if d.get("name") == "情绪极化":
+            try:
+                score = int(d.get("score", 0) or 0)
+            except (TypeError, ValueError):
+                score = 0
+            if score < 76:
+                d["score"] = 76
+                d["severity"] = "red"
+                d["polarization_hit"] = True
+                ev = d.get("evidence") or ""
+                note = "【煽动兜底】检测到阶级对立/忍无可忍动员话术"
+                if note not in ev:
+                    d["evidence"] = (ev + note).strip()
+            else:
+                d["polarization_hit"] = True
+    return dimensions
+
+
 def detect_finance_pitch(text: str) -> bool:
     """荐股/投资话术识别（BT009 类：无硬红线时橙档封顶）"""
     text = text or ""
