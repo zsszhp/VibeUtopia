@@ -67,6 +67,13 @@
         <div v-if="result.strategy?.rewrite_note" class="rewrite-note">
           改写说明：{{ result.strategy.rewrite_note }}
         </div>
+        <button
+          v-if="result.modified_text"
+          class="apply-btn"
+          @click="applyRewrite"
+        >
+          采用改写到输入框（可再预审）
+        </button>
       </div>
 
       <!-- 风险面方向性预估（不承诺必降） -->
@@ -111,16 +118,24 @@
 import { ref, computed } from 'vue'
 import { NButton, NAlert } from 'naive-ui'
 import { v3Api } from '../api'
+import { useReviewStore } from '../stores'
 
 const props = defineProps<{
   text?: string
   riskItems?: any[]
 }>()
 
+const reviewStore = useReviewStore()
 const selectedStrategy = ref('soften')
 const simulating = ref(false)
 const result = ref<any>(null)
 const errorMsg = ref('')
+
+function applyRewrite() {
+  const text = result.value?.modified_text
+  if (!text) return
+  reviewStore.applyDraft(text)
+}
 
 const strategies = [
   { value: 'delete', label: '删除', desc: '直接删除高风险句子' },
@@ -231,6 +246,26 @@ async function runSimulation() {
 .range-hint {
   color: #888;
   font-size: 10px;
+}
+
+.rewrite-note {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary, #aaa);
+}
+
+.apply-btn {
+  margin-top: 8px;
+  background: var(--color-success, #22c55e);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.apply-btn:hover {
+  filter: brightness(1.05);
 }
 
 .rewrite-note {
