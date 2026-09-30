@@ -41,6 +41,7 @@ const message = ref('')
 const results = ref<Array<{
   client_id: string
   risk_level?: string | null
+  risk_level_zh?: string | null
   overall_score?: number | null
   suggestion?: string | null
   error?: string | null
