@@ -66,15 +66,88 @@ _limiter_lock = threading.Lock()
 
 
 def get_limiter() -> SlidingWindowRateLimiter:
-    """取共享限流器；首次创建时读取 settings.RATE_LIMIT_PER_MIN"""
+    """取共享限流器；RATE_LIMIT_BACKEND=file 时用 SQLite 跨进程计数"""
     global _limiter
     with _limiter_lock:
         if _limiter is None:
-            _limiter = SlidingWindowRateLimiter(
-                max_requests=int(settings.RATE_LIMIT_PER_MIN),
-                window_seconds=60.0,
-            )
+            backend = (getattr(settings, "RATE_LIMIT_BACKEND", "") or "memory").strip().lower()
+            if backend == "file":
+                _limiter = FileSharedRateLimiter(
+                    max_requests=int(settings.RATE_LIMIT_PER_MIN),
+                    window_seconds=60.0,
+                    db_path=getattr(settings, "RATE_LIMIT_DB", "") or "data/rate_limit.sqlite3",
+                )
+            else:
+                _limiter = SlidingWindowRateLimiter(
+                    max_requests=int(settings.RATE_LIMIT_PER_MIN),
+                    window_seconds=60.0,
+                )
         return _limiter
+
+
+class FileSharedRateLimiter(SlidingWindowRateLimiter):
+    """基于 SQLite 的跨进程限流（多 worker 部署可选用）
+
+    通过 settings.RATE_LIMIT_BACKEND=file 启用；默认仍是内存实现。
+    锁粒度粗、吞吐低于内存版，适合低 QPS 控制面。
+    """
+
+    def __init__(self, max_requests: int, window_seconds: float = 60.0, db_path: str = ""):
+        super().__init__(max_requests, window_seconds)
+        self.db_path = db_path or "data/rate_limit.sqlite3"
+
+    def check(self, key: str) -> tuple[bool, int]:
+        try:
+            import sqlite3
+            from pathlib import Path
+
+            Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
+            conn = sqlite3.connect(self.db_path, timeout=5)
+            try:
+                conn.execute(
+                    "CREATE TABLE IF NOT EXISTS hits (k TEXT, ts REAL, PRIMARY KEY(k, ts))"
+                )
+                now = time.time()
+                cutoff = now - self.window_seconds
+                conn.execute("DELETE FROM hits WHERE ts <= ?", (cutoff,))
+                cur = conn.execute("SELECT COUNT(*) FROM hits WHERE k=?", (key,))
+                n = cur.fetchone()[0]
+                if n >= self.max_requests:
+                    conn.commit()
+                    return False, 0
+                conn.execute("INSERT OR IGNORE INTO hits(k, ts) VALUES (?, ?)", (key, now))
+                conn.commit()
+                return True, self.max_requests - n - 1
+            finally:
+                conn.close()
+        except Exception:
+            # 共享存储失败时退回内存限流，保证可用性
+            return super().check(key)
+
+    def remaining(self, key: str) -> int:
+        try:
+            import sqlite3
+
+            conn = sqlite3.connect(self.db_path, timeout=5)
+            try:
+                cur = conn.execute("SELECT COUNT(*) FROM hits WHERE k=?", (key,))
+                n = cur.fetchone()[0]
+                return max(self.max_requests - n, 0)
+            finally:
+                conn.close()
+        except Exception:
+            return super().remaining(key)
+
+    def reset(self) -> None:
+        try:
+            import sqlite3
+
+            conn = sqlite3.connect(self.db_path, timeout=5)
+            conn.execute("DELETE FROM hits")
+            conn.commit()
+            conn.close()
+        except Exception:
+            super().reset()
 
 
 def set_limiter(limiter: SlidingWindowRateLimiter | None) -> None:
