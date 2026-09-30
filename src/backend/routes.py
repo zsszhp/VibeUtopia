@@ -191,6 +191,7 @@ class BatchReviewResult(BaseModel):
     status: str
     overall_score: int | None = None
     risk_level: str | None = None
+    risk_level_zh: str | None = None
     suggestion: str | None = None
     top_dimensions: list[dict] = []
     error: str | None = None
@@ -242,6 +243,7 @@ async def submit_review_batch(
                 status="ok",
                 overall_score=score,
                 risk_level=level,
+                risk_level_zh=_level_zh(level),
                 suggestion=get_suggestion(score),
                 top_dimensions=[
                     {"name": d.get("name"), "score": d.get("score"), "severity": d.get("severity")}

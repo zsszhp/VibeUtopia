@@ -20,7 +20,7 @@
         class="row"
         :class="`lvl-${r.risk_level || 'error'}`"
       >
-        <span class="lvl">{{ levelLabel(r.risk_level) }}</span>
+        <span class="lvl">{{ r.risk_level_zh || levelLabel(r.risk_level) }}</span>
         <span class="score">{{ r.overall_score ?? '—' }}</span>
         <span class="text">{{ r.text_preview }}</span>
         <span class="sug">{{ r.suggestion || r.error || '' }}</span>
