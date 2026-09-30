@@ -202,7 +202,7 @@
             <div class="decision-advice-label">{{ decisionAdviceLabel }}</div>
             <div class="decision-advice-reasoning">{{ decisionAdviceReasoning }}</div>
             <div v-if="decisionModCount > 0" class="decision-mod-count">
-              需修改 {{ decisionModCount }} 项，预计风险降低 {{ decisionRiskReduction }} 分
+              需修改 {{ decisionModCount }} 项，风险可能下降约 {{ decisionRiskReduction }} 分（启发式预估）
             </div>
           </div>
         </section>
