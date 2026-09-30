@@ -97,7 +97,15 @@ import WorkflowExportBar from '../components/WorkflowExportBar.vue'
 const reviewStore = useReviewStore()
 
 const score = computed(() => reviewStore.result?.overall_risk ?? 0)
-const verdict = computed(() => scoreVerdict(score.value))
+const verdict = computed(() => {
+  const dims = reviewStore.result?.dimensions || []
+  const top = [...dims]
+    .sort((a: any, b: any) => (b.score || 0) - (a.score || 0))
+    .filter((d: any) => (d.score || 0) >= 30)
+    .map((d: any) => d.name as string)
+    .slice(0, 2)
+  return scoreVerdict(score.value, top)
+})
 const scoreDisplay = computed(() => Math.round(score.value))
 
 const confidenceText = computed(() => {

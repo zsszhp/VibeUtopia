@@ -42,17 +42,18 @@ export interface Verdict {
   advice: string
 }
 
-export function scoreVerdict(score: number): Verdict {
+export function scoreVerdict(score: number, topDims?: string[]): Verdict {
+  const focus = topDims?.length ? `优先处理：${topDims.slice(0, 2).join('、')}。` : ''
   if (score >= RISK_THRESHOLDS.critical) {
-    return { label: '不建议发布', level: 'red', advice: '存在严重风险，发布后大概率引发负面舆情，建议重做或仅限内部流转。' }
+    return { label: '不建议发布', level: 'red', advice: `${focus}存在严重风险，发布后大概率引发负面舆情，建议重做或仅限内部流转。` }
   }
   if (score >= RISK_THRESHOLDS.high) {
-    return { label: '建议暂缓发布', level: 'orange', advice: '风险较高，建议先处理高危问题并复验后再发布。' }
+    return { label: '建议暂缓发布', level: 'orange', advice: `${focus}风险较高，建议先处理高危问题并复验后再发布。` }
   }
   if (score >= RISK_THRESHOLDS.warn) {
-    return { label: '建议修改后发布', level: 'yellow', advice: '存在可改进风险点，按修改建议调整后可发布。' }
+    return { label: '建议修改后发布', level: 'yellow', advice: `${focus}存在可改进风险点，按修改建议调整后可发布。` }
   }
-  return { label: '可发布', level: 'green', advice: '整体风险可控，可按计划发布并持续关注反馈。' }
+  return { label: '可发布', level: 'green', advice: `${focus}整体风险可控，可按计划发布并持续关注反馈。` }
 }
 
 /** 分数 → 语义色 class 后缀（green/yellow/orange/red） */
