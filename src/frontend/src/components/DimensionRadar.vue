@@ -25,17 +25,26 @@ async function render() {
   }
   chart.setOption({
     radar: {
-      indicator: props.dimensions.map(d => ({ name: d.name, max: 100 })),
+      indicator: props.dimensions.map(d => ({
+        name: d.name.length > 5 ? d.name.slice(0, 5) + '…' : d.name,
+        max: 100,
+        color: (d.score || 0) >= 60 ? '#f97316' : undefined,
+      })),
       shape: 'polygon',
-      splitArea: { areaStyle: { color: ['rgba(99,102,241,0.05)', 'rgba(99,102,241,0.1)'] } },
+      radius: '62%',
+      splitNumber: 4,
+      axisName: { color: '#aaa', fontSize: 10 },
+      splitLine: { lineStyle: { color: 'rgba(99,102,241,0.15)' } },
+      splitArea: { areaStyle: { color: ['rgba(99,102,241,0.04)', 'rgba(99,102,241,0.08)'] } },
     },
+    tooltip: { trigger: 'item' },
     series: [{
       type: 'radar',
       data: [{
         value: props.dimensions.map(d => d.score),
         name: '风险评分',
         areaStyle: { color: 'rgba(99,102,241,0.2)' },
-        lineStyle: { color: '#6366f1' },
+        lineStyle: { color: '#6366f1', width: 2 },
         itemStyle: { color: '#6366f1' },
       }],
     }],
