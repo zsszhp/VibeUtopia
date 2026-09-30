@@ -214,13 +214,19 @@ function loadForm() {
 }
 
 function handleSave() {
+  const prev = loadSettings()
+  const nextApi = form.apiBase.trim()
   saveSettings({
-    apiBase: form.apiBase.trim(),
+    apiBase: nextApi,
     defaultDepth: form.defaultDepth,
   })
-  // 深度/API 变更即时生效；主题与模型项不可用，不参与保存
+  // 仅 API 地址变更才整页刷新；默认深度下次新建时生效
   emit('update:show', false)
-  window.location.reload()
+  if (prev.apiBase !== nextApi) {
+    window.location.reload()
+  } else {
+    auth.message = '设置已保存'
+  }
 }
 
 function handleReset() {
