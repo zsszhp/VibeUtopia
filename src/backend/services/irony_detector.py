@@ -115,7 +115,11 @@ def detect_irony_risk(text: str) -> dict:
 
 
 def apply_irony_floor(dimensions: list[dict], text: str) -> list[dict]:
-    """对时事踩雷/群体冒犯/价值观/政治敏感 等维度做反讽兜底抬分"""
+    """对非红线敏感维度做反讽/寓言兜底抬分（橙档封顶 70）
+
+    注意：不作用于硬红线维度（政治敏感/民族宗教/平台禁区），
+    且分数上限 70，避免「兜底 55 → 硬红线触及 50 → 强制 76」串联过冲。
+    """
     signal = detect_irony_risk(text)
     meta = detect_metaphor_risk(text)
     floor = max(signal["suggested_min_score"], meta["suggested_min_score"])
@@ -123,7 +127,10 @@ def apply_irony_floor(dimensions: list[dict], text: str) -> list[dict]:
     if floor <= 0:
         return dimensions
 
-    target_dims = {"时事踩雷", "群体冒犯", "价值观倾向", "政治敏感", "情绪极化"}
+    # 橙档封顶：兜底只保证「至少 orange」，不自动进 red
+    floor = min(floor, 70)
+    # 硬红线维度由 severity/规则单独处理，避免串联强制 76
+    target_dims = {"时事踩雷", "群体冒犯", "价值观倾向", "情绪极化"}
     for d in dimensions or []:
         name = d.get("name")
         if name in target_dims:
@@ -133,7 +140,8 @@ def apply_irony_floor(dimensions: list[dict], text: str) -> list[dict]:
                 continue
             if score < floor:
                 d["score"] = floor
-                if d.get("severity") in (None, "green", "low"):
+                d["irony_lifted"] = True
+                if d.get("severity") in (None, "green", "low", "yellow"):
                     d["severity"] = "orange"
                 note = "；".join(notes)
                 ev = d.get("evidence") or ""

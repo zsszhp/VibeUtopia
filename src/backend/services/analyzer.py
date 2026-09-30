@@ -186,6 +186,12 @@ def calculate_overall_score(dimensions: list[dict]) -> tuple[int, dict, list[dic
     if redline_triggers_floor(dimensions):
         overall = max(overall, REDLINE_SCORE_FLOOR)
 
+    # 反讽/寓言兜底：至少 orange 起评（55），封顶 70，避免强制进 red
+    if any(d.get("irony_lifted") for d in dimensions or []):
+        overall = max(overall, 55)
+        if not redline_triggers_floor(dimensions):
+            overall = min(overall, 70)
+
     return overall, dimension_weights, cross_effects
 
 
