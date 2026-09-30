@@ -3,9 +3,9 @@
     <NTabs v-model:value="activeTab" type="line" size="small" class="right-tabs">
       <!-- ===== 风险详情 ===== -->
       <NTabPane name="detail" tab="风险详情">
-        <!-- 置信度与不确定性 -->
+        <!-- 分析完整度与不确定性 -->
         <section v-if="reviewStore.result?.confidence !== undefined" class="confidence-section">
-          <h3 class="section-title">评估置信度</h3>
+          <h3 class="section-title">评估分析完整度</h3>
           <div class="confidence-row">
             <div class="conf-bar-lg">
               <div class="conf-fill-lg" :style="{ width: ((reviewStore.result.confidence ?? 0) * 100) + '%' }"></div>
@@ -16,14 +16,14 @@
             </NTag>
           </div>
 
-          <!-- 置信度原因标签 -->
+          <!-- 分析完整度原因标签 -->
           <div v-if="reviewStore.result?.confidence_breakdown?.reason_labels?.length" class="reason-labels">
             <NTag v-for="lab in reviewStore.result.confidence_breakdown.reason_labels" :key="lab" size="tiny" round class="reason-tag">
               {{ reasonLabelName(lab) }}
             </NTag>
           </div>
 
-          <!-- 置信度详细分解 -->
+          <!-- 分析完整度详细分解 -->
           <div v-if="reviewStore.result.confidence_breakdown" class="confidence-breakdown">
             <div class="breakdown-item">
               <span class="breakdown-label">数据质量</span>
@@ -85,7 +85,7 @@
               <div v-if="expanded === dim.name" class="risk-body">
                 <p class="evidence">{{ dim.evidence }}</p>
                 <div class="confidence">
-                  <span>置信度:</span>
+                  <span>分析完整度:</span>
                   <div class="conf-bar">
                     <div class="conf-fill" :style="{ width: ((dim.confidence ?? 0) * 100) + '%' }"></div>
                   </div>
@@ -120,7 +120,7 @@
             </div>
             <div class="evidence-stat">
               <span class="stat-value tabular-nums">{{ avgConfidence.toFixed(0) }}%</span>
-              <span class="stat-label">平均置信度</span>
+              <span class="stat-label">平均分析完整度</span>
             </div>
           </div>
         </section>

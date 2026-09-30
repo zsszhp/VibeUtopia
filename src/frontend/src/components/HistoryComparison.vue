@@ -42,14 +42,14 @@
           </div>
         </div>
 
-        <!-- 置信度对比 -->
+        <!-- 分析完整度对比 -->
         <div class="compare-section">
           <div class="compare-row">
             <div class="compare-cell current">
               <span class="compare-value">{{ currentResult?.confidence !== undefined ? (currentResult.confidence * 100).toFixed(0) + '%' : '-' }}</span>
             </div>
             <div class="compare-divider">
-              <span class="compare-label">置信度</span>
+              <span class="compare-label">分析完整度</span>
             </div>
             <div class="compare-cell history">
               <span class="compare-value">{{ historyResult?.confidence !== undefined ? (historyResult.confidence * 100).toFixed(0) + '%' : '-' }}</span>

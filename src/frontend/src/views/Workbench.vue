@@ -11,7 +11,7 @@
         <div class="verdict-sub">
           <span v-if="highRiskCount > 0">{{ highRiskCount }} 项需处理</span>
           <span v-else>无高风险项</span>
-          <span v-if="confidenceText" class="verdict-conf">置信度 {{ confidenceText }}</span>
+          <span v-if="confidenceText" class="verdict-conf">分析完整度 {{ confidenceText }}</span>
         </div>
         <p class="verdict-advice">{{ verdict.advice }}</p>
       </div>
