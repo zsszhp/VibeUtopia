@@ -211,14 +211,16 @@ async def submit_review_batch(
     db: Session = Depends(get_db),
     identity: AuthIdentity = Depends(get_identity),
 ):
-    """批量快速预审（MCN/机构）：对多条文案做 11 维快筛
+    """批量快速预审（MCN/机构）：对多条文案做 14 维快筛
 
     - 单条失败不阻断整批
-    - 返回 overall/level/top 维度，便于人工复核队列排序
+    - depth=quick 仅评估；standard/deep 附带证据摘要
+    - 等级阈值与 UI 一致：30/60/80
     """
     from backend.services.risk_assessor import assess_risks
     from backend.services.analyzer import calculate_overall_score, get_suggestion
 
+    with_evidence = (req.depth or "quick") in ("standard", "deep", "large_scale")
     results: list[BatchReviewResult] = []
     ok = 0
     for item in req.items:
@@ -229,11 +231,11 @@ async def submit_review_batch(
                 raise RuntimeError("空维度")
             overall, _w, _c = calculate_overall_score(dimensions, context_text=item.text)
             score = int(overall)
-            if score >= 76:
+            if score >= 80:
                 level = "red"
-            elif score >= 61:
+            elif score >= 60:
                 level = "orange"
-            elif score >= 31:
+            elif score >= 30:
                 level = "yellow"
             else:
                 level = "green"
@@ -246,7 +248,12 @@ async def submit_review_batch(
                 risk_level_zh=_level_zh(level),
                 suggestion=get_suggestion(score),
                 top_dimensions=[
-                    {"name": d.get("name"), "score": d.get("score"), "severity": d.get("severity")}
+                    {
+                        "name": d.get("name"),
+                        "score": d.get("score"),
+                        "severity": d.get("severity"),
+                        **({"evidence": (d.get("evidence") or "")[:120]} if with_evidence else {}),
+                    }
                     for d in top
                 ],
             ))
